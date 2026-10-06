@@ -288,8 +288,6 @@ public class BillingService {
         List<Patient> directMatches;
         if (cleanQuery.isEmpty()) {
             directMatches = patientRepository.findByTenantId(tenant.getId());
-        } else if (cleanQuery.length() < 2) {
-            return Collections.emptyList();
         } else {
             directMatches = patientRepository.searchPatients(tenant.getId(), cleanQuery);
         }
@@ -351,6 +349,55 @@ public class BillingService {
         List<PatientBillingSearchResultDto> list = new ArrayList<>(resultMap.values());
         for (PatientBillingSearchResultDto dto : list) {
             enrichPatientMetadata(tenant.getId(), dto);
+        }
+
+        // Prioritize results starting with the entered text (STARTS WITH matching)
+        if (!cleanQuery.isEmpty()) {
+            final String qLower = cleanQuery.toLowerCase();
+            list.sort((a, b) -> {
+                String nameA = a.getFullName() != null ? a.getFullName().toLowerCase() : "";
+                String nameB = b.getFullName() != null ? b.getFullName().toLowerCase() : "";
+
+                boolean aNameStarts = nameA.startsWith(qLower);
+                boolean bNameStarts = nameB.startsWith(qLower);
+                if (aNameStarts && !bNameStarts) return -1;
+                if (!aNameStarts && bNameStarts) return 1;
+
+                boolean aWordStarts = nameA.contains(" " + qLower);
+                boolean bWordStarts = nameB.contains(" " + qLower);
+                if (aWordStarts && !bWordStarts) return -1;
+                if (!aWordStarts && bWordStarts) return 1;
+
+                String uhidA = a.getUhid() != null ? a.getUhid().toLowerCase() : "";
+                String uhidB = b.getUhid() != null ? b.getUhid().toLowerCase() : "";
+                boolean aUhidStarts = uhidA.startsWith(qLower);
+                boolean bUhidStarts = uhidB.startsWith(qLower);
+                if (aUhidStarts && !bUhidStarts) return -1;
+                if (!aUhidStarts && bUhidStarts) return 1;
+
+                String phoneA = a.getPhone() != null ? a.getPhone() : "";
+                String phoneB = b.getPhone() != null ? b.getPhone() : "";
+                boolean aPhoneStarts = phoneA.startsWith(cleanQuery);
+                boolean bPhoneStarts = phoneB.startsWith(cleanQuery);
+                if (aPhoneStarts && !bPhoneStarts) return -1;
+                if (!aPhoneStarts && bPhoneStarts) return 1;
+
+                String opA = a.getLatestOpId() != null ? a.getLatestOpId().toLowerCase() : "";
+                String opB = b.getLatestOpId() != null ? b.getLatestOpId().toLowerCase() : "";
+                boolean aOpStarts = opA.startsWith(qLower);
+                boolean bOpStarts = opB.startsWith(qLower);
+                if (aOpStarts && !bOpStarts) return -1;
+                if (!aOpStarts && bOpStarts) return 1;
+
+                String ipA = a.getLatestIpId() != null ? a.getLatestIpId().toLowerCase() : "";
+                String ipB = b.getLatestIpId() != null ? b.getLatestIpId().toLowerCase() : "";
+                boolean aIpStarts = ipA.startsWith(qLower);
+                boolean bIpStarts = ipB.startsWith(qLower);
+                if (aIpStarts && !bIpStarts) return -1;
+                if (!aIpStarts && bIpStarts) return 1;
+
+                return nameA.compareTo(nameB);
+            });
         }
 
         return list;

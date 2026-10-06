@@ -9257,25 +9257,35 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  // Common Patient Search Bar Helper for Category Billing
+  // Common Patient Search Bar Helper for Category Billing & Central Billing
   function setupPatientSearchWidget(inputId, dropdownId, onSelectCallback) {
     const searchInput = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
     if (!searchInput || !dropdown) return;
 
     let debounceTimer = null;
+    let lastQuery = '';
+    let currentReqId = 0;
+
     searchInput.addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
       const query = e.target.value.trim();
-      if (!query || query.length < 2) {
+      if (!query || query.length < 1) {
+        lastQuery = '';
         dropdown.style.display = 'none';
         dropdown.innerHTML = '';
         return;
       }
+      if (query === lastQuery) return;
+      lastQuery = query;
+
       debounceTimer = setTimeout(async () => {
+        const reqId = ++currentReqId;
         try {
           const res = await Api.get(`/api/billing/patients/search?q=${encodeURIComponent(query)}`);
-          if (res && res.success && res.data.length > 0) {
+          if (reqId !== currentReqId) return;
+
+          if (res && res.success && res.data && res.data.length > 0) {
             const sorted = sortByStartsWith(res.data, query);
             dropdown.innerHTML = sorted.map(p => `
               <div class="cv-patient-dropdown-item" data-id="${p.id}" style="padding:0.6rem 0.85rem; border-bottom:1px solid #f1f5f9; cursor:pointer;">
@@ -9301,19 +9311,28 @@ function renderPharmacyModule(activeTab = 'billing') {
                   onSelectCallback(pat);
                 }
                 dropdown.style.display = 'none';
+                dropdown.innerHTML = '';
                 searchInput.value = '';
+                lastQuery = '';
               });
             });
           } else {
-            dropdown.innerHTML = '<div style="padding:0.75rem; text-align:center; color:var(--cv-text-muted); font-size:0.8rem;">No matching patients found in MySQL.</div>';
+            dropdown.innerHTML = '<div style="padding:0.75rem; text-align:center; color:var(--cv-text-muted); font-size:0.82rem;">No matching patients found.</div>';
             dropdown.style.display = 'block';
           }
         } catch (err) {
+          if (reqId !== currentReqId) return;
           console.error('Error querying patients for billing', err);
           dropdown.innerHTML = '<div style="padding:0.75rem; text-align:center; color:var(--cv-danger); font-size:0.8rem;">Unable to search patients. Please try again.</div>';
           dropdown.style.display = 'block';
         }
-      }, 200);
+      }, 150);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
     });
 
     document.addEventListener('click', (e) => {
