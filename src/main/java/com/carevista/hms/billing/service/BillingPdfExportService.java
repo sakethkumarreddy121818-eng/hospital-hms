@@ -1,0 +1,613 @@
+package com.carevista.hms.billing.service;
+
+import com.carevista.hms.billing.dto.BillingHistoryItemDto;
+import com.carevista.hms.billing.dto.BillingHistoryReportDto;
+import com.carevista.hms.billing.entity.CentralBill;
+import com.carevista.hms.billing.entity.CentralBillItem;
+import com.lowagie.text.*;
+import com.lowagie.text.Font;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.*;
+import org.springframework.stereotype.Service;
+
+import java.awt.*;
+import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+@Service
+public class BillingPdfExportService {
+
+    private static final Color PRIMARY_NAVY = new Color(30, 58, 138);       // #1e3a8a
+    private static final Color SECONDARY_BLUE = new Color(2, 132, 199);     // #0284c7
+    private static final Color HEADER_BG = new Color(241, 245, 249);        // #f1f5f9
+    private static final Color ROW_ALT_BG = new Color(248, 250, 252);       // #f8fafc
+    private static final Color BORDER_COLOR = new Color(203, 213, 225);     // #cbd5e1
+    private static final Color TEXT_MUTED = new Color(100, 116, 139);       // #64748b
+    private static final Color BADGE_GREEN = new Color(22, 101, 52);        // #166534
+    private static final Color BADGE_GREEN_BG = new Color(220, 252, 231);   // #dcfce7
+    private static final Color BADGE_AMBER = new Color(146, 64, 14);        // #92400e
+    private static final Color BADGE_AMBER_BG = new Color(254, 243, 199);   // #fef3c7
+
+    private static final DecimalFormat CURRENCY_FMT = new DecimalFormat("#,##0.00");
+    private static final DateTimeFormatter DATE_TIME_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter PRINT_DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
+    public byte[] generateBillingHistoryPdf(BillingHistoryReportDto report) {
+        Document document = new Document(PageSize.A4.rotate(), 20, 20, 30, 28);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter writer = PdfWriter.getInstance(document, baos);
+            String printDate = LocalDateTime.now().format(PRINT_DATE_FMT);
+            writer.setPageEvent(new HeaderFooterEvent(report.getHospitalFilter(), printDate));
+
+            document.open();
+
+            // 1. Report Title & Hospital Header
+            addReportHeader(document, report, printDate);
+
+            // 2. Financial Summary Cards / Table
+            addSummarySection(document, report);
+
+            // 3. Billing Ledger Table
+            addBillingTable(document, report);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (DocumentException e) {
+            throw new RuntimeException("Error generating patient billing PDF report: " + e.getMessage(), e);
+        }
+    }
+
+    private void addReportHeader(Document document, BillingHistoryReportDto report, String printDate) throws DocumentException {
+        Font titleFont = new Font(Font.HELVETICA, 16, Font.BOLD, PRIMARY_NAVY);
+        Font subtitleFont = new Font(Font.HELVETICA, 11, Font.BOLD, SECONDARY_BLUE);
+        Font labelFont = new Font(Font.HELVETICA, 8, Font.BOLD, PRIMARY_NAVY);
+        Font valueFont = new Font(Font.HELVETICA, 8, Font.NORMAL, Color.DARK_GRAY);
+
+        // Header Banner Table
+        PdfPTable headerTable = new PdfPTable(2);
+        headerTable.setWidthPercentage(100);
+        headerTable.setWidths(new float[]{65f, 35f});
+        headerTable.setSpacingAfter(8f);
+
+        // Left Cell: Hospital SaaS Title
+        PdfPCell leftCell = new PdfPCell();
+        leftCell.setBorder(Rectangle.NO_BORDER);
+        leftCell.addElement(new Paragraph("CAREVISTA HOSPITAL MANAGEMENT SAAS", titleFont));
+        leftCell.addElement(new Paragraph("PATIENT BILLING HISTORY & AUDIT REPORT", subtitleFont));
+
+        Paragraph hospitalP = new Paragraph();
+        hospitalP.add(new Chunk("Hospital / Tenant: ", labelFont));
+        hospitalP.add(new Chunk(report.getHospitalFilter() != null ? report.getHospitalFilter() : "All Hospitals (Multi-Tenant)", 
+                new Font(Font.HELVETICA, 10, Font.BOLD, PRIMARY_NAVY)));
+        leftCell.addElement(hospitalP);
+
+        // Right Cell: Metadata Box
+        PdfPCell rightCell = new PdfPCell();
+        rightCell.setBackgroundColor(HEADER_BG);
+        rightCell.setBorderColor(BORDER_COLOR);
+        rightCell.setBorderWidth(0.8f);
+        rightCell.setPadding(6f);
+
+        PdfPTable metaTable = new PdfPTable(2);
+        metaTable.setWidthPercentage(100);
+        metaTable.setWidths(new float[]{40f, 60f});
+
+        addMetaRow(metaTable, "Billing Period:", report.getPeriodName() + " (" + report.getStartDate() + " to " + report.getEndDate() + ")", labelFont, valueFont);
+        addMetaRow(metaTable, "Generated On:", printDate, labelFont, valueFont);
+        addMetaRow(metaTable, "Generated By:", "Super Admin (carevista.com)", labelFont, valueFont);
+        addMetaRow(metaTable, "Data Source:", "Verified MySQL Production", labelFont, valueFont);
+
+        rightCell.addElement(metaTable);
+
+        headerTable.addCell(leftCell);
+        headerTable.addCell(rightCell);
+        document.add(headerTable);
+    }
+
+    private void addMetaRow(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
+        PdfPCell c1 = new PdfPCell(new Phrase(label, labelFont));
+        c1.setBorder(Rectangle.NO_BORDER);
+        c1.setPadding(1.5f);
+        table.addCell(c1);
+
+        PdfPCell c2 = new PdfPCell(new Phrase(value, valueFont));
+        c2.setBorder(Rectangle.NO_BORDER);
+        c2.setPadding(1.5f);
+        table.addCell(c2);
+    }
+
+    private void addSummarySection(Document document, BillingHistoryReportDto report) throws DocumentException {
+        Font headerFont = new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE);
+        Font valueFont = new Font(Font.HELVETICA, 9, Font.BOLD, Color.BLACK);
+        Font subFont = new Font(Font.HELVETICA, 7, Font.NORMAL, TEXT_MUTED);
+
+        PdfPTable summaryTable = new PdfPTable(7);
+        summaryTable.setWidthPercentage(100);
+        summaryTable.setWidths(new float[]{12f, 15f, 14f, 14f, 15f, 15f, 15f});
+        summaryTable.setSpacingAfter(10f);
+
+        String[] headers = {"TOTAL BILLS", "GROSS SUBTOTAL", "TOTAL DISCOUNT", "TOTAL GST", "TOTAL BILLED", "AMOUNT PAID", "OUTSTANDING"};
+        for (String h : headers) {
+            PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
+            cell.setBackgroundColor(PRIMARY_NAVY);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cell.setPadding(4f);
+            summaryTable.addCell(cell);
+        }
+
+        // Values Row
+        addSummaryValueCell(summaryTable, String.valueOf(report.getTotalRecords()), "Verified Records", valueFont, subFont, Color.BLACK);
+        addSummaryValueCell(summaryTable, formatCurrency(report.getGrossSubtotal()), "Before Deductions", valueFont, subFont, Color.BLACK);
+        addSummaryValueCell(summaryTable, formatCurrency(report.getTotalDiscount()), "Authorized Concessions", valueFont, subFont, new Color(180, 83, 9));
+        addSummaryValueCell(summaryTable, formatCurrency(report.getTotalGst()), "Applicable Taxes", valueFont, subFont, Color.BLACK);
+        addSummaryValueCell(summaryTable, formatCurrency(report.getTotalBilled()), "Net Receivable", valueFont, subFont, PRIMARY_NAVY);
+        addSummaryValueCell(summaryTable, formatCurrency(report.getTotalPaid()), "Collected to Date", valueFont, subFont, BADGE_GREEN);
+
+        Color outColor = report.getTotalOutstanding().compareTo(BigDecimal.ZERO) > 0 ? new Color(185, 28, 28) : BADGE_GREEN;
+        addSummaryValueCell(summaryTable, formatCurrency(report.getTotalOutstanding()), 
+                report.getTotalOutstanding().compareTo(BigDecimal.ZERO) > 0 ? "Pending Collection" : "Zero Balance", 
+                valueFont, subFont, outColor);
+
+        document.add(summaryTable);
+    }
+
+    private void addSummaryValueCell(PdfPTable table, String val, String subtitle, Font valFont, Font subFont, Color color) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBackgroundColor(HEADER_BG);
+        cell.setBorderColor(BORDER_COLOR);
+        cell.setBorderWidth(0.6f);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(5f);
+
+        Font customValFont = new Font(valFont.getFamily(), valFont.getSize(), valFont.getStyle(), color);
+        Paragraph p1 = new Paragraph(val, customValFont);
+        p1.setAlignment(Element.ALIGN_CENTER);
+        cell.addElement(p1);
+
+        Paragraph p2 = new Paragraph(subtitle, subFont);
+        p2.setAlignment(Element.ALIGN_CENTER);
+        cell.addElement(p2);
+
+        table.addCell(cell);
+    }
+
+    private void addBillingTable(Document document, BillingHistoryReportDto report) throws DocumentException {
+        Font headerFont = new Font(Font.HELVETICA, 7.5f, Font.BOLD, Color.WHITE);
+        Font cellFont = new Font(Font.HELVETICA, 7f, Font.NORMAL, Color.BLACK);
+        Font boldCellFont = new Font(Font.HELVETICA, 7f, Font.BOLD, Color.BLACK);
+        Font mutedFont = new Font(Font.HELVETICA, 6.5f, Font.NORMAL, TEXT_MUTED);
+
+        // 11 Columns Table
+        PdfPTable table = new PdfPTable(11);
+        table.setWidthPercentage(100);
+        table.setHeaderRows(1);
+        table.setWidths(new float[]{
+                3.5f,  // #
+                10f,   // Bill Number & Type
+                11f,   // Hospital
+                13f,   // Patient Name & UHID
+                7.5f,  // OP/IP ID
+                8f,    // Bill Date & Time
+                13f,   // Doctor & Dept
+                15f,   // Services / Items (Qty)
+                6.5f,  // Total Billed
+                6.5f,  // Amount Paid
+                6f     // Status & Mode
+        });
+
+        String[] cols = {
+                "#", "Bill No & Type", "Hospital", "Patient / UHID", "OP / IP ID",
+                "Date & Time", "Doctor & Dept", "Services / Items", "Total", "Paid", "Status"
+        };
+
+        for (String col : cols) {
+            PdfPCell cell = new PdfPCell(new Phrase(col, headerFont));
+            cell.setBackgroundColor(PRIMARY_NAVY);
+            cell.setBorderColor(BORDER_COLOR);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            cell.setPadding(4f);
+            table.addCell(cell);
+        }
+
+        if (report.getItems().isEmpty()) {
+            PdfPCell emptyCell = new PdfPCell(new Phrase("No billing records found for the selected hospital and date range filter.", cellFont));
+            emptyCell.setColspan(11);
+            emptyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            emptyCell.setPadding(12f);
+            table.addCell(emptyCell);
+            document.add(table);
+            return;
+        }
+
+        int index = 1;
+        for (BillingHistoryItemDto item : report.getItems()) {
+            Color rowBg = (index % 2 == 0) ? ROW_ALT_BG : Color.WHITE;
+
+            // 1. S.No
+            table.addCell(createCell(String.valueOf(index), cellFont, Element.ALIGN_CENTER, rowBg));
+
+            // 2. Bill Number & Type
+            PdfPCell billCell = new PdfPCell();
+            billCell.setBackgroundColor(rowBg);
+            billCell.setBorderColor(BORDER_COLOR);
+            billCell.setPadding(3f);
+            billCell.addElement(new Paragraph(item.getBillNumber(), boldCellFont));
+            billCell.addElement(new Paragraph(item.getBillingType() != null ? item.getBillingType() : "General", mutedFont));
+            table.addCell(billCell);
+
+            // 3. Hospital
+            table.addCell(createCell(item.getHospitalName() != null ? item.getHospitalName() : "CareVista Hospital", cellFont, Element.ALIGN_LEFT, rowBg));
+
+            // 4. Patient & UHID
+            PdfPCell patientCell = new PdfPCell();
+            patientCell.setBackgroundColor(rowBg);
+            patientCell.setBorderColor(BORDER_COLOR);
+            patientCell.setPadding(3f);
+            patientCell.addElement(new Paragraph(item.getPatientName() != null ? item.getPatientName() : "Patient", boldCellFont));
+            patientCell.addElement(new Paragraph("UHID: " + (item.getUhid() != null ? item.getUhid() : "N/A"), mutedFont));
+            table.addCell(patientCell);
+
+            // 5. OP / IP ID
+            String opIp = "N/A";
+            if (item.getOpId() != null && !item.getOpId().equals("N/A") && !item.getOpId().isEmpty()) {
+                opIp = item.getOpId();
+            } else if (item.getIpId() != null && !item.getIpId().equals("N/A") && !item.getIpId().isEmpty()) {
+                opIp = item.getIpId();
+            }
+            table.addCell(createCell(opIp, cellFont, Element.ALIGN_CENTER, rowBg));
+
+            // 6. Date & Time
+            String dt = (item.getBillDate() != null ? item.getBillDate().toString() : "") + 
+                    (item.getBillTime() != null ? "\n" + item.getBillTime() : "");
+            table.addCell(createCell(dt, cellFont, Element.ALIGN_CENTER, rowBg));
+
+            // 7. Doctor & Department
+            PdfPCell docCell = new PdfPCell();
+            docCell.setBackgroundColor(rowBg);
+            docCell.setBorderColor(BORDER_COLOR);
+            docCell.setPadding(3f);
+            docCell.addElement(new Paragraph(item.getDoctorName() != null ? item.getDoctorName() : "Attending Physician", cellFont));
+            docCell.addElement(new Paragraph(item.getDepartment() != null ? item.getDepartment() : "General", mutedFont));
+            table.addCell(docCell);
+
+            // 8. Services / Items (Qty)
+            String svc = (item.getServicesOrItems() != null ? item.getServicesOrItems() : "General Healthcare Consultation") + 
+                    (item.getQuantity() != null && item.getQuantity() > 1 ? " (x" + item.getQuantity() + ")" : "");
+            table.addCell(createCell(svc, cellFont, Element.ALIGN_LEFT, rowBg));
+
+            // 9. Total Amount
+            table.addCell(createCell(formatCurrency(item.getTotalAmount()), boldCellFont, Element.ALIGN_RIGHT, rowBg));
+
+            // 10. Paid Amount
+            table.addCell(createCell(formatCurrency(item.getPaidAmount()), cellFont, Element.ALIGN_RIGHT, rowBg));
+
+            // 11. Payment Status & Method
+            PdfPCell statusCell = new PdfPCell();
+            statusCell.setBackgroundColor(rowBg);
+            statusCell.setBorderColor(BORDER_COLOR);
+            statusCell.setPadding(3f);
+            boolean isPaid = "PAID".equalsIgnoreCase(item.getPaymentStatus());
+            Font statusFont = new Font(Font.HELVETICA, 6.5f, Font.BOLD, isPaid ? BADGE_GREEN : BADGE_AMBER);
+            statusCell.addElement(new Paragraph(item.getPaymentStatus() != null ? item.getPaymentStatus() : "PAID", statusFont));
+            statusCell.addElement(new Paragraph(item.getPaymentMethod() != null ? item.getPaymentMethod() : "CASH", mutedFont));
+            table.addCell(statusCell);
+
+            index++;
+        }
+
+        document.add(table);
+    }
+
+    private PdfPCell createCell(String text, Font font, int align, Color bg) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setHorizontalAlignment(align);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setBackgroundColor(bg);
+        cell.setBorderColor(BORDER_COLOR);
+        cell.setBorderWidth(0.5f);
+        cell.setPadding(3f);
+        return cell;
+    }
+
+    private String formatCurrency(BigDecimal amount) {
+        if (amount == null) return "Rs. 0.00";
+        return "Rs. " + CURRENCY_FMT.format(amount);
+    }
+
+    public byte[] generateCentralInvoicePdf(CentralBill bill) {
+        Document document = new Document(PageSize.A4, 25, 25, 25, 25);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try {
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            Font titleFont = new Font(Font.HELVETICA, 15, Font.BOLD, PRIMARY_NAVY);
+            Font subtitleFont = new Font(Font.HELVETICA, 8.5f, Font.NORMAL, TEXT_MUTED);
+            Font invoiceTitleFont = new Font(Font.HELVETICA, 13, Font.BOLD, PRIMARY_NAVY);
+            Font labelFont = new Font(Font.HELVETICA, 8, Font.BOLD, PRIMARY_NAVY);
+            Font valueFont = new Font(Font.HELVETICA, 8, Font.NORMAL, Color.DARK_GRAY);
+            Font boldValueFont = new Font(Font.HELVETICA, 8, Font.BOLD, Color.BLACK);
+
+            PdfPTable topTable = new PdfPTable(2);
+            topTable.setWidthPercentage(100);
+            topTable.setWidths(new float[]{60f, 40f});
+            topTable.setSpacingAfter(8f);
+
+            // Left: Hospital Information
+            PdfPCell leftCell = new PdfPCell();
+            leftCell.setBorder(Rectangle.NO_BORDER);
+            String hospName = (bill.getTenant() != null && bill.getTenant().getHospitalName() != null) ? bill.getTenant().getHospitalName().toUpperCase() : "CAREVISTA MULTISPECIALITY HOSPITAL";
+            leftCell.addElement(new Paragraph(hospName, titleFont));
+            leftCell.addElement(new Paragraph("NABH Accredited Multi-Speciality Tertiary Care Hospital", subtitleFont));
+            String hospContact = (bill.getTenant() != null && bill.getTenant().getEmail() != null) ? bill.getTenant().getEmail() : "billing@carevista.com";
+            leftCell.addElement(new Paragraph("Helpline: +91 8000 123 456 | Email: " + hospContact, subtitleFont));
+            if (bill.getGstNumber() != null && !bill.getGstNumber().isEmpty()) {
+                Paragraph gstP = new Paragraph("GSTIN / Tax ID: " + bill.getGstNumber(), labelFont);
+                leftCell.addElement(gstP);
+            }
+            topTable.addCell(leftCell);
+
+            // Right: Invoice Metadata Box
+            PdfPCell rightCell = new PdfPCell();
+            rightCell.setBackgroundColor(HEADER_BG);
+            rightCell.setBorderColor(BORDER_COLOR);
+            rightCell.setBorderWidth(1f);
+            rightCell.setPadding(6f);
+
+            Paragraph invTitle = new Paragraph("TAX INVOICE / CENTRAL BILL", invoiceTitleFont);
+            invTitle.setAlignment(Element.ALIGN_RIGHT);
+            rightCell.addElement(invTitle);
+
+            PdfPTable invMeta = new PdfPTable(2);
+            invMeta.setWidthPercentage(100);
+            invMeta.setWidths(new float[]{45f, 55f});
+
+            addMetaRow(invMeta, "Invoice Number:", bill.getInvoiceNumber() != null ? bill.getInvoiceNumber() : "N/A", labelFont, boldValueFont);
+            addMetaRow(invMeta, "Central Bill No:", bill.getBillNumber(), labelFont, boldValueFont);
+            addMetaRow(invMeta, "Bill Date:", bill.getBillDate() != null ? bill.getBillDate().toString() : "", labelFont, valueFont);
+            if (bill.getBillTime() != null) {
+                addMetaRow(invMeta, "Bill Time:", bill.getBillTime(), labelFont, valueFont);
+            }
+            addMetaRow(invMeta, "Payment Status:", bill.getPaymentStatus() != null ? bill.getPaymentStatus() : "PAID", labelFont, boldValueFont);
+
+            rightCell.addElement(invMeta);
+            topTable.addCell(rightCell);
+            document.add(topTable);
+
+            // 2. Patient & Clinical Metadata Table
+            PdfPTable patTable = new PdfPTable(4);
+            patTable.setWidthPercentage(100);
+            patTable.setWidths(new float[]{25f, 25f, 25f, 25f});
+            patTable.setSpacingAfter(8f);
+
+            addPatCell(patTable, "PATIENT NAME", bill.getPatientName() != null ? bill.getPatientName() : (bill.getPatient() != null ? bill.getPatient().getFullName() : "—"), true);
+            addPatCell(patTable, "UHID", bill.getUhid() != null ? bill.getUhid() : (bill.getPatient() != null ? bill.getPatient().getUhid() : "—"), false);
+            addPatCell(patTable, "PHONE NUMBER", bill.getPhone() != null ? bill.getPhone() : (bill.getPatient() != null ? bill.getPatient().getPhone() : "—"), false);
+            addPatCell(patTable, "PAYMENT METHOD", bill.getPaymentMethod() != null ? bill.getPaymentMethod() : "CASH", false);
+
+            addPatCell(patTable, "OP REGISTRATION ID", bill.getOpId() != null && !bill.getOpId().isEmpty() ? bill.getOpId() : "—", false);
+            addPatCell(patTable, "IP ADMISSION ID", bill.getIpId() != null && !bill.getIpId().isEmpty() ? bill.getIpId() : "—", false);
+            addPatCell(patTable, "DOCTOR / CONSULTANT", bill.getDoctorName() != null && !bill.getDoctorName().isEmpty() ? bill.getDoctorName() : "Attending Physician", false);
+            addPatCell(patTable, "DEPARTMENT", bill.getDepartment() != null && !bill.getDepartment().isEmpty() ? bill.getDepartment() : "General Medicine", false);
+
+            document.add(patTable);
+
+            // 3. Billing Line Items
+            Font thFont = new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE);
+            Font tbFont = new Font(Font.HELVETICA, 8, Font.NORMAL, Color.BLACK);
+            Font tbBold = new Font(Font.HELVETICA, 8, Font.BOLD, Color.BLACK);
+
+            PdfPTable itemsTable = new PdfPTable(5);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setHeaderRows(1);
+            itemsTable.setWidths(new float[]{5f, 18f, 18f, 44f, 15f});
+            itemsTable.setSpacingAfter(8f);
+
+            String[] cols = {"#", "CATEGORY", "REF ID", "DESCRIPTION / SERVICE", "AMOUNT"};
+            for (String col : cols) {
+                PdfPCell th = new PdfPCell(new Phrase(col, thFont));
+                th.setBackgroundColor(PRIMARY_NAVY);
+                th.setBorderColor(BORDER_COLOR);
+                th.setPadding(4f);
+                if ("AMOUNT".equals(col)) th.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                else if ("#".equals(col)) th.setHorizontalAlignment(Element.ALIGN_CENTER);
+                else th.setHorizontalAlignment(Element.ALIGN_LEFT);
+                itemsTable.addCell(th);
+            }
+
+            int idx = 1;
+            if (bill.getItems() != null && !bill.getItems().isEmpty()) {
+                for (CentralBillItem item : bill.getItems()) {
+                    Color rowBg = (idx % 2 == 0) ? ROW_ALT_BG : Color.WHITE;
+                    itemsTable.addCell(createCell(String.valueOf(idx), tbFont, Element.ALIGN_CENTER, rowBg));
+                    itemsTable.addCell(createCell(item.getModuleType() != null ? item.getModuleType() : "GENERAL", tbBold, Element.ALIGN_LEFT, rowBg));
+                    itemsTable.addCell(createCell(item.getReferenceId() != null ? item.getReferenceId() : "—", tbFont, Element.ALIGN_LEFT, rowBg));
+                    itemsTable.addCell(createCell(item.getDescription() != null ? item.getDescription() : "Hospital Service", tbFont, Element.ALIGN_LEFT, rowBg));
+                    itemsTable.addCell(createCell(formatCurrency(item.getAmount()), tbBold, Element.ALIGN_RIGHT, rowBg));
+                    idx++;
+                }
+            } else {
+                Color rowBg = Color.WHITE;
+                itemsTable.addCell(createCell("1", tbFont, Element.ALIGN_CENTER, rowBg));
+                itemsTable.addCell(createCell("CONSOLIDATED", tbBold, Element.ALIGN_LEFT, rowBg));
+                itemsTable.addCell(createCell(bill.getBillNumber(), tbFont, Element.ALIGN_LEFT, rowBg));
+                itemsTable.addCell(createCell("Consolidated Hospital Services & Patient Care", tbFont, Element.ALIGN_LEFT, rowBg));
+                itemsTable.addCell(createCell(formatCurrency(bill.getSubtotal()), tbBold, Element.ALIGN_RIGHT, rowBg));
+            }
+
+            document.add(itemsTable);
+
+            // 4. Financial Calculation Summary Table
+            PdfPTable calcTable = new PdfPTable(2);
+            calcTable.setWidthPercentage(100);
+            calcTable.setWidths(new float[]{60f, 40f});
+            calcTable.setSpacingAfter(10f);
+
+            // Left: Notes & Conditions
+            PdfPCell noteCell = new PdfPCell();
+            noteCell.setBorderColor(BORDER_COLOR);
+            noteCell.setPadding(6f);
+            noteCell.setBackgroundColor(HEADER_BG);
+            noteCell.addElement(new Paragraph("BILLING NOTES & REMARKS:", labelFont));
+            String notesText = (bill.getConsolidatedNotes() != null && !bill.getConsolidatedNotes().trim().isEmpty())
+                    ? bill.getConsolidatedNotes() : "Consolidated central settlement of patient charges across OP, IP, Pharmacy, and Diagnostics.";
+            noteCell.addElement(new Paragraph(notesText, valueFont));
+
+            Paragraph termP = new Paragraph("\nTerms & Conditions:\n1. Payment receipt valid subject to realization.\n2. Please quote Invoice and Bill Number for future inquiries.\n3. Goods & medicines once sold cannot be taken back.", new Font(Font.HELVETICA, 7, Font.ITALIC, TEXT_MUTED));
+            noteCell.addElement(termP);
+            calcTable.addCell(noteCell);
+
+            // Right: Calculations Table
+            PdfPCell sumBoxCell = new PdfPCell();
+            sumBoxCell.setBorder(Rectangle.NO_BORDER);
+            sumBoxCell.setPadding(0f);
+
+            PdfPTable sumTable = new PdfPTable(2);
+            sumTable.setWidthPercentage(100);
+            sumTable.setWidths(new float[]{55f, 45f});
+
+            addSummaryRow(sumTable, "Gross Subtotal:", formatCurrency(bill.getSubtotal()), false);
+            if (bill.getDiscountAmount() != null && bill.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
+                String discLabel = "Discount (" + (bill.getDiscountPct() != null ? bill.getDiscountPct() : "0") + "%):";
+                addSummaryRow(sumTable, discLabel, "- " + formatCurrency(bill.getDiscountAmount()), false);
+                addSummaryRow(sumTable, "Net Amount:", formatCurrency(bill.getNetAmount()), false);
+            }
+            if (bill.getGstAmount() != null && bill.getGstAmount().compareTo(BigDecimal.ZERO) > 0) {
+                String gstLabel = "GST (" + (bill.getGstPct() != null ? bill.getGstPct() : "0") + "%):";
+                addSummaryRow(sumTable, gstLabel, "+ " + formatCurrency(bill.getGstAmount()), false);
+            }
+
+            PdfPCell grandLbl = new PdfPCell(new Phrase("FINAL TOTAL:", new Font(Font.HELVETICA, 9, Font.BOLD, PRIMARY_NAVY)));
+            grandLbl.setBackgroundColor(new Color(224, 231, 255));
+            grandLbl.setPadding(4f);
+            grandLbl.setBorderColor(BORDER_COLOR);
+            sumTable.addCell(grandLbl);
+
+            PdfPCell grandVal = new PdfPCell(new Phrase(formatCurrency(bill.getFinalTotal()), new Font(Font.HELVETICA, 10, Font.BOLD, PRIMARY_NAVY)));
+            grandVal.setBackgroundColor(new Color(224, 231, 255));
+            grandVal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            grandVal.setPadding(4f);
+            grandVal.setBorderColor(BORDER_COLOR);
+            sumTable.addCell(grandVal);
+
+            addSummaryRow(sumTable, "Amount Paid:", formatCurrency(bill.getAmountPaid()), false);
+
+            boolean isSettled = bill.getBalance() == null || bill.getBalance().compareTo(BigDecimal.ZERO) <= 0;
+            Font balFont = new Font(Font.HELVETICA, 9, Font.BOLD, isSettled ? BADGE_GREEN : BADGE_AMBER);
+            PdfPCell balLbl = new PdfPCell(new Phrase("BALANCE DUE:", balFont));
+            balLbl.setBackgroundColor(HEADER_BG);
+            balLbl.setPadding(4f);
+            balLbl.setBorderColor(BORDER_COLOR);
+            sumTable.addCell(balLbl);
+
+            PdfPCell balVal = new PdfPCell(new Phrase(formatCurrency(bill.getBalance()), balFont));
+            balVal.setBackgroundColor(HEADER_BG);
+            balVal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            balVal.setPadding(4f);
+            balVal.setBorderColor(BORDER_COLOR);
+            sumTable.addCell(balVal);
+
+            sumBoxCell.addElement(sumTable);
+            calcTable.addCell(sumBoxCell);
+            document.add(calcTable);
+
+            // 5. Signoff & Footer
+            PdfPTable footerTable = new PdfPTable(2);
+            footerTable.setWidthPercentage(100);
+            footerTable.setWidths(new float[]{60f, 40f});
+            footerTable.setSpacingBefore(12f);
+
+            PdfPCell fLeft = new PdfPCell();
+            fLeft.setBorder(Rectangle.NO_BORDER);
+            fLeft.addElement(new Paragraph("System Generated Invoice  |  CareVista HMS SaaS Security & Tenant Isolation Verified", new Font(Font.HELVETICA, 7, Font.NORMAL, TEXT_MUTED)));
+            fLeft.addElement(new Paragraph("Audit Timestamp: " + LocalDateTime.now().format(PRINT_DATE_FMT), new Font(Font.HELVETICA, 7, Font.NORMAL, TEXT_MUTED)));
+            footerTable.addCell(fLeft);
+
+            PdfPCell fRight = new PdfPCell();
+            fRight.setBorder(Rectangle.NO_BORDER);
+            fRight.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            Paragraph signLine = new Paragraph("___________________________________\nAuthorized Hospital Billing Officer", new Font(Font.HELVETICA, 8, Font.BOLD, PRIMARY_NAVY));
+            signLine.setAlignment(Element.ALIGN_RIGHT);
+            fRight.addElement(signLine);
+            footerTable.addCell(fRight);
+
+            document.add(footerTable);
+
+            document.close();
+            return baos.toByteArray();
+        } catch (DocumentException e) {
+            throw new RuntimeException("Error generating Central Bill invoice PDF: " + e.getMessage(), e);
+        }
+    }
+
+    private void addPatCell(PdfPTable table, String label, String value, boolean isPrimary) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBackgroundColor(HEADER_BG);
+        cell.setBorderColor(BORDER_COLOR);
+        cell.setBorderWidth(0.5f);
+        cell.setPadding(4f);
+
+        Font lFont = new Font(Font.HELVETICA, 6.5f, Font.BOLD, TEXT_MUTED);
+        Font vFont = new Font(Font.HELVETICA, 8f, isPrimary ? Font.BOLD : Font.NORMAL, Color.BLACK);
+
+        cell.addElement(new Paragraph(label, lFont));
+        cell.addElement(new Paragraph(value != null && !value.isEmpty() ? value : "—", vFont));
+        table.addCell(cell);
+    }
+
+    private void addSummaryRow(PdfPTable table, String label, String value, boolean isBold) {
+        Font lFont = new Font(Font.HELVETICA, 8, isBold ? Font.BOLD : Font.NORMAL, Color.BLACK);
+        Font vFont = new Font(Font.HELVETICA, 8, isBold ? Font.BOLD : Font.NORMAL, Color.BLACK);
+
+        PdfPCell c1 = new PdfPCell(new Phrase(label, lFont));
+        c1.setBorderColor(BORDER_COLOR);
+        c1.setPadding(3.5f);
+        table.addCell(c1);
+
+        PdfPCell c2 = new PdfPCell(new Phrase(value, vFont));
+        c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        c2.setBorderColor(BORDER_COLOR);
+        c2.setPadding(3.5f);
+        table.addCell(c2);
+    }
+
+    private static class HeaderFooterEvent extends PdfPageEventHelper {
+        private final String hospitalFilter;
+        private final String printDate;
+        private final Font footerFont = new Font(Font.HELVETICA, 7.5f, Font.ITALIC, new Color(100, 116, 139));
+
+        public HeaderFooterEvent(String hospitalFilter, String printDate) {
+            this.hospitalFilter = hospitalFilter != null ? hospitalFilter : "All Hospitals";
+            this.printDate = printDate;
+        }
+
+        @Override
+        public void onEndPage(PdfWriter writer, Document document) {
+            PdfContentByte cb = writer.getDirectContent();
+            Rectangle page = document.getPageSize();
+
+            // Header watermark / top notice
+            ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
+                    new Phrase("CareVista Hospital Management SaaS  |  " + hospitalFilter, footerFont),
+                    document.left(), page.getTop() - 18, 0);
+
+            // Footer Left
+            ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
+                    new Phrase("Confidential Healthcare Financial Ledger  |  Generated on: " + printDate, footerFont),
+                    document.left(), page.getBottom() + 10, 0);
+
+            // Footer Right: Page Number
+            ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
+                    new Phrase("Page " + writer.getPageNumber(), footerFont),
+                    document.right(), page.getBottom() + 10, 0);
+        }
+    }
+}

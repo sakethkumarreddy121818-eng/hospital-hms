@@ -1,0 +1,43 @@
+server:
+  port: ${PORT:8082}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: carevista-hms
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/carevista_hms?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: ${MYSQL_PASSWORD:1981}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: never
+
+carevista:
+  app:
+    name: "CareVista Hospital Management SaaS"
+    version: "1.0.0"
+    seed-demo-data: true
+  security:
+    token-header: "Authorization"
+    jwt-secret: "CarevistaSuperSecretKeyForJwtAuthenticationTokens2026SecureKey"
+    jwt-expiration-ms: 86400000
+
+logging:
+  level:
+    root: INFO
+    com.carevista.hms: DEBUG
+    org.springframework.security: INFO
