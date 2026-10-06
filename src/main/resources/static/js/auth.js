@@ -170,12 +170,14 @@ const Auth = (function () {
   }
 
   function showLogin() {
+    document.body.classList.remove('cv-dashboard-active');
     document.getElementById('loginView').style.display = 'flex';
     document.getElementById('dashboardView').classList.remove('active');
     clearAlert();
   }
 
   function showDashboard(user) {
+    document.body.classList.add('cv-dashboard-active');
     document.getElementById('loginView').style.display = 'none';
     const dbView = document.getElementById('dashboardView');
     dbView.classList.add('active');

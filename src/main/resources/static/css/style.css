@@ -87,6 +87,20 @@ body {
   flex-direction: column;
 }
 
+/* Stable Fixed Dashboard Viewport */
+body:has(.cv-dashboard-view.active),
+body.cv-dashboard-active {
+  overflow: hidden;
+  height: 100vh;
+}
+
+body:has(.cv-dashboard-view.active) #app,
+body.cv-dashboard-active #app {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 /* ====================================================================
    TOP NAVIGATION BAR (Clean Clinical Header)
    ==================================================================== */
@@ -102,6 +116,7 @@ body {
   top: 0;
   z-index: 50;
   box-shadow: var(--cv-shadow-xs);
+  flex-shrink: 0;
 }
 
 .cv-brand {
@@ -461,6 +476,15 @@ body {
 
 .cv-dashboard-view.active {
   display: flex;
+  flex: 1;
+  min-height: 0;
+  height: calc(100vh - 68px);
+  max-height: calc(100vh - 68px);
+  overflow: hidden;
+}
+
+.cv-dashboard-view.active ~ .cv-footer {
+  display: none;
 }
 
 /* Sidebar */
@@ -598,8 +622,11 @@ body {
 /* Main Content Area */
 .cv-main-content {
   flex: 1;
+  min-height: 0;
+  height: 100%;
   padding: 2rem 2.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--cv-bg);
 }
 
