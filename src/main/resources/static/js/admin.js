@@ -19,6 +19,130 @@ const Admin = (function () {
   let adminHistoryIndex = 1;
   let cachedHospitalSettings = null;
 
+  // ====================================================================
+  // COMMON HISTORY PAGE-SIZE & PAGINATION ENGINE (Phase 4)
+  // Allowed page sizes strictly: 10, 25, 50, 100 (Default: 10)
+  // Reusable across OP, IP, Pharmacy, Lab & Central Billing History
+  // ====================================================================
+  function createHistoryPaginationController(config = {}) {
+    const defaultPageSize = [10, 25, 50, 100].includes(Number(config.defaultPageSize)) ? Number(config.defaultPageSize) : 10;
+    let pageSize = defaultPageSize;
+    let currentPage = 1;
+    let allItems = [];
+    const onPageChange = config.onPageChange;
+
+    function setPageSize(newSize) {
+      const allowed = [10, 25, 50, 100];
+      const parsed = Number(newSize);
+      pageSize = allowed.includes(parsed) ? parsed : 10;
+      currentPage = 1;
+      if (typeof onPageChange === 'function') {
+        onPageChange(getPagedItems(), getPaginationState());
+      }
+    }
+
+    function setPage(p) {
+      const totalPages = Math.max(1, Math.ceil(allItems.length / pageSize));
+      let target = Number(p);
+      if (isNaN(target) || target < 1) target = 1;
+      if (target > totalPages) target = totalPages;
+      currentPage = target;
+      if (typeof onPageChange === 'function') {
+        onPageChange(getPagedItems(), getPaginationState());
+      }
+    }
+
+    function setItems(items, preservePage = false) {
+      allItems = Array.isArray(items) ? items : [];
+      const totalPages = Math.max(1, Math.ceil(allItems.length / pageSize));
+      if (!preservePage || currentPage > totalPages || currentPage < 1) {
+        currentPage = 1;
+      }
+      return getPagedItems();
+    }
+
+    function getPagedItems() {
+      const start = (currentPage - 1) * pageSize;
+      return allItems.slice(start, start + pageSize);
+    }
+
+    function getPaginationState() {
+      const total = allItems.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+      const end = Math.min(total, currentPage * pageSize);
+      return {
+        currentPage,
+        pageSize,
+        total,
+        totalPages,
+        start,
+        end,
+        hasPrev: currentPage > 1,
+        hasNext: currentPage < totalPages
+      };
+    }
+
+    function renderControlsHtml(prefix) {
+      const state = getPaginationState();
+      return `
+        <div class="cv-history-pagination-bar" id="${prefix}_paginationBar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding:0.65rem 1rem; background:#f8fafc; border-top:1px solid #e2e8f0; border-radius:0 0 8px 8px; font-size:0.82rem; color:#475569;">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label for="${prefix}_pageSizeSelect" style="font-weight:600; font-size:0.8rem; color:#475569; margin:0;">Rows per page:</label>
+            <select id="${prefix}_pageSizeSelect" class="cv-form-select" style="height:32px; width:74px; padding:0 0.5rem; font-size:0.82rem; font-weight:700; background:#fff; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">
+              <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+              <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+              <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+            </select>
+            <span style="color:#64748b; font-size:0.8rem; margin-left:0.5rem;">
+              Showing <strong>${state.start}</strong>–<strong>${state.end}</strong> of <strong>${state.total}</strong> records
+            </span>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <button type="button" class="cv-btn-secondary" id="${prefix}_prevBtn" style="padding:0.3rem 0.7rem; font-size:0.78rem; height:30px;" ${!state.hasPrev ? 'disabled' : ''}>
+              &larr; Prev
+            </button>
+            <span style="padding:0 0.4rem; font-weight:700; font-size:0.8rem; color:#1e293b;">
+              Page ${state.currentPage} of ${state.totalPages}
+            </span>
+            <button type="button" class="cv-btn-secondary" id="${prefix}_nextBtn" style="padding:0.3rem 0.7rem; font-size:0.78rem; height:30px;" ${!state.hasNext ? 'disabled' : ''}>
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindEvents(prefix) {
+      const selectEl = document.getElementById(`${prefix}_pageSizeSelect`);
+      const prevEl = document.getElementById(`${prefix}_prevBtn`);
+      const nextEl = document.getElementById(`${prefix}_nextBtn`);
+
+      selectEl?.addEventListener('change', (e) => {
+        setPageSize(e.target.value);
+      });
+      prevEl?.addEventListener('click', () => {
+        setPage(currentPage - 1);
+      });
+      nextEl?.addEventListener('click', () => {
+        setPage(currentPage + 1);
+      });
+    }
+
+    return {
+      setItems,
+      setPageSize,
+      setPage,
+      getPagedItems,
+      getPaginationState,
+      renderControlsHtml,
+      bindEvents,
+      getPageSize: () => pageSize,
+      getCurrentPage: () => currentPage
+    };
+  }
+
   function init(user) {
     currentUser = user || Auth.getCurrentUser();
     if (currentUser && currentUser.role === 'ADMIN') {
@@ -272,7 +396,15 @@ const Admin = (function () {
     } else if (mod === 'laboratory') {
       executeLabTab(sub && sub !== 'main' ? sub : 'orders');
     } else if (mod === 'billing') {
-      renderBillingModule('billing', sub && sub !== 'main' ? sub : 'op');
+      if (sub === 'history' || sub === 'main-history') {
+        renderBillingModule('main');
+        mainBillingSubView = 'history';
+        renderSection2MainBilling();
+      } else if (sub === 'main' || sub === 'main-billing') {
+        renderBillingModule('main');
+      } else {
+        renderBillingModule('billing', sub && sub !== 'main' ? sub : 'op');
+      }
     } else if (mod === 'money') {
       renderMoneyManagementModule();
     } else if (mod === 'settings') {
@@ -2955,9 +3087,26 @@ const Admin = (function () {
   // ====================================================================
   // SUB-TAB 2: OP HISTORY & PATIENT DIRECTORY
   // ====================================================================
+  let opHistoryPagination = null;
+  let opHistoryRawList = [];
+
   function renderOpHistoryTab() {
     const tabContent = document.getElementById('opTabContent');
     if (!tabContent) return;
+
+    if (!opHistoryPagination) {
+      opHistoryPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          renderOpHistoryTableRows(pagedItems);
+          const mount = document.getElementById('opHistoryPaginationMount');
+          if (mount) {
+            mount.innerHTML = opHistoryPagination.renderControlsHtml('opHistory');
+            opHistoryPagination.bindEvents('opHistory');
+          }
+        }
+      });
+    }
 
     tabContent.innerHTML = `
       <div class="cv-op-section-card">
@@ -2971,7 +3120,8 @@ const Admin = (function () {
             <svg style="position:absolute; left:0.85rem; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--cv-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             <input type="text" id="opHistorySearchInput" class="cv-input" style="padding-left:2.5rem;" placeholder="Search previous OP by OP ID, Patient Name, UHID, Phone, or Doctor...">
           </div>
-          <button type="button" id="btnRefreshOpHistory" class="cv-btn-secondary" style="padding:0.75rem 1.25rem;">
+          <button type="button" id="btnRefreshOpHistory" class="cv-btn-secondary" style="padding:0.75rem 1.25rem; display:inline-flex; align-items:center; gap:0.4rem;">
+            <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             Refresh History
           </button>
         </div>
@@ -3000,6 +3150,7 @@ const Admin = (function () {
             </tbody>
           </table>
         </div>
+        <div id="opHistoryPaginationMount"></div>
       </div>
     `;
 
@@ -3014,8 +3165,87 @@ const Admin = (function () {
       }, 300);
     });
 
-    document.getElementById('btnRefreshOpHistory')?.addEventListener('click', () => {
-      loadOpHistoryList(searchInput ? searchInput.value.trim() : '');
+    document.getElementById('btnRefreshOpHistory')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshOpHistory');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        await loadOpHistoryList(searchInput ? searchInput.value.trim() : '');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh History';
+        }
+      }
+    });
+  }
+
+  function renderOpHistoryTableRows(items) {
+    const tbody = document.getElementById('opHistoryTableBody');
+    if (!tbody) return;
+
+    if (!items || items.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">
+            No OP registration records found.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = items.map(item => `
+      <tr>
+        <td>
+          <strong style="color:var(--cv-primary); font-family:monospace; font-size:0.92rem;">${escapeHtml(item.opId)}</strong>
+        </td>
+        <td>
+          <div style="font-weight:700; color:var(--cv-deep-blue); font-size:0.88rem;">${escapeHtml(item.patientName || 'Patient')}</div>
+          <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.uhid || 'N/A')}</div>
+        </td>
+        <td>
+          ${item.age ? `${item.age} Yrs` : 'N/A'} &bull; ${escapeHtml(item.gender || 'N/A')}
+        </td>
+        <td>
+          ${escapeHtml(item.phone || 'N/A')}
+        </td>
+        <td>
+          <div style="font-weight:600; color:var(--cv-deep-blue);">${escapeHtml(item.doctorName)}</div>
+          <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.department || 'OPD')}</div>
+        </td>
+        <td>
+          <div style="font-size:0.84rem;">${escapeHtml(item.visitDate)}</div>
+          <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.registrationTime || '')}</div>
+        </td>
+        <td>
+          <div style="font-weight:700; color:#059669;">&#8377;${formatCurrency(item.consultationFee)}</div>
+          <div style="font-size:0.73rem; color:var(--cv-text-muted);">${escapeHtml(item.paymentMethod || 'CASH')}</div>
+        </td>
+        <td>
+          <span class="cv-metric-badge" style="background:#ecfdf5; color:#059669; font-size:0.72rem;">
+            ${escapeHtml(item.status || 'REGISTERED')}
+          </span>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button type="button" class="cv-btn-secondary btn-view-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem; margin-right:0.3rem;">
+            View
+          </button>
+          <button type="button" class="cv-btn-primary btn-receipt-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem;">
+            Receipt
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('.btn-view-op').forEach(btn => {
+      btn.addEventListener('click', () => showOpDetailsModal(btn.dataset.id));
+    });
+
+    tbody.querySelectorAll('.btn-receipt-op').forEach(btn => {
+      btn.addEventListener('click', () => showOpReceiptModal(btn.dataset.id));
     });
   }
 
@@ -3026,65 +3256,32 @@ const Admin = (function () {
     try {
       const url = '/api/op/history' + (query ? '?q=' + encodeURIComponent(query) : '');
       const res = await Api.get(url);
-      if (res.ok && res.data && res.data.length > 0) {
-        tbody.innerHTML = res.data.map(item => `
-          <tr>
-            <td>
-              <strong style="color:var(--cv-primary); font-family:monospace; font-size:0.92rem;">${escapeHtml(item.opId)}</strong>
-            </td>
-            <td>
-              <div style="font-weight:700; color:var(--cv-deep-blue); font-size:0.88rem;">${escapeHtml(item.patientName || 'Patient')}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.uhid || 'N/A')}</div>
-            </td>
-            <td>
-              ${item.age ? `${item.age} Yrs` : 'N/A'} &bull; ${escapeHtml(item.gender || 'N/A')}
-            </td>
-            <td>
-              ${escapeHtml(item.phone || 'N/A')}
-            </td>
-            <td>
-              <div style="font-weight:600; color:var(--cv-deep-blue);">${escapeHtml(item.doctorName)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.department || 'OPD')}</div>
-            </td>
-            <td>
-              <div style="font-size:0.84rem;">${escapeHtml(item.visitDate)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(item.registrationTime || '')}</div>
-            </td>
-            <td>
-              <div style="font-weight:700; color:#059669;">&#8377;${formatCurrency(item.consultationFee)}</div>
-              <div style="font-size:0.73rem; color:var(--cv-text-muted);">${escapeHtml(item.paymentMethod || 'CASH')}</div>
-            </td>
-            <td>
-              <span class="cv-metric-badge" style="background:#ecfdf5; color:#059669; font-size:0.72rem;">
-                ${escapeHtml(item.status || 'REGISTERED')}
-              </span>
-            </td>
-            <td style="text-align:right; white-space:nowrap;">
-              <button type="button" class="cv-btn-secondary btn-view-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem; margin-right:0.3rem;">
-                View
-              </button>
-              <button type="button" class="cv-btn-primary btn-receipt-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem;">
-                Receipt
-              </button>
-            </td>
-          </tr>
-        `).join('');
-
-        tbody.querySelectorAll('.btn-view-op').forEach(btn => {
-          btn.addEventListener('click', () => showOpDetailsModal(btn.dataset.id));
-        });
-
-        tbody.querySelectorAll('.btn-receipt-op').forEach(btn => {
-          btn.addEventListener('click', () => showOpReceiptModal(btn.dataset.id));
-        });
+      if (res.ok && res.data) {
+        opHistoryRawList = res.data;
+        if (!opHistoryPagination) {
+          opHistoryPagination = createHistoryPaginationController({
+            defaultPageSize: 10,
+            onPageChange: (pagedItems) => {
+              renderOpHistoryTableRows(pagedItems);
+              const mount = document.getElementById('opHistoryPaginationMount');
+              if (mount) {
+                mount.innerHTML = opHistoryPagination.renderControlsHtml('opHistory');
+                opHistoryPagination.bindEvents('opHistory');
+              }
+            }
+          });
+        }
+        const paged = opHistoryPagination.setItems(opHistoryRawList, true);
+        renderOpHistoryTableRows(paged);
+        const mount = document.getElementById('opHistoryPaginationMount');
+        if (mount) {
+          mount.innerHTML = opHistoryPagination.renderControlsHtml('opHistory');
+          opHistoryPagination.bindEvents('opHistory');
+        }
       } else {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="9" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">
-              ${query ? `No OP registrations found matching "${escapeHtml(query)}".` : 'No OP registration records found in the database.'}
-            </td>
-          </tr>
-        `;
+        renderOpHistoryTableRows([]);
+        const mount = document.getElementById('opHistoryPaginationMount');
+        if (mount) mount.innerHTML = '';
       }
     } catch (err) {
       console.error('Error fetching OP history:', err);
@@ -4217,7 +4414,21 @@ const Admin = (function () {
       </div>
     `;
 
-    document.getElementById('btnRefreshInpatients')?.addEventListener('click', () => loadCurrentInpatients());
+    document.getElementById('btnRefreshInpatients')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshInpatients');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        await loadCurrentInpatients(searchInput ? searchInput.value.trim() : '');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px; margin-right:0.35rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh';
+        }
+      }
+    });
     document.getElementById('btnNewAdmissionFromCurrent')?.addEventListener('click', () => switchIpTab('admission'));
 
     const searchInput = document.getElementById('ipInpatientsSearchInput');
@@ -4326,6 +4537,11 @@ const Admin = (function () {
           </td>
           <td style="text-align:right;">
             <div style="display:inline-flex; align-items:center; gap:0.4rem;">
+              ${adm.paymentStatus !== 'PAID' ? `
+                <button type="button" class="cv-btn-primary" onclick="Admin.showBedPaymentModal(null, ${adm.id})" style="padding:0.35rem 0.65rem; font-size:0.78rem; background:#0284c7; border-color:#0284c7;" title="Collect Payment for this Inpatient">
+                  Pay Due
+                </button>
+              ` : ''}
               <button type="button" class="cv-btn-secondary" onclick="Admin.showIpDetailsModal(${adm.id})" style="padding:0.35rem 0.65rem; font-size:0.78rem;" title="View Clinical &amp; Admission Details">
                 View
               </button>
@@ -4342,9 +4558,25 @@ const Admin = (function () {
   // ====================================================================
   // SUB-TAB 3: IP HISTORY
   // ====================================================================
+  let ipHistoryPagination = null;
+
   async function renderIpHistoryTab() {
     const tabContent = document.getElementById('ipTabContent');
     if (!tabContent) return;
+
+    if (!ipHistoryPagination) {
+      ipHistoryPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          renderHistoryRows(pagedItems);
+          const mount = document.getElementById('ipHistoryPaginationMount');
+          if (mount) {
+            mount.innerHTML = ipHistoryPagination.renderControlsHtml('ipHistory');
+            ipHistoryPagination.bindEvents('ipHistory');
+          }
+        }
+      });
+    }
 
     tabContent.innerHTML = `
       <div style="background:var(--cv-surface); border:1px solid var(--cv-border); border-radius:var(--cv-radius-lg); padding:1.25rem; box-shadow:var(--cv-shadow-xs);">
@@ -4361,8 +4593,8 @@ const Admin = (function () {
               <option value="ADMITTED">Currently Admitted</option>
               <option value="DISCHARGED">Discharged Patients</option>
             </select>
-            <button type="button" class="cv-btn-secondary" id="btnRefreshHistory" style="padding:0.45rem 0.85rem; font-size:0.82rem;">
-              <svg style="width:14px; height:14px; margin-right:0.35rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <button type="button" class="cv-btn-secondary" id="btnRefreshHistory" style="padding:0.45rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
               Refresh
             </button>
           </div>
@@ -4388,10 +4620,25 @@ const Admin = (function () {
             </tbody>
           </table>
         </div>
+        <div id="ipHistoryPaginationMount"></div>
       </div>
     `;
 
-    document.getElementById('btnRefreshHistory')?.addEventListener('click', () => loadIpHistory());
+    document.getElementById('btnRefreshHistory')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshHistory');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        await loadIpHistory();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh';
+        }
+      }
+    });
     document.getElementById('ipHistoryStatusFilter')?.addEventListener('change', () => filterHistoryTable());
     document.getElementById('ipHistorySearchInput')?.addEventListener('input', () => filterHistoryTable());
 
@@ -4439,7 +4686,27 @@ const Admin = (function () {
       });
     }
 
-    renderHistoryRows(filtered);
+    if (!ipHistoryPagination) {
+      ipHistoryPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          renderHistoryRows(pagedItems);
+          const mount = document.getElementById('ipHistoryPaginationMount');
+          if (mount) {
+            mount.innerHTML = ipHistoryPagination.renderControlsHtml('ipHistory');
+            ipHistoryPagination.bindEvents('ipHistory');
+          }
+        }
+      });
+    }
+
+    const paged = ipHistoryPagination.setItems(filtered, true);
+    renderHistoryRows(paged);
+    const mount = document.getElementById('ipHistoryPaginationMount');
+    if (mount) {
+      mount.innerHTML = ipHistoryPagination.renderControlsHtml('ipHistory');
+      ipHistoryPagination.bindEvents('ipHistory');
+    }
   }
 
   function renderHistoryRows(list) {
@@ -4731,7 +4998,7 @@ const Admin = (function () {
               }
 
               return `
-                <div class="cv-bed-chip ${bClass}">
+                <div class="cv-bed-chip ${bClass}" ${bStatus === 'OCCUPIED' && bed.admissionId ? `style="cursor:pointer;" onclick="Admin.showBedPaymentModal(${bed.id}, ${bed.admissionId})"` : ''} title="${bStatus === 'OCCUPIED' ? 'Click to view / collect bed payment' : ''}">
                   <div class="cv-bed-head">
                     <span>Bed ${escapeHtml(bed.bedNumber)}</span>
                     <span style="font-size:0.7rem;">${statusLabel}</span>
@@ -4740,6 +5007,16 @@ const Admin = (function () {
                     <div class="cv-bed-patient-text" title="Patient: ${escapeHtml(bed.assignedPatientName)}">
                       &bull; ${escapeHtml(bed.assignedPatientName)}
                     </div>
+                    ${(bed.balanceAmount != null && bed.balanceAmount > 0) ? `
+                      <div style="margin-top:4px; font-size:0.72rem; color:#dc2626; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Due: &#8377;${formatCurrency(bed.balanceAmount)}</span>
+                        <span class="cv-btn-primary" style="padding:1px 6px; font-size:0.68rem; border-radius:3px; line-height:1.2;">Collect</span>
+                      </div>
+                    ` : `
+                      <div style="margin-top:2px; font-size:0.7rem; color:#059669; font-weight:600;">
+                        Paid (&#8377;0 Due)
+                      </div>
+                    `}
                   ` : `
                     <div class="cv-bed-price-text">&#8377;${formatCurrency(bed.dailyPrice)}/day</div>
                   `}
@@ -4750,6 +5027,213 @@ const Admin = (function () {
         </div>
       `;
     }).join('');
+  }
+
+  // ====================================================================
+  // IP ROOM / BED PAYMENT COLLECTION (Phase 4)
+  // Integrates payment confirmation modal + real MySQL update + print
+  // ====================================================================
+  async function showBedPaymentModal(bedId, admissionId) {
+    if (!admissionId) {
+      alert('No active inpatient admission found for this bed.');
+      return;
+    }
+
+    try {
+      const res = await Api.get(`/api/ip/admissions/${admissionId}`);
+      if (!res || !res.ok || !res.data) {
+        alert('Could not fetch inpatient billing details for bed.');
+        return;
+      }
+      const adm = res.data;
+      const roomBed = (Number(adm.roomPrice || 0) + Number(adm.bedPrice || 0));
+      const totalCharges = (Number(adm.totalCharges || 0) > 0) ? Number(adm.totalCharges) : (roomBed > 0 ? roomBed : Number(adm.depositAmount || 0));
+      const paidAmount = adm.paidAmount != null ? Number(adm.paidAmount) :
+        (adm.paymentStatus === 'PAID' ? totalCharges : (adm.depositAmount != null ? Number(adm.depositAmount) : 0));
+      const balanceAmount = adm.balanceAmount != null ? Number(adm.balanceAmount) : Math.max(0, totalCharges - paidAmount);
+
+      if (balanceAmount <= 0) {
+        alert(`This inpatient admission (${adm.ipId}) has already been fully paid (Balance: ₹0.00).`);
+        return;
+      }
+
+      const prev = document.getElementById('cvBedPaymentBackdrop');
+      if (prev) prev.remove();
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'cv-modal-backdrop show';
+      backdrop.id = 'cvBedPaymentBackdrop';
+      backdrop.style.zIndex = '1040';
+
+      backdrop.innerHTML = `
+        <div class="cv-modal" style="max-width: 480px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.22); border:1px solid #cbd5e1; background:#ffffff;">
+          <div class="cv-modal-header" style="background:#f8fafc; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--cv-border);">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <span style="width:32px; height:32px; border-radius:8px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center;">
+                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              </span>
+              <h3 class="cv-modal-title" style="margin:0; font-size:1.1rem; font-weight:700; color:#0f172a;">IP Room / Bed Payment Collection</h3>
+            </div>
+            <button type="button" class="cv-modal-close" id="btnBedPayClose" style="cursor:pointer;" aria-label="Close">&times;</button>
+          </div>
+
+          <div class="cv-modal-body" style="padding: 1.4rem;">
+            <!-- Patient & Bed Details Summary -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.9rem 1.15rem; margin-bottom:1.15rem; font-size:0.85rem;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Patient:</span>
+                <strong style="color:#0f172a;">${escapeHtml(adm.patientName)} <span style="font-family:monospace; color:var(--cv-primary);">(${escapeHtml(adm.uhid || '—')})</span></strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">IP ID:</span>
+                <strong style="font-family:monospace; color:#0f172a;">${escapeHtml(adm.ipId)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Room / Bed:</span>
+                <strong style="color:#0f172a;">Room ${escapeHtml(adm.roomNumber)} &bull; Bed ${escapeHtml(adm.bedNumber)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Total Charges:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(totalCharges)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Amount Paid So Far:</span>
+                <strong style="color:#059669;">₹${formatCurrency(paidAmount)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:0.4rem; margin-top:0.4rem;">
+                <span style="color:#64748b; font-weight:700;">Outstanding Balance:</span>
+                <strong style="color:var(--cv-danger); font-size:1.05rem;">₹${formatCurrency(balanceAmount)}</strong>
+              </div>
+            </div>
+
+            <!-- Amount Paid Input & Payment Method -->
+            <div style="margin-bottom:1rem;">
+              <label for="bedPayAmountInput" style="display:block; font-size:0.8rem; font-weight:700; color:#334155; text-transform:uppercase; margin-bottom:0.35rem;">
+                Amount Paid / Enter Amount <span style="color:#dc2626;">*</span>
+              </label>
+              <div style="position:relative;">
+                <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
+                <input type="number" id="bedPayAmountInput" class="cv-form-input" style="padding-left:1.8rem; height:42px; font-size:1.05rem; font-weight:700;" placeholder="0.00" value="${balanceAmount}" min="0.01" max="${balanceAmount}" step="any">
+              </div>
+            </div>
+
+            <div style="margin-bottom:0.5rem;">
+              <label for="bedPayMethodSelect" style="display:block; font-size:0.8rem; font-weight:700; color:#334155; text-transform:uppercase; margin-bottom:0.35rem;">
+                Payment Method
+              </label>
+              <select id="bedPayMethodSelect" class="cv-form-select" style="height:40px; font-size:0.88rem;">
+                <option value="CASH">Cash</option>
+                <option value="CARD">Credit/Debit Card</option>
+                <option value="UPI">UPI / Digital Payment</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:flex-end; gap:0.75rem;">
+            <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
+              Cancel
+            </button>
+            <button type="button" class="cv-btn-primary" id="btnBedPaySubmit" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+              Submit
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(backdrop);
+
+      const closeBedModal = () => backdrop.remove();
+      document.getElementById('btnBedPayClose')?.addEventListener('click', closeBedModal);
+      document.getElementById('btnBedPayCancel')?.addEventListener('click', closeBedModal);
+
+      document.getElementById('btnBedPaySubmit')?.addEventListener('click', () => {
+        const amtInput = document.getElementById('bedPayAmountInput');
+        const rawVal = amtInput ? amtInput.value : '';
+        const method = document.getElementById('bedPayMethodSelect')?.value || 'CASH';
+
+        if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+          alert('Please enter a payment amount.');
+          return;
+        }
+        const enteredAmt = parseFloat(rawVal);
+        if (isNaN(enteredAmt) || enteredAmt <= 0) {
+          alert('Payment amount must be a valid positive number greater than 0.');
+          return;
+        }
+        if (enteredAmt > balanceAmount + 0.001) {
+          alert(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(balanceAmount)}.`);
+          return;
+        }
+
+        const remBal = Math.max(0, parseFloat((balanceAmount - enteredAmt).toFixed(2)));
+
+        // Hide bed pay modal while confirmation is open
+        backdrop.style.display = 'none';
+
+        showPaymentConfirmationModal({
+          title: 'Confirm Room / Bed Payment',
+          billRef: 'IP Bill: ' + (adm.ipId || 'IP-' + admissionId),
+          paymentAmount: enteredAmt,
+          remainingBalance: remBal,
+          moduleType: 'IP',
+          printButtonLabel: 'Print Bill',
+          onCancel: () => {
+            // Restore bed payment modal
+            backdrop.style.display = 'flex';
+          },
+          onConfirm: async (showSuccessState, unlockBtn) => {
+            try {
+              const payRes = await Api.post('/api/billing/payment', {
+                moduleType: 'IP',
+                billId: admissionId,
+                billNumber: adm.ipId,
+                paymentAmount: enteredAmt,
+                paymentMethod: method,
+                notes: 'IP room/bed payment collected'
+              });
+
+              if (payRes && payRes.ok && payRes.data) {
+                backdrop.remove();
+                showSuccessState(payRes.data);
+                loadRoomsData();
+                if (document.getElementById('ipInpatientsTableBody')) {
+                  loadCurrentInpatients();
+                }
+              } else {
+                unlockBtn();
+                alert(payRes?.message || 'Payment processing failed.');
+                backdrop.style.display = 'flex';
+              }
+            } catch (err) {
+              unlockBtn();
+              alert('Error processing payment: ' + (err.message || err));
+              backdrop.style.display = 'flex';
+            }
+          },
+          onPrint: (resultData) => {
+            const updatedAdm = {
+              ...adm,
+              paidAmount: resultData?.amountPaid != null ? resultData.amountPaid : (paidAmount + enteredAmt),
+              depositAmount: resultData?.amountPaid != null ? resultData.amountPaid : (paidAmount + enteredAmt),
+              balanceAmount: resultData?.balanceAmount != null ? resultData.balanceAmount : remBal,
+              paymentStatus: resultData?.paymentStatus || (remBal <= 0 ? 'PAID' : 'PARTIALLY PAID'),
+              paymentMethod: method
+            };
+            openBillPrintWindow(buildIpBillPrintHtml({
+              fullName: adm.patientName,
+              uhid: adm.uhid,
+              phone: adm.phone
+            }, updatedAdm));
+          }
+        });
+      });
+
+    } catch (e) {
+      console.error(e);
+      alert('Error fetching inpatient admission details.');
+    }
   }
 
   // ====================================================================
@@ -6333,9 +6817,26 @@ function renderPharmacyModule(activeTab = 'billing') {
   // ------------------------------------------------------------------
   // TAB 2: PHARMACY SALES HISTORY
   // ------------------------------------------------------------------
+  let pharHistoryPagination = null;
+
   async function renderPharmacyHistoryTab() {
     const container = document.getElementById('pharTabContent');
     if (!container) return;
+
+    if (!pharHistoryPagination) {
+      pharHistoryPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          document.getElementById('pharHistoryTableBody').innerHTML = renderHistoryTableBodyHtml(pagedItems);
+          wireHistoryInvoiceButtons();
+          const mount = document.getElementById('pharHistoryPaginationMount');
+          if (mount) {
+            mount.innerHTML = pharHistoryPagination.renderControlsHtml('pharHistory');
+            pharHistoryPagination.bindEvents('pharHistory');
+          }
+        }
+      });
+    }
 
     container.innerHTML = `
       <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
@@ -6376,7 +6877,8 @@ function renderPharmacyModule(activeTab = 'billing') {
               </i>
               <input type="text" id="pharHistorySearchInput" placeholder="Search by Patient, UHID, OP ID, IP ID, Bill No..." autocomplete="off">
             </div>
-            <button type="button" class="cv-btn-secondary" id="btnRefreshPharHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem;">
+            <button type="button" class="cv-btn-secondary" id="btnRefreshPharHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
               Refresh
             </button>
           </div>
@@ -6399,25 +6901,19 @@ function renderPharmacyModule(activeTab = 'billing') {
               </tr>
             </thead>
             <tbody id="pharHistoryTableBody">
-              ${renderHistoryTableBodyHtml(pharAllSalesHistory)}
+              <!-- Populated via pagination -->
             </tbody>
           </table>
         </div>
+        <div id="pharHistoryPaginationMount"></div>
       </div>
     `;
 
-    // Filter event
-    const searchInput = document.getElementById('pharHistorySearchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase().trim();
-        if (!q) {
-          document.getElementById('pharHistoryTableBody').innerHTML = renderHistoryTableBodyHtml(pharAllSalesHistory);
-          wireHistoryInvoiceButtons();
-          return;
-        }
-
-        const filtered = pharAllSalesHistory.filter(b => {
+    function updatePharHistoryView(preservePage = false) {
+      const q = (document.getElementById('pharHistorySearchInput')?.value || '').toLowerCase().trim();
+      let filtered = pharAllSalesHistory;
+      if (q) {
+        filtered = filtered.filter(b => {
           return (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
                  (b.patientName && b.patientName.toLowerCase().includes(q)) ||
                  (b.uhid && b.uhid.toLowerCase().includes(q)) ||
@@ -6425,14 +6921,46 @@ function renderPharmacyModule(activeTab = 'billing') {
                  (b.ipId && b.ipId.toLowerCase().includes(q)) ||
                  (b.phone && b.phone.toLowerCase().includes(q));
         });
-
-        document.getElementById('pharHistoryTableBody').innerHTML = renderHistoryTableBodyHtml(filtered);
-        wireHistoryInvoiceButtons();
-      });
+      }
+      const paged = pharHistoryPagination.setItems(filtered, preservePage);
+      document.getElementById('pharHistoryTableBody').innerHTML = renderHistoryTableBodyHtml(paged);
+      wireHistoryInvoiceButtons();
+      const mount = document.getElementById('pharHistoryPaginationMount');
+      if (mount) {
+        mount.innerHTML = pharHistoryPagination.renderControlsHtml('pharHistory');
+        pharHistoryPagination.bindEvents('pharHistory');
+      }
     }
 
-    document.getElementById('btnRefreshPharHistory')?.addEventListener('click', renderPharmacyHistoryTab);
-    wireHistoryInvoiceButtons();
+    // Filter event
+    const searchInput = document.getElementById('pharHistorySearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => updatePharHistoryView(false));
+    }
+
+    document.getElementById('btnRefreshPharHistory')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshPharHistory');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        const res = await cvFetch('/api/pharmacy/bills/history');
+        if (res && res.success && Array.isArray(res.data)) {
+          pharAllSalesHistory = res.data;
+        }
+        updatePharHistoryView(true);
+      } catch (e) {
+        console.error('Error refreshing pharmacy history:', e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh';
+        }
+      }
+    });
+
+    updatePharHistoryView(false);
   }
 
   function renderHistoryTableBodyHtml(bills) {
@@ -7402,7 +7930,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     if (tab === 'orders') {
       document.getElementById('tabBtnLabOrders')?.classList.add('active');
       renderLabOrdersTab();
-    } else if (tab === 'processing') {
+    } else if (tab === 'processing' || tab === 'history') {
       document.getElementById('tabBtnLabProcessing')?.classList.add('active');
       renderLabProcessingTab();
     }
@@ -8204,9 +8732,25 @@ function renderPharmacyModule(activeTab = 'billing') {
   // ------------------------------------------------------------------
   // TAB 2: LABORATORY PROCESSING
   // ------------------------------------------------------------------
+  let labProcessingPagination = null;
+
   async function renderLabProcessingTab() {
     const container = document.getElementById('labTabContent');
     if (!container) return;
+
+    if (!labProcessingPagination) {
+      labProcessingPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          renderLabProcessingRows(pagedItems);
+          const mount = document.getElementById('labProcessingPaginationMount');
+          if (mount) {
+            mount.innerHTML = labProcessingPagination.renderControlsHtml('labProcessing');
+            labProcessingPagination.bindEvents('labProcessing');
+          }
+        }
+      });
+    }
 
     container.innerHTML = `
       <div class="cv-lab-processing-wrapper">
@@ -8230,7 +8774,7 @@ function renderPharmacyModule(activeTab = 'billing') {
               </i>
               <input type="text" id="labProcessingSearchInput" placeholder="Search by Order ID, Patient, UHID, OP, Test..." value="${escapeHtml(labCurrentProcessingSearch)}">
             </div>
-            <button type="button" class="cv-btn-secondary" id="btnLabRefreshOrders" title="Refresh List" style="height:36px; padding:0 0.75rem;">
+            <button type="button" class="cv-btn-secondary" id="btnLabRefreshOrders" title="Refresh List" style="height:36px; padding:0 0.75rem; display:inline-flex; align-items:center; justify-content:center;">
               <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </button>
           </div>
@@ -8255,16 +8799,17 @@ function renderPharmacyModule(activeTab = 'billing') {
                 </tr>
               </thead>
               <tbody id="labProcessingTableBody">
-                <!-- Populated dynamically -->
+                <!-- Populated dynamically via pagination -->
               </tbody>
             </table>
           </div>
+          <div id="labProcessingPaginationMount"></div>
         </div>
       </div>
     `;
 
     setupLabProcessingEvents();
-    loadLabProcessingOrders();
+    loadLabProcessingOrders(false);
   }
 
   function setupLabProcessingEvents() {
@@ -8274,7 +8819,7 @@ function renderPharmacyModule(activeTab = 'billing') {
         document.querySelectorAll('#labStatusFilterPills .cv-filter-pill').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         labActiveFilter = btn.getAttribute('data-filter') || 'ALL';
-        loadLabProcessingOrders();
+        loadLabProcessingOrders(false);
       });
     });
 
@@ -8285,18 +8830,30 @@ function renderPharmacyModule(activeTab = 'billing') {
         labCurrentProcessingSearch = e.target.value.trim();
         if (labProcessingSearchDebounce) clearTimeout(labProcessingSearchDebounce);
         labProcessingSearchDebounce = setTimeout(() => {
-          loadLabProcessingOrders();
+          loadLabProcessingOrders(false);
         }, 300);
       });
     }
 
     // Refresh button
-    document.getElementById('btnLabRefreshOrders')?.addEventListener('click', () => {
-      loadLabProcessingOrders();
+    document.getElementById('btnLabRefreshOrders')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnLabRefreshOrders');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle;"></span>';
+      }
+      try {
+        await loadLabProcessingOrders(true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>';
+        }
+      }
     });
   }
 
-  async function loadLabProcessingOrders() {
+  async function loadLabProcessingOrders(preservePage = false) {
     const tbody = document.getElementById('labProcessingTableBody');
     const loader = document.getElementById('labProcessingLoading');
     if (!tbody) return;
@@ -8317,16 +8874,31 @@ function renderPharmacyModule(activeTab = 'billing') {
 
       if (res && res.success && Array.isArray(res.data)) {
         labProcessingOrders = res.data;
-        renderLabProcessingRows(labProcessingOrders);
+        if (!labProcessingPagination) {
+          labProcessingPagination = createHistoryPaginationController({
+            defaultPageSize: 10,
+            onPageChange: (pagedItems) => {
+              renderLabProcessingRows(pagedItems);
+              const mount = document.getElementById('labProcessingPaginationMount');
+              if (mount) {
+                mount.innerHTML = labProcessingPagination.renderControlsHtml('labProcessing');
+                labProcessingPagination.bindEvents('labProcessing');
+              }
+            }
+          });
+        }
+        const paged = labProcessingPagination.setItems(labProcessingOrders, preservePage);
+        renderLabProcessingRows(paged);
+        const mount = document.getElementById('labProcessingPaginationMount');
+        if (mount) {
+          mount.innerHTML = labProcessingPagination.renderControlsHtml('labProcessing');
+          labProcessingPagination.bindEvents('labProcessing');
+        }
       } else {
         labProcessingOrders = [];
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="7" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">
-              No laboratory orders found.
-            </td>
-          </tr>
-        `;
+        renderLabProcessingRows([]);
+        const mount = document.getElementById('labProcessingPaginationMount');
+        if (mount) mount.innerHTML = '';
       }
     } catch (err) {
       if (loader) loader.style.display = 'none';
@@ -13653,69 +14225,94 @@ function renderPharmacyModule(activeTab = 'billing') {
   }
 
   // Central Billing History View
+  // Central Billing History View
+  let cbHistoryPagination = null;
+  let cbHistoryAllBills = [];
+
   async function renderMainBillingHistoryView() {
     const mount = document.getElementById('mainBillingSubViewMount');
     if (!mount) return;
+
+    if (!cbHistoryPagination) {
+      cbHistoryPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          const tbody = document.getElementById('cbHistoryTableBody');
+          if (tbody) tbody.innerHTML = renderCbHistoryRows(pagedItems);
+          const pMount = document.getElementById('cbHistoryPaginationMount');
+          if (pMount) {
+            pMount.innerHTML = cbHistoryPagination.renderControlsHtml('cbHistory');
+            cbHistoryPagination.bindEvents('cbHistory');
+          }
+        }
+      });
+    }
+
     mount.innerHTML = '<div class="cv-spinner" style="margin:2.5rem auto;"></div>';
 
     try {
       const res = await Api.get('/api/billing/central/history');
-      const bills = (res && res.success) ? res.data : [];
+      cbHistoryAllBills = (res && res.success && Array.isArray(res.data)) ? res.data : [];
 
       mount.innerHTML = `
-        <div class="cv-pharmacy-card">
+        <div class="cv-pharmacy-card" style="box-shadow:var(--cv-shadow-sm);">
           <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Central Billing History &amp; Issued Invoices
             </div>
-            <div style="display:flex; gap:0.5rem; align-items:center;">
-              <input type="text" id="cbHistoryFilterInput" class="cv-form-input" style="height:34px; font-size:0.82rem; width:240px;" placeholder="Search bill, invoice, patient, UHID...">
-              <select id="cbHistoryStatusFilter" class="cv-form-select" style="height:34px; font-size:0.82rem; width:130px;">
+            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+              <input type="text" id="cbHistoryFilterInput" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Search bill, invoice, patient, UHID...">
+              <select id="cbHistoryStatusFilter" class="cv-form-select" style="height:34px; font-size:0.82rem; width:125px;">
                 <option value="">All Statuses</option>
                 <option value="PAID">Paid</option>
                 <option value="PARTIALLY PAID">Partially Paid</option>
                 <option value="UNPAID">Unpaid</option>
               </select>
+              <button type="button" class="cv-btn-secondary" id="btnRefreshCbHistory" style="height:34px; padding:0 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+              </button>
             </div>
           </div>
 
-          <div class="cv-bill-table-wrapper">
-            <table class="cv-bill-table" id="cbHistoryTable">
-              <thead>
+          <!-- Compact Fixed/Controlled Layout for Table -->
+          <div class="cv-bill-table-wrapper" style="max-height: 480px; overflow-y: auto; overflow-x: auto; margin-top:0; border:1px solid var(--cv-border); border-radius:6px 6px 0 0;">
+            <table class="cv-bill-table" id="cbHistoryTable" style="margin-bottom:0;">
+              <thead style="position:sticky; top:0; z-index:10; background:#f8fafc;">
                 <tr>
-                  <th>Central Bill No</th>
-                  <th>Invoice Number</th>
-                  <th>Date &amp; Time</th>
+                  <th style="white-space:nowrap;">Central Bill No</th>
+                  <th style="white-space:nowrap;">Invoice Number</th>
+                  <th style="white-space:nowrap;">Date &amp; Time</th>
                   <th>Patient Name</th>
                   <th>UHID</th>
                   <th>OP / IP ID</th>
-                  <th style="text-align:right;">Subtotal</th>
-                  <th style="text-align:right;">Discount</th>
-                  <th style="text-align:right;">GST</th>
-                  <th style="text-align:right;">Final Total</th>
-                  <th style="text-align:right;">Paid</th>
-                  <th style="text-align:right;">Balance</th>
+                  <th style="text-align:right; white-space:nowrap;">Subtotal</th>
+                  <th style="text-align:right; white-space:nowrap;">Discount</th>
+                  <th style="text-align:right; white-space:nowrap;">GST</th>
+                  <th style="text-align:right; white-space:nowrap;">Final Total</th>
+                  <th style="text-align:right; white-space:nowrap;">Paid</th>
+                  <th style="text-align:right; white-space:nowrap;">Balance</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th style="text-align:center;">Actions</th>
                 </tr>
               </thead>
               <tbody id="cbHistoryTableBody">
-                ${renderCbHistoryRows(bills)}
+                <!-- Sliced via pagination controller -->
               </tbody>
             </table>
           </div>
+          <div id="cbHistoryPaginationMount"></div>
         </div>
       `;
 
-      const filterInput = document.getElementById('cbHistoryFilterInput');
-      const filterStatus = document.getElementById('cbHistoryStatusFilter');
-      const tableBody = document.getElementById('cbHistoryTableBody');
+      function filterCbHistory(preservePage = false) {
+        const filterInput = document.getElementById('cbHistoryFilterInput');
+        const filterStatus = document.getElementById('cbHistoryStatusFilter');
+        const q = filterInput ? filterInput.value.toLowerCase().trim() : '';
+        const st = filterStatus ? filterStatus.value.toUpperCase().trim() : '';
 
-      function filterCbHistory() {
-        const q = filterInput.value.toLowerCase().trim();
-        const st = filterStatus.value.toUpperCase().trim();
-        const filtered = bills.filter(b => {
+        const filtered = cbHistoryAllBills.filter(b => {
           const matchQ = !q ||
             (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
             (b.invoiceNumber && b.invoiceNumber.toLowerCase().includes(q)) ||
@@ -13726,11 +14323,44 @@ function renderPharmacyModule(activeTab = 'billing') {
           const matchSt = !st || (b.paymentStatus && b.paymentStatus.toUpperCase() === st);
           return matchQ && matchSt;
         });
-        tableBody.innerHTML = renderCbHistoryRows(filtered);
+
+        const paged = cbHistoryPagination.setItems(filtered, preservePage);
+        const tbody = document.getElementById('cbHistoryTableBody');
+        if (tbody) tbody.innerHTML = renderCbHistoryRows(paged);
+
+        const pMount = document.getElementById('cbHistoryPaginationMount');
+        if (pMount) {
+          pMount.innerHTML = cbHistoryPagination.renderControlsHtml('cbHistory');
+          cbHistoryPagination.bindEvents('cbHistory');
+        }
       }
 
-      filterInput?.addEventListener('input', filterCbHistory);
-      filterStatus?.addEventListener('change', filterCbHistory);
+      document.getElementById('cbHistoryFilterInput')?.addEventListener('input', () => filterCbHistory(false));
+      document.getElementById('cbHistoryStatusFilter')?.addEventListener('change', () => filterCbHistory(false));
+
+      document.getElementById('btnRefreshCbHistory')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnRefreshCbHistory');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+        }
+        try {
+          const r = await Api.get('/api/billing/central/history');
+          if (r && r.success && Array.isArray(r.data)) {
+            cbHistoryAllBills = r.data;
+          }
+          filterCbHistory(true);
+        } catch (e) {
+          console.error('Error refreshing central billing history:', e);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
+          }
+        }
+      });
+
+      filterCbHistory(false);
 
     } catch (e) {
       mount.innerHTML = '<div class="cv-alert cv-alert-error">Failed to load Central Billing history from MySQL.</div>';
@@ -14134,145 +14764,256 @@ function renderPharmacyModule(activeTab = 'billing') {
           <button type="button" class="cv-btn-primary" onclick="Admin.applyCustomMoneyDateRange()" style="height:36px; padding:0 1rem; font-size:0.82rem;">Apply Filter</button>
         </div>
 
-        <!-- Main Financial KPI Summary Cards -->
-        <div class="cv-money-kpi-grid">
-
-          <!-- 1. Total Revenue -->
-          <div class="cv-money-kpi-card cv-money-kpi-rev">
-            <div>
-              <div class="cv-money-kpi-title">
-                <span>TOTAL REVENUE (BILLED)</span>
-                <span class="cv-money-badge-rev">REVENUE</span>
-              </div>
-              <div class="cv-money-kpi-amount" style="color:#065f46;">₹${formatCurrency(data.totalRevenueBilled)}</div>
-            </div>
-            <div class="cv-money-kpi-meta">
-              <div style="display:flex; justify-content:space-between;">
-                <span>Actual Collected:</span>
-                <strong style="color:#059669;">₹${formatCurrency(data.totalRevenueCollected)}</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between;">
-                <span>Unpaid Balance:</span>
-                <strong style="color:#dc2626;">₹${formatCurrency(data.totalOutstanding)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. Total Expenses -->
-          <div class="cv-money-kpi-card cv-money-kpi-exp">
-            <div>
-              <div class="cv-money-kpi-title">
-                <span>TOTAL EXPENSES</span>
-                <span class="cv-money-badge-exp">EXPENSES</span>
-              </div>
-              <div class="cv-money-kpi-amount" style="color:#92400e;">₹${formatCurrency(data.totalExpenses)}</div>
-            </div>
-            <div class="cv-money-kpi-meta">
-              <div style="display:flex; justify-content:space-between;">
-                <span>Pharmacy Purchases:</span>
-                <strong>₹${formatCurrency(data.expenseBreakdown?.pharmacyPurchasesTotal || 0)}</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between;">
-                <span>Hospital Operational:</span>
-                <strong>₹${formatCurrency(data.expenseBreakdown?.operationalExpensesTotal || 0)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. Net Amount -->
-          <div class="cv-money-kpi-card cv-money-kpi-net">
-            <div>
-              <div class="cv-money-kpi-title">
-                <span>NET AMOUNT</span>
-                <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; ${netIsPositive ? 'background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;' : 'background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;'}">
-                  ${netIsPositive ? 'NET SURPLUS' : 'NET DEFICIT'}
-                </span>
-              </div>
-              <div class="cv-money-kpi-amount" style="color:${netIsPositive ? '#059669' : '#b91c1c'};">
-                ${netIsPositive ? '' : '- '}₹${formatCurrency(Math.abs(data.netAmount || 0))}
-              </div>
-            </div>
-            <div class="cv-money-kpi-meta">
-              <div style="display:flex; justify-content:space-between;">
-                <span>Formula:</span>
-                <span style="font-family:monospace; color:#475569;">Revenue - Expenses</span>
-              </div>
-              <div style="display:flex; justify-content:space-between;">
-                <span>Collected Cash Net:</span>
-                <strong style="color:${(data.netCollected || 0) >= 0 ? '#059669' : '#b91c1c'};">₹${formatCurrency(data.netCollected || 0)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- 4. Total Outstanding -->
-          <div class="cv-money-kpi-card cv-money-kpi-out">
-            <div>
-              <div class="cv-money-kpi-title">
-                <span>TOTAL OUTSTANDING</span>
-                <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">UNCOLLECTED</span>
-              </div>
-              <div class="cv-money-kpi-amount" style="color:#b91c1c;">₹${formatCurrency(data.totalOutstanding)}</div>
-            </div>
-            <div class="cv-money-kpi-meta">
-              <div style="display:flex; justify-content:space-between;">
-                <span>OP Outstanding:</span>
-                <strong>₹${formatCurrency(data.revenueSources?.op?.outstanding || 0)}</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between;">
-                <span>IP Outstanding:</span>
-                <strong>₹${formatCurrency(data.revenueSources?.ip?.outstanding || 0)}</strong>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Today's Financial Snapshot -->
-        <div class="cv-money-today-bar">
-          <div style="display:flex; align-items:center; gap:0.5rem; font-weight:700; color:var(--cv-deep-blue);">
-            <svg style="width:16px; height:16px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            TODAY'S FINANCIAL ACTIVITY:
-          </div>
-          <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
-            <div>Today's Revenue: <strong style="color:#059669; font-weight:800;">₹${formatCurrency(data.todayRevenue || 0)}</strong></div>
-            <div style="color:#cbd5e1;">|</div>
-            <div>Today's Expenses: <strong style="color:#d97706; font-weight:800;">₹${formatCurrency(data.todayExpenses || 0)}</strong></div>
-            <div style="color:#cbd5e1;">|</div>
-            <div>Today's Net: <strong style="color:${(data.todayNet || 0) >= 0 ? '#059669' : '#b91c1c'}; font-weight:800;">₹${formatCurrency(data.todayNet || 0)}</strong></div>
-            <div style="color:#cbd5e1;">|</div>
-            <div>Today's Outstanding: <strong style="color:#b91c1c; font-weight:800;">₹${formatCurrency(data.todayOutstanding || 0)}</strong></div>
-          </div>
-        </div>
-
-        <!-- Overall Financial Result Banner (Section 17) -->
-        <div class="cv-money-formula-banner">
-          <div style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.6rem;">OVERALL FINANCIAL SUMMARY</div>
-          <div style="display:flex; align-items:center; justify-content:center; gap:1.25rem; flex-wrap:wrap; font-size:1.15rem; font-weight:800;">
-            <div style="background:#ecfdf5; border:1px solid #a7f3d0; padding:0.6rem 1.25rem; border-radius:8px; text-align:center;">
-              <div style="font-size:0.68rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL REVENUE</div>
-              <div style="color:#065f46; font-size:1.35rem; margin-top:0.2rem;">₹${formatCurrency(data.totalRevenueBilled)}</div>
-            </div>
-            <div style="font-size:1.5rem; color:#94a3b8; font-weight:900;">&minus;</div>
-            <div style="background:#fffbeb; border:1px solid #fde68a; padding:0.6rem 1.25rem; border-radius:8px; text-align:center;">
-              <div style="font-size:0.68rem; font-weight:700; color:#92400e; text-transform:uppercase;">TOTAL EXPENSES</div>
-              <div style="color:#92400e; font-size:1.35rem; margin-top:0.2rem;">₹${formatCurrency(data.totalExpenses)}</div>
-            </div>
-            <div style="font-size:1.5rem; color:#94a3b8; font-weight:900;">&equals;</div>
-            <div style="background:${netIsPositive ? '#ecfdf5' : '#fef2f2'}; border:1px solid ${netIsPositive ? '#a7f3d0' : '#fecaca'}; padding:0.6rem 1.5rem; border-radius:8px; text-align:center;">
-              <div style="font-size:0.68rem; font-weight:700; color:${netIsPositive ? '#065f46' : '#991b1b'}; text-transform:uppercase;">NET AMOUNT</div>
-              <div style="color:${netIsPositive ? '#065f46' : '#b91c1c'}; font-size:1.35rem; margin-top:0.2rem;">
-                ${netIsPositive ? '' : '- '}₹${formatCurrency(Math.abs(data.netAmount || 0))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 1: REVENUE SOURCES & REVENUE ANALYTICS (Section 4 & 12) -->
-        <div class="cv-card" style="padding:1.25rem;">
+        <!-- SECTION D: OVERALL FINANCIAL SUMMARY (Phase 4) -->
+        <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
             <div>
-              <h2 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">Revenue Sources &amp; Clinical Analytics</h2>
-              <p style="font-size:0.78rem; color:var(--cv-text-muted); margin:0.2rem 0 0 0;">Department-wise generated revenue, actual cash collection &amp; outstanding balances</p>
+              <div style="font-size:0.75rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">SECTION D &bull; EXECUTIVE FINANCIAL SUMMARY</div>
+              <h2 style="font-size:1.15rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Overall Financial Performance</h2>
+            </div>
+            <div style="font-size:0.75rem; color:#64748b; background:#f1f5f9; padding:0.35rem 0.75rem; border-radius:6px;">
+              Sales &amp; Collections are separated &bull; Zero Double-Counting
+            </div>
+          </div>
+
+          <div class="cv-money-kpi-grid">
+            <!-- 1. Total Sales / Billed -->
+            <div class="cv-money-kpi-card cv-money-kpi-rev">
+              <div>
+                <div class="cv-money-kpi-title">
+                  <span>TOTAL SALES (BILLED)</span>
+                  <span class="cv-money-badge-rev">INVOICED</span>
+                </div>
+                <div class="cv-money-kpi-amount" style="color:#065f46;">₹${formatCurrency(data.totalRevenueBilled)}</div>
+              </div>
+              <div class="cv-money-kpi-meta">
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Gross Services Billed:</span>
+                  <strong style="color:#065f46;">₹${formatCurrency(data.totalRevenueBilled)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Total Collection / Received -->
+            <div class="cv-money-kpi-card" style="border-left:4px solid #059669; background:#ffffff;">
+              <div>
+                <div class="cv-money-kpi-title">
+                  <span>TOTAL COLLECTION</span>
+                  <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;">RECEIVED</span>
+                </div>
+                <div class="cv-money-kpi-amount" style="color:#059669;">₹${formatCurrency(data.totalRevenueCollected)}</div>
+              </div>
+              <div class="cv-money-kpi-meta">
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Actual Cash Realized:</span>
+                  <strong style="color:#059669;">₹${formatCurrency(data.totalRevenueCollected)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Total Outstanding / Receivable -->
+            <div class="cv-money-kpi-card cv-money-kpi-out">
+              <div>
+                <div class="cv-money-kpi-title">
+                  <span>TOTAL OUTSTANDING</span>
+                  <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">RECEIVABLE</span>
+                </div>
+                <div class="cv-money-kpi-amount" style="color:#b91c1c;">₹${formatCurrency(data.totalOutstanding)}</div>
+              </div>
+              <div class="cv-money-kpi-meta">
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Unpaid Patient Dues:</span>
+                  <strong style="color:#dc2626;">₹${formatCurrency(data.totalOutstanding)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Total Expenses -->
+            <div class="cv-money-kpi-card cv-money-kpi-exp">
+              <div>
+                <div class="cv-money-kpi-title">
+                  <span>TOTAL EXPENSES</span>
+                  <span class="cv-money-badge-exp">EXPENSES</span>
+                </div>
+                <div class="cv-money-kpi-amount" style="color:#92400e;">₹${formatCurrency(data.totalExpenses)}</div>
+              </div>
+              <div class="cv-money-kpi-meta">
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Operational &amp; Purchases:</span>
+                  <strong style="color:#92400e;">₹${formatCurrency(data.totalExpenses)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Net Amount -->
+            <div class="cv-money-kpi-card cv-money-kpi-net">
+              <div>
+                <div class="cv-money-kpi-title">
+                  <span>NET AMOUNT</span>
+                  <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; ${netIsPositive ? 'background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;' : 'background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;'}">
+                    ${netIsPositive ? 'SURPLUS' : 'DEFICIT'}
+                  </span>
+                </div>
+                <div class="cv-money-kpi-amount" style="color:${netIsPositive ? '#059669' : '#b91c1c'};">
+                  ${netIsPositive ? '' : '- '}₹${formatCurrency(Math.abs(data.netAmount || 0))}
+                </div>
+              </div>
+              <div class="cv-money-kpi-meta">
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Net Cash Realized:</span>
+                  <strong style="color:${(data.netCollected || 0) >= 0 ? '#059669' : '#b91c1c'};">₹${formatCurrency(data.netCollected || 0)}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial Formula Calculation Banner -->
+          <div class="cv-money-formula-banner" style="margin-top:1.25rem;">
+            <div style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.6rem;">OVERALL FINANCIAL FORMULA LEDGER</div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:1.25rem; flex-wrap:wrap; font-size:1.15rem; font-weight:800;">
+              <div style="background:#ecfdf5; border:1px solid #a7f3d0; padding:0.6rem 1.25rem; border-radius:8px; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL SALES (BILLED)</div>
+                <div style="color:#065f46; font-size:1.35rem; margin-top:0.2rem;">₹${formatCurrency(data.totalRevenueBilled)}</div>
+              </div>
+              <div style="font-size:1.5rem; color:#94a3b8; font-weight:900;">&minus;</div>
+              <div style="background:#fffbeb; border:1px solid #fde68a; padding:0.6rem 1.25rem; border-radius:8px; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:700; color:#92400e; text-transform:uppercase;">TOTAL EXPENSES</div>
+                <div style="color:#92400e; font-size:1.35rem; margin-top:0.2rem;">₹${formatCurrency(data.totalExpenses)}</div>
+              </div>
+              <div style="font-size:1.5rem; color:#94a3b8; font-weight:900;">&equals;</div>
+              <div style="background:${netIsPositive ? '#ecfdf5' : '#fef2f2'}; border:1px solid ${netIsPositive ? '#a7f3d0' : '#fecaca'}; padding:0.6rem 1.5rem; border-radius:8px; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:700; color:${netIsPositive ? '#065f46' : '#991b1b'}; text-transform:uppercase;">NET AMOUNT</div>
+                <div style="color:${netIsPositive ? '#065f46' : '#b91c1c'}; font-size:1.35rem; margin-top:0.2rem;">
+                  ${netIsPositive ? '' : '- '}₹${formatCurrency(Math.abs(data.netAmount || 0))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- THREE-SECTION BREAKDOWN: A. SALES, B. COLLECTIONS, C. OUTSTANDING (Phase 4) -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem; margin-bottom:1.25rem;">
+
+          <!-- SECTION A: SALES / BILLING -->
+          <div class="cv-card" style="padding:1.25rem; border-top:4px solid #2563eb;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem;">
+              <div>
+                <h3 style="font-size:1rem; font-weight:800; color:#1e3a8a; margin:0;">A. SALES / BILLING</h3>
+                <span style="font-size:0.75rem; color:#64748b;">Total Invoiced Service Revenue</span>
+              </div>
+              <span style="font-size:0.72rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:4px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">BILLED</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.85rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">OP Sales:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.op?.billed || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">IP Sales:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.ip?.billed || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Pharmacy Sales:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.pharmacy?.billed || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Laboratory Sales:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.laboratory?.billed || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Other Sales:</span>
+                <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.other?.billed || data.revenueSources?.doctors?.billed || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.65rem 0.75rem; background:#eff6ff; border-radius:6px; border:1px solid #bfdbfe; margin-top:0.35rem;">
+                <span style="color:#1e3a8a; font-weight:800; font-size:0.9rem;">Total Sales:</span>
+                <strong style="color:#1d4ed8; font-size:1.15rem;">₹${formatCurrency(data.totalRevenueBilled)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION B: COLLECTIONS / RECEIVED AMOUNT -->
+          <div class="cv-card" style="padding:1.25rem; border-top:4px solid #059669;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem;">
+              <div>
+                <h3 style="font-size:1rem; font-weight:800; color:#065f46; margin:0;">B. COLLECTIONS / RECEIVED</h3>
+                <span style="font-size:0.75rem; color:#64748b;">Actual Cash &amp; Digital Realized</span>
+              </div>
+              <span style="font-size:0.72rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:4px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;">RECEIVED</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.85rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">OP Collection:</span>
+                <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.op?.collected || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">IP Collection:</span>
+                <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.ip?.collected || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Pharmacy Collection:</span>
+                <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.pharmacy?.collected || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Laboratory Collection:</span>
+                <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.laboratory?.collected || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Other Collection:</span>
+                <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.other?.collected || data.revenueSources?.doctors?.collected || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.65rem 0.75rem; background:#ecfdf5; border-radius:6px; border:1px solid #a7f3d0; margin-top:0.35rem;">
+                <span style="color:#065f46; font-weight:800; font-size:0.9rem;">Total Collection:</span>
+                <strong style="color:#059669; font-size:1.15rem;">₹${formatCurrency(data.totalRevenueCollected)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION C: OUTSTANDING / RECEIVABLE -->
+          <div class="cv-card" style="padding:1.25rem; border-top:4px solid #dc2626;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem;">
+              <div>
+                <h3 style="font-size:1rem; font-weight:800; color:#991b1b; margin:0;">C. OUTSTANDING / RECEIVABLE</h3>
+                <span style="font-size:0.75rem; color:#64748b;">Remaining Patient Balances Due</span>
+              </div>
+              <span style="font-size:0.72rem; font-weight:700; padding:0.2rem 0.55rem; border-radius:4px; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">RECEIVABLE</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.65rem; font-size:0.85rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">OP Outstanding:</span>
+                <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.op?.outstanding || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">IP Outstanding:</span>
+                <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.ip?.outstanding || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Pharmacy Outstanding:</span>
+                <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.pharmacy?.outstanding || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Laboratory Outstanding:</span>
+                <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.laboratory?.outstanding || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; background:#f8fafc; border-radius:6px;">
+                <span style="color:#475569; font-weight:600;">Other Outstanding:</span>
+                <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.other?.outstanding || data.revenueSources?.doctors?.outstanding || 0)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:0.65rem 0.75rem; background:#fef2f2; border-radius:6px; border:1px solid #fecaca; margin-top:0.35rem;">
+                <span style="color:#991b1b; font-weight:800; font-size:0.9rem;">Total Outstanding:</span>
+                <strong style="color:#b91c1c; font-size:1.15rem;">₹${formatCurrency(data.totalOutstanding)}</strong>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SECTION 6: CATEGORY-WISE PERFORMANCE & RECOVERY VIEW (Phase 4) -->
+        <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">CATEGORY-WISE VIEW &bull; OP / IP / PHARMACY / LABORATORY</div>
+              <h2 style="font-size:1.1rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Department Clinical &amp; Financial Analytics</h2>
+              <p style="font-size:0.78rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Discrete reporting of Billed, Collected, Outstanding, and Transaction count per department</p>
             </div>
             <span class="cv-money-badge-rev">Total Billed: ₹${formatCurrency(data.totalRevenueBilled)}</span>
           </div>
@@ -14280,109 +15021,125 @@ function renderPharmacyModule(activeTab = 'billing') {
           <!-- Visual Distribution Chart Bar -->
           ${renderRevenueVisualDistributionBar(data.revenueSources)}
 
-          <!-- 4 Revenue Source Cards -->
+          <!-- 4 Category-Wise Cards -->
           <div class="cv-money-sources-grid" style="margin-top:1.25rem;">
 
-            <!-- OP Revenue -->
+            <!-- OP Category -->
             <div class="cv-money-source-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; font-size:0.85rem; color:var(--cv-deep-blue); display:flex; align-items:center; gap:0.35rem;">
                   <span style="width:10px; height:10px; border-radius:50%; background:#3b82f6; display:inline-block;"></span>
-                  OP REVENUE
+                  OP DEPARTMENT
                 </span>
-                <span style="font-size:0.75rem; font-weight:700; color:#3b82f6;">${data.revenueSources?.op?.percentage || 0}%</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#3b82f6;">${data.revenueSources?.op?.percentage || 0}% share</span>
               </div>
               <div style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:0.2rem 0;">₹${formatCurrency(data.revenueSources?.op?.billed || 0)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.2rem; border-top:1px solid #f1f5f9; padding-top:0.4rem;">
+              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.25rem; border-top:1px solid #f1f5f9; padding-top:0.45rem;">
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Collections:</span>
+                  <span>Sales / Billed:</span>
+                  <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.op?.billed || 0)}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Collection / Received:</span>
                   <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.op?.collected || 0)}</strong>
                 </div>
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Outstanding:</span>
+                  <span>Outstanding Due:</span>
                   <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.op?.outstanding || 0)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between;">
-                  <span>Registrations:</span>
+                <div style="display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:0.25rem;">
+                  <span>Transaction Count:</span>
                   <strong>${data.revenueSources?.op?.count || 0} visits</strong>
                 </div>
               </div>
             </div>
 
-            <!-- IP Revenue -->
+            <!-- IP Category -->
             <div class="cv-money-source-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; font-size:0.85rem; color:var(--cv-deep-blue); display:flex; align-items:center; gap:0.35rem;">
                   <span style="width:10px; height:10px; border-radius:50%; background:#10b981; display:inline-block;"></span>
-                  IP REVENUE
+                  IP INPATIENTS
                 </span>
-                <span style="font-size:0.75rem; font-weight:700; color:#10b981;">${data.revenueSources?.ip?.percentage || 0}%</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#10b981;">${data.revenueSources?.ip?.percentage || 0}% share</span>
               </div>
               <div style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:0.2rem 0;">₹${formatCurrency(data.revenueSources?.ip?.billed || 0)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.2rem; border-top:1px solid #f1f5f9; padding-top:0.4rem;">
+              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.25rem; border-top:1px solid #f1f5f9; padding-top:0.45rem;">
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Collections:</span>
+                  <span>Sales / Billed:</span>
+                  <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.ip?.billed || 0)}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Collection / Received:</span>
                   <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.ip?.collected || 0)}</strong>
                 </div>
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Outstanding:</span>
+                  <span>Outstanding Due:</span>
                   <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.ip?.outstanding || 0)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between;">
-                  <span>Admissions:</span>
-                  <strong>${data.revenueSources?.ip?.count || 0} patients</strong>
+                <div style="display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:0.25rem;">
+                  <span>Transaction Count:</span>
+                  <strong>${data.revenueSources?.ip?.count || 0} admissions</strong>
                 </div>
               </div>
             </div>
 
-            <!-- Pharmacy Revenue -->
+            <!-- Pharmacy Category -->
             <div class="cv-money-source-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; font-size:0.85rem; color:var(--cv-deep-blue); display:flex; align-items:center; gap:0.35rem;">
                   <span style="width:10px; height:10px; border-radius:50%; background:#8b5cf6; display:inline-block;"></span>
-                  PHARMACY REVENUE
+                  PHARMACY DISPENSARY
                 </span>
-                <span style="font-size:0.75rem; font-weight:700; color:#8b5cf6;">${data.revenueSources?.pharmacy?.percentage || 0}%</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#8b5cf6;">${data.revenueSources?.pharmacy?.percentage || 0}% share</span>
               </div>
               <div style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:0.2rem 0;">₹${formatCurrency(data.revenueSources?.pharmacy?.billed || 0)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.2rem; border-top:1px solid #f1f5f9; padding-top:0.4rem;">
+              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.25rem; border-top:1px solid #f1f5f9; padding-top:0.45rem;">
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Collections:</span>
+                  <span>Sales / Billed:</span>
+                  <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.pharmacy?.billed || 0)}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Collection / Received:</span>
                   <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.pharmacy?.collected || 0)}</strong>
                 </div>
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Outstanding:</span>
+                  <span>Outstanding Due:</span>
                   <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.pharmacy?.outstanding || 0)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between;">
-                  <span>Sales Bills:</span>
-                  <strong>${data.revenueSources?.pharmacy?.count || 0} bills</strong>
+                <div style="display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:0.25rem;">
+                  <span>Transaction Count:</span>
+                  <strong>${data.revenueSources?.pharmacy?.count || 0} sales bills</strong>
                 </div>
               </div>
             </div>
 
-            <!-- Laboratory Revenue -->
+            <!-- Laboratory Category -->
             <div class="cv-money-source-card">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; font-size:0.85rem; color:var(--cv-deep-blue); display:flex; align-items:center; gap:0.35rem;">
                   <span style="width:10px; height:10px; border-radius:50%; background:#f59e0b; display:inline-block;"></span>
-                  LABORATORY REVENUE
+                  LABORATORY DIAGNOSTICS
                 </span>
-                <span style="font-size:0.75rem; font-weight:700; color:#f59e0b;">${data.revenueSources?.laboratory?.percentage || 0}%</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#f59e0b;">${data.revenueSources?.laboratory?.percentage || 0}% share</span>
               </div>
               <div style="font-size:1.35rem; font-weight:800; color:#0f172a; margin:0.2rem 0;">₹${formatCurrency(data.revenueSources?.laboratory?.billed || 0)}</div>
-              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.2rem; border-top:1px solid #f1f5f9; padding-top:0.4rem;">
+              <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; flex-direction:column; gap:0.25rem; border-top:1px solid #f1f5f9; padding-top:0.45rem;">
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Collections:</span>
+                  <span>Sales / Billed:</span>
+                  <strong style="color:#0f172a;">₹${formatCurrency(data.revenueSources?.laboratory?.billed || 0)}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>Collection / Received:</span>
                   <strong style="color:#059669;">₹${formatCurrency(data.revenueSources?.laboratory?.collected || 0)}</strong>
                 </div>
                 <div style="display:flex; justify-content:space-between;">
-                  <span>Outstanding:</span>
+                  <span>Outstanding Due:</span>
                   <strong style="color:#dc2626;">₹${formatCurrency(data.revenueSources?.laboratory?.outstanding || 0)}</strong>
                 </div>
-                <div style="display:flex; justify-content:space-between;">
-                  <span>Lab Orders:</span>
-                  <strong>${data.revenueSources?.laboratory?.count || 0} tests</strong>
+                <div style="display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:0.25rem;">
+                  <span>Transaction Count:</span>
+                  <strong>${data.revenueSources?.laboratory?.count || 0} lab tests</strong>
                 </div>
               </div>
             </div>
@@ -15199,7 +15956,8 @@ function renderPharmacyModule(activeTab = 'billing') {
     openPaymentDoneModal: openPaymentDoneModal,
     executeBillPayment: executeBillPayment,
     refreshCurrentBillingCategory: refreshCurrentBillingCategory,
-    showPaymentConfirmationModal: showPaymentConfirmationModal
+    showPaymentConfirmationModal: showPaymentConfirmationModal,
+    showBedPaymentModal: showBedPaymentModal
   };
 })();
 window.AdminModule = Admin;
