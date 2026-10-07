@@ -10327,6 +10327,173 @@ function renderPharmacyModule(activeTab = 'billing') {
     // Deprecated: Separate Paid / Payment Done modal removed in favor of direct Amount Paid + Submit flow
   }
 
+  // ----------------------------------------------------------
+  // CENTRAL BILLING PAYMENT CONFIRMATION & PRINT MODAL ENGINE
+  // Shows clean confirmation popup before saving to MySQL.
+  // After confirmation, shows success state with optional Print.
+  // Cancel preserves all data unchanged.
+  // ----------------------------------------------------------
+  function showPaymentConfirmationModal(config) {
+    const {
+      title = 'Confirm Payment',
+      billRef = '',
+      paymentAmount = 0,
+      remainingBalance = 0,
+      moduleType = 'BILLING',
+      printButtonLabel = 'Print Bill',
+      onCancel,
+      onConfirm,
+      onPrint
+    } = config;
+
+    const prev = document.getElementById('cvPaymentConfirmBackdrop');
+    if (prev) prev.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'cv-modal-backdrop show';
+    backdrop.id = 'cvPaymentConfirmBackdrop';
+    backdrop.style.zIndex = '1050';
+
+    const billRefHtml = billRef ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; padding-bottom:0.5rem; border-bottom:1px dashed #cbd5e1;">
+        <span style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase;">Reference:</span>
+        <strong style="font-size:0.92rem; font-family:monospace; color:#0f172a;">${escapeHtml(billRef)}</strong>
+      </div>
+    ` : '';
+
+    backdrop.innerHTML = `
+      <div class="cv-modal" style="max-width: 440px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.22); border:1px solid #cbd5e1; background:#ffffff;">
+        <div class="cv-modal-header" style="background:#f8fafc; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--cv-border);">
+          <div style="display:flex; align-items:center; gap:0.6rem;">
+            <span style="width:32px; height:32px; border-radius:8px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center;">
+              <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </span>
+            <h3 class="cv-modal-title" style="margin:0; font-size:1.1rem; font-weight:700; color:#0f172a;" id="cvPaymentConfirmTitle">${escapeHtml(title)}</h3>
+          </div>
+          <button type="button" class="cv-modal-close" id="btnPaymentConfirmClose" style="cursor:pointer;" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="cv-modal-body" id="cvPaymentConfirmBody" style="padding: 1.4rem 1.4rem 1rem 1.4rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.9rem 1.15rem; margin-bottom:1.15rem;">
+            ${billRefHtml}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+              <span style="font-size:0.85rem; font-weight:600; color:#475569;">Payment Amount:</span>
+              <strong style="font-size:1.15rem; color:#0f172a;">₹${formatCurrency(paymentAmount)}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.85rem; font-weight:600; color:#475569;">Remaining Balance:</span>
+              <strong style="font-size:1.15rem; color:${remainingBalance <= 0 ? '#059669' : 'var(--cv-danger)'};">₹${formatCurrency(remainingBalance)}</strong>
+            </div>
+          </div>
+
+          <p style="font-size:0.92rem; color:#334155; margin:0; text-align:center; font-weight:500;">
+            Are you sure you want to confirm this payment?
+          </p>
+        </div>
+
+        <div class="cv-modal-footer" id="cvPaymentConfirmFooter" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:flex-end; gap:0.75rem;">
+          <button type="button" class="cv-btn-secondary" id="btnCancelPaymentConfirm" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
+            Cancel
+          </button>
+          <button type="button" class="cv-btn-primary" id="btnProceedPaymentConfirm" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+            Confirm
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    const closeModal = () => {
+      backdrop.remove();
+      if (typeof onCancel === 'function') onCancel();
+    };
+
+    document.getElementById('btnPaymentConfirmClose')?.addEventListener('click', closeModal);
+    document.getElementById('btnCancelPaymentConfirm')?.addEventListener('click', closeModal);
+
+    const confirmBtn = document.getElementById('btnProceedPaymentConfirm');
+    const cancelBtn = document.getElementById('btnCancelPaymentConfirm');
+
+    confirmBtn?.addEventListener('click', async () => {
+      if (confirmBtn.disabled || confirmBtn.dataset.processing === 'true') return;
+
+      confirmBtn.disabled = true;
+      confirmBtn.dataset.processing = 'true';
+      if (cancelBtn) cancelBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; margin-right:4px;"></span> Processing...';
+
+      const showSuccessState = (resultData) => {
+        const bodyEl = document.getElementById('cvPaymentConfirmBody');
+        const footerEl = document.getElementById('cvPaymentConfirmFooter');
+        const titleEl = document.getElementById('cvPaymentConfirmTitle');
+        if (titleEl) titleEl.textContent = 'Payment Confirmed';
+
+        const status = resultData?.paymentStatus || (remainingBalance <= 0 ? 'PAID' : 'PARTIALLY PAID');
+        const isNowPaid = (status === 'PAID');
+        const curPaid = resultData?.amountPaid != null ? resultData.amountPaid : paymentAmount;
+        const curBal = resultData?.balanceAmount != null ? resultData.balanceAmount : remainingBalance;
+        const refNo = resultData?.invoiceNumber || resultData?.billNumber || billRef;
+
+        if (bodyEl) {
+          bodyEl.innerHTML = `
+            <div style="text-align:center; padding:0.5rem 0.25rem;">
+              <div style="width:48px; height:48px; border-radius:50%; background:#dcfce7; color:#16a34a; display:inline-flex; align-items:center; justify-content:center; margin-bottom:0.75rem;">
+                <svg style="width:26px; height:26px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <h4 style="margin:0 0 0.35rem 0; font-size:1.15rem; font-weight:800; color:#0f172a;">Payment Confirmed</h4>
+              <div style="display:inline-block; font-size:0.8rem; font-weight:700; padding:0.25rem 0.75rem; border-radius:9999px; background:${isNowPaid ? '#dcfce7' : '#fef3c7'}; color:${isNowPaid ? '#15803d' : '#b45309'}; margin-bottom:1rem;">
+                Payment Status: ${escapeHtml(status)}
+              </div>
+
+              <div style="background:#f8fafc; border:1px solid var(--cv-border); border-radius:8px; padding:0.85rem 1.15rem; text-align:left; margin-bottom:0.25rem; font-size:0.85rem;">
+                ${refNo ? `<div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;"><span style="color:#64748b;">${moduleType === 'MAIN' || moduleType === 'CENTRAL' ? 'Invoice' : 'Bill'} Number:</span><strong style="font-family:monospace; color:#0f172a;">${escapeHtml(refNo)}</strong></div>` : ''}
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;"><span style="color:#64748b;">Total Paid:</span><strong style="color:#0f172a;">₹${formatCurrency(curPaid)}</strong></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#64748b;">Outstanding Balance:</span><strong style="color:${curBal <= 0 ? '#059669' : 'var(--cv-danger)'};">₹${formatCurrency(curBal)}</strong></div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (footerEl) {
+          footerEl.innerHTML = `
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; width:100%;">
+              <button type="button" class="cv-btn-secondary" id="btnDonePaymentConfirm" style="padding:0.45rem 1.1rem; font-size:0.85rem; font-weight:600;">
+                Close
+              </button>
+              <button type="button" class="cv-btn-primary" id="btnPrintAfterPaymentConfirm" style="padding:0.45rem 1.25rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                ${escapeHtml(printButtonLabel)}
+              </button>
+            </div>
+          `;
+
+          document.getElementById('btnDonePaymentConfirm')?.addEventListener('click', () => backdrop.remove());
+          document.getElementById('btnPrintAfterPaymentConfirm')?.addEventListener('click', () => {
+            backdrop.remove();
+            if (typeof onPrint === 'function') onPrint(resultData);
+          });
+        }
+      };
+
+      if (typeof onConfirm === 'function') {
+        try {
+          await onConfirm(showSuccessState, () => {
+            confirmBtn.disabled = false;
+            delete confirmBtn.dataset.processing;
+            if (cancelBtn) cancelBtn.disabled = false;
+            confirmBtn.innerHTML = 'Confirm';
+          });
+        } catch (e) {
+          confirmBtn.disabled = false;
+          delete confirmBtn.dataset.processing;
+          if (cancelBtn) cancelBtn.disabled = false;
+          confirmBtn.innerHTML = 'Confirm';
+        }
+      }
+    });
+  }
+
   async function refreshCurrentBillingCategory() {
     await loadBillingSummaryData();
     updateBillingKpiValues();
@@ -10706,55 +10873,72 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          await executeBillPayment({
+          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
+
+          showPaymentConfirmationModal({
+            title: 'Confirm Payment',
+            billRef: 'OP Bill: ' + o.opId,
+            paymentAmount: numAmt,
+            remainingBalance: remBal,
             moduleType: 'OP',
-            billId: o.id,
-            billNumber: o.opId,
-            amount: numAmt,
-            balance: curBal,
-            paymentMethod: mthVal,
-            buttonEl: btn,
-            onSuccess: async (data) => {
-              o.paidAmount = data.amountPaid;
-              o.balanceAmount = data.balanceAmount;
-              o.paymentStatus = data.paymentStatus;
-              o.paymentMethod = data.paymentMethod;
-              if (activeOpRecord && activeOpRecord.id === o.id) {
-                activeOpRecord.paidAmount = data.amountPaid;
-                activeOpRecord.balanceAmount = data.balanceAmount;
-                activeOpRecord.paymentStatus = data.paymentStatus;
-                activeOpRecord.paymentMethod = data.paymentMethod;
-              }
-              const isNowPaid = (data.balanceAmount <= 0);
-              const paidEl = document.getElementById(`opSummaryPaid_${o.id}`);
-              const balEl = document.getElementById(`opSummaryBal_${o.id}`);
-              const statusEl = document.getElementById(`opSummaryStatus_${o.id}`);
-              const methodEl = document.getElementById(`opSummaryMethod_${o.id}`);
-              const payArea = document.getElementById(`opPaymentArea_${o.id}`);
-              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-              if (balEl) {
-                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-              }
-              if (statusEl) {
-                statusEl.textContent = data.paymentStatus;
-                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-              }
-              if (methodEl) methodEl.textContent = data.paymentMethod;
-              if (payArea) {
-                if (isNowPaid) {
-                  payArea.innerHTML = '';
-                } else {
-                  if (amtInput) {
-                    amtInput.value = data.balanceAmount.toFixed(2);
-                    amtInput.max = data.balanceAmount.toFixed(2);
+            printButtonLabel: 'Print Bill',
+            onConfirm: async (showSuccessState) => {
+              await executeBillPayment({
+                moduleType: 'OP',
+                billId: o.id,
+                billNumber: o.opId,
+                amount: numAmt,
+                balance: curBal,
+                paymentMethod: mthVal,
+                buttonEl: btn,
+                onSuccess: async (data) => {
+                  o.paidAmount = data.amountPaid;
+                  o.balanceAmount = data.balanceAmount;
+                  o.paymentStatus = data.paymentStatus;
+                  o.paymentMethod = data.paymentMethod;
+                  if (activeOpRecord && activeOpRecord.id === o.id) {
+                    activeOpRecord.paidAmount = data.amountPaid;
+                    activeOpRecord.balanceAmount = data.balanceAmount;
+                    activeOpRecord.paymentStatus = data.paymentStatus;
+                    activeOpRecord.paymentMethod = data.paymentMethod;
                   }
-                  const areaBal = document.getElementById(`opAreaBal_${o.id}`);
-                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                  const isNowPaid = (data.balanceAmount <= 0);
+                  const paidEl = document.getElementById(`opSummaryPaid_${o.id}`);
+                  const balEl = document.getElementById(`opSummaryBal_${o.id}`);
+                  const statusEl = document.getElementById(`opSummaryStatus_${o.id}`);
+                  const methodEl = document.getElementById(`opSummaryMethod_${o.id}`);
+                  const payArea = document.getElementById(`opPaymentArea_${o.id}`);
+                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+                  if (balEl) {
+                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+                  }
+                  if (statusEl) {
+                    statusEl.textContent = data.paymentStatus;
+                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+                  }
+                  if (methodEl) methodEl.textContent = data.paymentMethod;
+                  if (payArea) {
+                    if (isNowPaid) {
+                      payArea.innerHTML = '';
+                    } else {
+                      if (amtInput) {
+                        amtInput.value = data.balanceAmount.toFixed(2);
+                        amtInput.max = data.balanceAmount.toFixed(2);
+                      }
+                      const areaBal = document.getElementById(`opAreaBal_${o.id}`);
+                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    }
+                  }
+                  await loadBillingSummaryData();
+                  updateBillingKpiValues();
+
+                  showSuccessState(data);
                 }
-              }
-              await loadBillingSummaryData();
-              updateBillingKpiValues();
+              });
+            },
+            onPrint: () => {
+              printDedicatedDocument(buildOpBillPrintHtml(patient, o));
             }
           });
         });
@@ -11272,57 +11456,74 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          await executeBillPayment({
+          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
+
+          showPaymentConfirmationModal({
+            title: 'Confirm Payment',
+            billRef: 'IP Admission: ' + ip.ipId,
+            paymentAmount: numAmt,
+            remainingBalance: remBal,
             moduleType: 'IP',
-            billId: ip.id,
-            billNumber: ip.ipId,
-            amount: numAmt,
-            balance: curBal,
-            paymentMethod: mthVal,
-            buttonEl: btn,
-            onSuccess: async (data) => {
-              ip.paidAmount = data.amountPaid;
-              ip.depositAmount = data.amountPaid;
-              ip.balanceAmount = data.balanceAmount;
-              ip.paymentStatus = data.paymentStatus;
-              ip.paymentMethod = data.paymentMethod;
-              if (activeIpRecord && activeIpRecord.id === ip.id) {
-                activeIpRecord.paidAmount = data.amountPaid;
-                activeIpRecord.depositAmount = data.amountPaid;
-                activeIpRecord.balanceAmount = data.balanceAmount;
-                activeIpRecord.paymentStatus = data.paymentStatus;
-                activeIpRecord.paymentMethod = data.paymentMethod;
-              }
-              const isNowPaid = (data.balanceAmount <= 0);
-              const paidEl = document.getElementById(`ipSummaryPaid_${ip.id}`);
-              const balEl = document.getElementById(`ipSummaryBal_${ip.id}`);
-              const statusEl = document.getElementById(`ipSummaryStatus_${ip.id}`);
-              const methodEl = document.getElementById(`ipSummaryMethod_${ip.id}`);
-              const payArea = document.getElementById(`ipPaymentArea_${ip.id}`);
-              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-              if (balEl) {
-                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-              }
-              if (statusEl) {
-                statusEl.textContent = data.paymentStatus;
-                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-              }
-              if (methodEl) methodEl.textContent = data.paymentMethod;
-              if (payArea) {
-                if (isNowPaid) {
-                  payArea.innerHTML = '';
-                } else {
-                  if (amtInput) {
-                    amtInput.value = data.balanceAmount.toFixed(2);
-                    amtInput.max = data.balanceAmount.toFixed(2);
+            printButtonLabel: 'Print Bill',
+            onConfirm: async (showSuccessState) => {
+              await executeBillPayment({
+                moduleType: 'IP',
+                billId: ip.id,
+                billNumber: ip.ipId,
+                amount: numAmt,
+                balance: curBal,
+                paymentMethod: mthVal,
+                buttonEl: btn,
+                onSuccess: async (data) => {
+                  ip.paidAmount = data.amountPaid;
+                  ip.depositAmount = data.amountPaid;
+                  ip.balanceAmount = data.balanceAmount;
+                  ip.paymentStatus = data.paymentStatus;
+                  ip.paymentMethod = data.paymentMethod;
+                  if (activeIpRecord && activeIpRecord.id === ip.id) {
+                    activeIpRecord.paidAmount = data.amountPaid;
+                    activeIpRecord.depositAmount = data.amountPaid;
+                    activeIpRecord.balanceAmount = data.balanceAmount;
+                    activeIpRecord.paymentStatus = data.paymentStatus;
+                    activeIpRecord.paymentMethod = data.paymentMethod;
                   }
-                  const areaBal = document.getElementById(`ipAreaBal_${ip.id}`);
-                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                  const isNowPaid = (data.balanceAmount <= 0);
+                  const paidEl = document.getElementById(`ipSummaryPaid_${ip.id}`);
+                  const balEl = document.getElementById(`ipSummaryBal_${ip.id}`);
+                  const statusEl = document.getElementById(`ipSummaryStatus_${ip.id}`);
+                  const methodEl = document.getElementById(`ipSummaryMethod_${ip.id}`);
+                  const payArea = document.getElementById(`ipPaymentArea_${ip.id}`);
+                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+                  if (balEl) {
+                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+                  }
+                  if (statusEl) {
+                    statusEl.textContent = data.paymentStatus;
+                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+                  }
+                  if (methodEl) methodEl.textContent = data.paymentMethod;
+                  if (payArea) {
+                    if (isNowPaid) {
+                      payArea.innerHTML = '';
+                    } else {
+                      if (amtInput) {
+                        amtInput.value = data.balanceAmount.toFixed(2);
+                        amtInput.max = data.balanceAmount.toFixed(2);
+                      }
+                      const areaBal = document.getElementById(`ipAreaBal_${ip.id}`);
+                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    }
+                  }
+                  await loadBillingSummaryData();
+                  updateBillingKpiValues();
+
+                  showSuccessState(data);
                 }
-              }
-              await loadBillingSummaryData();
-              updateBillingKpiValues();
+              });
+            },
+            onPrint: () => {
+              printDedicatedDocument(buildIpBillPrintHtml(patient, ip));
             }
           });
         });
@@ -11840,55 +12041,72 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          await executeBillPayment({
+          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
+
+          showPaymentConfirmationModal({
+            title: 'Confirm Payment',
+            billRef: 'Pharmacy Bill: ' + b.billNumber,
+            paymentAmount: numAmt,
+            remainingBalance: remBal,
             moduleType: 'PHARMACY',
-            billId: b.id,
-            billNumber: b.billNumber,
-            amount: numAmt,
-            balance: curBal,
-            paymentMethod: mthVal,
-            buttonEl: btn,
-            onSuccess: async (data) => {
-              b.paidAmount = data.amountPaid;
-              b.balanceAmount = data.balanceAmount;
-              b.paymentStatus = data.paymentStatus;
-              b.paymentMethod = data.paymentMethod;
-              if (activePhRecord && activePhRecord.id === b.id) {
-                activePhRecord.paidAmount = data.amountPaid;
-                activePhRecord.balanceAmount = data.balanceAmount;
-                activePhRecord.paymentStatus = data.paymentStatus;
-                activePhRecord.paymentMethod = data.paymentMethod;
-              }
-              const isNowPaid = (data.balanceAmount <= 0);
-              const paidEl = document.getElementById(`phSummaryPaid_${b.id}`);
-              const balEl = document.getElementById(`phSummaryBal_${b.id}`);
-              const statusEl = document.getElementById(`phSummaryStatus_${b.id}`);
-              const methodEl = document.getElementById(`phSummaryMethod_${b.id}`);
-              const payArea = document.getElementById(`phPaymentArea_${b.id}`);
-              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-              if (balEl) {
-                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-              }
-              if (statusEl) {
-                statusEl.textContent = data.paymentStatus;
-                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-              }
-              if (methodEl) methodEl.textContent = data.paymentMethod;
-              if (payArea) {
-                if (isNowPaid) {
-                  payArea.innerHTML = '';
-                } else {
-                  if (amtInput) {
-                    amtInput.value = data.balanceAmount.toFixed(2);
-                    amtInput.max = data.balanceAmount.toFixed(2);
+            printButtonLabel: 'Print Bill',
+            onConfirm: async (showSuccessState) => {
+              await executeBillPayment({
+                moduleType: 'PHARMACY',
+                billId: b.id,
+                billNumber: b.billNumber,
+                amount: numAmt,
+                balance: curBal,
+                paymentMethod: mthVal,
+                buttonEl: btn,
+                onSuccess: async (data) => {
+                  b.paidAmount = data.amountPaid;
+                  b.balanceAmount = data.balanceAmount;
+                  b.paymentStatus = data.paymentStatus;
+                  b.paymentMethod = data.paymentMethod;
+                  if (activePhRecord && activePhRecord.id === b.id) {
+                    activePhRecord.paidAmount = data.amountPaid;
+                    activePhRecord.balanceAmount = data.balanceAmount;
+                    activePhRecord.paymentStatus = data.paymentStatus;
+                    activePhRecord.paymentMethod = data.paymentMethod;
                   }
-                  const areaBal = document.getElementById(`phAreaBal_${b.id}`);
-                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                  const isNowPaid = (data.balanceAmount <= 0);
+                  const paidEl = document.getElementById(`phSummaryPaid_${b.id}`);
+                  const balEl = document.getElementById(`phSummaryBal_${b.id}`);
+                  const statusEl = document.getElementById(`phSummaryStatus_${b.id}`);
+                  const methodEl = document.getElementById(`phSummaryMethod_${b.id}`);
+                  const payArea = document.getElementById(`phPaymentArea_${b.id}`);
+                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+                  if (balEl) {
+                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+                  }
+                  if (statusEl) {
+                    statusEl.textContent = data.paymentStatus;
+                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+                  }
+                  if (methodEl) methodEl.textContent = data.paymentMethod;
+                  if (payArea) {
+                    if (isNowPaid) {
+                      payArea.innerHTML = '';
+                    } else {
+                      if (amtInput) {
+                        amtInput.value = data.balanceAmount.toFixed(2);
+                        amtInput.max = data.balanceAmount.toFixed(2);
+                      }
+                      const areaBal = document.getElementById(`phAreaBal_${b.id}`);
+                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    }
+                  }
+                  await loadBillingSummaryData();
+                  updateBillingKpiValues();
+
+                  showSuccessState(data);
                 }
-              }
-              await loadBillingSummaryData();
-              updateBillingKpiValues();
+              });
+            },
+            onPrint: () => {
+              printDedicatedDocument(buildPharmacyBillPrintHtml(patient, b));
             }
           });
         });
@@ -12391,55 +12609,72 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          await executeBillPayment({
+          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
+
+          showPaymentConfirmationModal({
+            title: 'Confirm Payment',
+            billRef: 'Lab Order: ' + l.orderNumber,
+            paymentAmount: numAmt,
+            remainingBalance: remBal,
             moduleType: 'LABORATORY',
-            billId: l.id,
-            billNumber: l.orderNumber,
-            amount: numAmt,
-            balance: curBal,
-            paymentMethod: mthVal,
-            buttonEl: btn,
-            onSuccess: async (data) => {
-              l.paidAmount = data.amountPaid;
-              l.balanceAmount = data.balanceAmount;
-              l.paymentStatus = data.paymentStatus;
-              l.paymentMethod = data.paymentMethod;
-              if (activeLabRecord && activeLabRecord.id === l.id) {
-                activeLabRecord.paidAmount = data.amountPaid;
-                activeLabRecord.balanceAmount = data.balanceAmount;
-                activeLabRecord.paymentStatus = data.paymentStatus;
-                activeLabRecord.paymentMethod = data.paymentMethod;
-              }
-              const isNowPaid = (data.balanceAmount <= 0);
-              const paidEl = document.getElementById(`labSummaryPaid_${l.id}`);
-              const balEl = document.getElementById(`labSummaryBal_${l.id}`);
-              const statusEl = document.getElementById(`labSummaryStatus_${l.id}`);
-              const methodEl = document.getElementById(`labSummaryMethod_${l.id}`);
-              const payArea = document.getElementById(`labPaymentArea_${l.id}`);
-              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-              if (balEl) {
-                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-              }
-              if (statusEl) {
-                statusEl.textContent = data.paymentStatus;
-                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-              }
-              if (methodEl) methodEl.textContent = data.paymentMethod;
-              if (payArea) {
-                if (isNowPaid) {
-                  payArea.innerHTML = '';
-                } else {
-                  if (amtInput) {
-                    amtInput.value = data.balanceAmount.toFixed(2);
-                    amtInput.max = data.balanceAmount.toFixed(2);
+            printButtonLabel: 'Print Bill',
+            onConfirm: async (showSuccessState) => {
+              await executeBillPayment({
+                moduleType: 'LABORATORY',
+                billId: l.id,
+                billNumber: l.orderNumber,
+                amount: numAmt,
+                balance: curBal,
+                paymentMethod: mthVal,
+                buttonEl: btn,
+                onSuccess: async (data) => {
+                  l.paidAmount = data.amountPaid;
+                  l.balanceAmount = data.balanceAmount;
+                  l.paymentStatus = data.paymentStatus;
+                  l.paymentMethod = data.paymentMethod;
+                  if (activeLabRecord && activeLabRecord.id === l.id) {
+                    activeLabRecord.paidAmount = data.amountPaid;
+                    activeLabRecord.balanceAmount = data.balanceAmount;
+                    activeLabRecord.paymentStatus = data.paymentStatus;
+                    activeLabRecord.paymentMethod = data.paymentMethod;
                   }
-                  const areaBal = document.getElementById(`labAreaBal_${l.id}`);
-                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                  const isNowPaid = (data.balanceAmount <= 0);
+                  const paidEl = document.getElementById(`labSummaryPaid_${l.id}`);
+                  const balEl = document.getElementById(`labSummaryBal_${l.id}`);
+                  const statusEl = document.getElementById(`labSummaryStatus_${l.id}`);
+                  const methodEl = document.getElementById(`labSummaryMethod_${l.id}`);
+                  const payArea = document.getElementById(`labPaymentArea_${l.id}`);
+                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+                  if (balEl) {
+                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+                  }
+                  if (statusEl) {
+                    statusEl.textContent = data.paymentStatus;
+                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+                  }
+                  if (methodEl) methodEl.textContent = data.paymentMethod;
+                  if (payArea) {
+                    if (isNowPaid) {
+                      payArea.innerHTML = '';
+                    } else {
+                      if (amtInput) {
+                        amtInput.value = data.balanceAmount.toFixed(2);
+                        amtInput.max = data.balanceAmount.toFixed(2);
+                      }
+                      const areaBal = document.getElementById(`labAreaBal_${l.id}`);
+                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
+                    }
+                  }
+                  await loadBillingSummaryData();
+                  updateBillingKpiValues();
+
+                  showSuccessState(data);
                 }
-              }
-              await loadBillingSummaryData();
-              updateBillingKpiValues();
+              });
+            },
+            onPrint: () => {
+              printDedicatedDocument(buildLabBillPrintHtml(patient, l));
             }
           });
         });
@@ -12450,7 +12685,7 @@ function renderPharmacyModule(activeTab = 'billing') {
       });
 
       document.getElementById('btnPrintLabBill')?.addEventListener('click', () => {
-        printDedicatedDocument(buildLaboratoryBillPrintHtml(patient, l));
+        printDedicatedDocument(buildLabBillPrintHtml(patient, l));
       });
 
     } catch (e) {
@@ -13199,62 +13434,75 @@ function renderPharmacyModule(activeTab = 'billing') {
         return;
       }
 
-      await executeBillPayment({
-        moduleType: 'CENTRAL',
-        billId: cbConsolidatedData.existingBillId,
-        billNumber: cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber,
-        amount: numAmt,
-        balance: curBal,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        buttonEl: submitBtn,
-        onSuccess: async (data) => {
-          cbConsolidatedData.existingAmountPaid = data.amountPaid;
-          cbConsolidatedData.existingBalance = data.balanceAmount;
-          cbConsolidatedData.existingPaymentStatus = data.paymentStatus;
-          cbConsolidatedData.existingPaymentMethod = data.paymentMethod;
+      const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
 
-          const isNowPaid = (data.balanceAmount <= 0);
+      showPaymentConfirmationModal({
+        title: 'Confirm Payment',
+        billRef: 'Invoice: ' + (cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber),
+        paymentAmount: numAmt,
+        remainingBalance: remBal,
+        moduleType: 'MAIN',
+        printButtonLabel: 'Print Invoice',
+        onConfirm: async (showSuccessState) => {
+          await executeBillPayment({
+            moduleType: 'CENTRAL',
+            billId: cbConsolidatedData.existingBillId,
+            billNumber: cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber,
+            amount: numAmt,
+            balance: curBal,
+            paymentMethod: paymentMethod,
+            notes: notes,
+            buttonEl: submitBtn,
+            onSuccess: async (data) => {
+              cbConsolidatedData.existingAmountPaid = data.amountPaid;
+              cbConsolidatedData.existingBalance = data.balanceAmount;
+              cbConsolidatedData.existingPaymentStatus = data.paymentStatus;
+              cbConsolidatedData.existingPaymentMethod = data.paymentMethod;
 
-          // Update UI immediately without refresh
-          const prevPaidEl = document.getElementById('cbDisplayPreviouslyPaid');
-          if (prevPaidEl) prevPaidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+              const isNowPaid = (data.balanceAmount <= 0);
 
-          const balEl = document.getElementById('cbOverallBalanceAmt');
-          if (balEl) {
-            balEl.innerText = '₹' + formatCurrency(data.balanceAmount);
-            balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-          }
+              // Update UI immediately without refresh
+              const prevPaidEl = document.getElementById('cbDisplayPreviouslyPaid');
+              if (prevPaidEl) prevPaidEl.textContent = '₹' + formatCurrency(data.amountPaid);
 
-          const statusBadge = document.getElementById('cbOverallStatusBadge');
-          if (statusBadge) {
-            statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
-            statusBadge.textContent = data.paymentStatus;
-            statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-          }
+              const balEl = document.getElementById('cbOverallBalanceAmt');
+              if (balEl) {
+                balEl.innerText = '₹' + formatCurrency(data.balanceAmount);
+                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+              }
 
-          const paidInput = document.getElementById('cbOverallPaidAmount');
-          if (paidInput) {
-            if (isNowPaid) {
-              paidInput.value = '0.00';
-              paidInput.disabled = true;
-            } else {
-              paidInput.value = data.balanceAmount.toFixed(2);
-              paidInput.max = data.balanceAmount.toFixed(2);
+              const statusBadge = document.getElementById('cbOverallStatusBadge');
+              if (statusBadge) {
+                statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
+                statusBadge.textContent = data.paymentStatus;
+                statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+              }
+
+              const paidInput = document.getElementById('cbOverallPaidAmount');
+              if (paidInput) {
+                if (isNowPaid) {
+                  paidInput.value = '0.00';
+                  paidInput.disabled = true;
+                } else {
+                  paidInput.value = data.balanceAmount.toFixed(2);
+                  paidInput.max = data.balanceAmount.toFixed(2);
+                }
+              }
+
+              if (isNowPaid && submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Fully Paid (PAID)';
+              }
+
+              await loadBillingSummaryData();
+              updateBillingKpiValues();
+
+              showSuccessState(data);
             }
-          }
-
-          if (isNowPaid && submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Fully Paid (PAID)';
-          }
-
-          await loadBillingSummaryData();
-          updateBillingKpiValues();
-
-          if (isPrintAfter) {
-            printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
-          }
+          });
+        },
+        onPrint: () => {
+          printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
         }
       });
       return;
@@ -13319,63 +13567,89 @@ function renderPharmacyModule(activeTab = 'billing') {
       items
     };
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.dataset.processing = 'true';
-      submitBtn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:0.4rem;"></span> Processing...';
-    }
+    const remBal = Math.max(0, parseFloat((finalTotal - amountPaid).toFixed(2)));
 
-    try {
-      const res = await Api.post('/api/billing/central/create', payload);
-      if (res && res.success) {
-        showToast(res.message || 'Central Bill generated successfully.', 'success');
-        cbConsolidatedData.existingInvoiceNumber = res.data.invoiceNumber;
-        cbConsolidatedData.existingBillNumber = res.data.billNumber;
-        cbConsolidatedData.existingBillId = res.data.id;
-        cbConsolidatedData.existingAmountPaid = res.data.amountPaid;
-        cbConsolidatedData.existingBalance = res.data.balance;
-        cbConsolidatedData.existingPaymentStatus = res.data.paymentStatus;
-        cbConsolidatedData.existingPaymentMethod = res.data.paymentMethod;
-
-        const isNowPaid = (res.data.balance <= 0);
-
-        // Update display immediately
-        const invEl = document.getElementById('cbDisplayInvoiceNumber');
-        if (invEl) invEl.innerText = res.data.invoiceNumber;
-
-        const balEl = document.getElementById('cbOverallBalanceAmt');
-        if (balEl) {
-          balEl.innerText = '₹' + formatCurrency(res.data.balance);
-          balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-        }
-
-        const statusBadge = document.getElementById('cbOverallStatusBadge');
-        if (statusBadge) {
-          statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
-          statusBadge.textContent = res.data.paymentStatus;
-          statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : (res.data.amountPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid'));
-        }
-
-        await loadBillingSummaryData();
-        updateBillingKpiValues();
-
-        if (isPrintAfter) {
-          printDedicatedCentralInvoice(res.data.id);
-        } else {
-          showCentralInvoiceModal(res.data.id);
-        }
-      } else {
-        showToast('Could not generate Central Bill: ' + (res?.message || 'Error'), 'danger');
-      }
-    } catch (err) {
-      showToast('Network or server error while generating Central Bill.', 'danger');
-    } finally {
+    const doCreateBill = async (showSuccessState, onError) => {
       if (submitBtn) {
-        submitBtn.disabled = false;
-        delete submitBtn.dataset.processing;
-        submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Submit';
+        submitBtn.disabled = true;
+        submitBtn.dataset.processing = 'true';
+        submitBtn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:0.4rem;"></span> Processing...';
       }
-    }
+
+      try {
+        const res = await Api.post('/api/billing/central/create', payload);
+        if (res && res.success) {
+          showToast(res.message || 'Central Bill generated successfully.', 'success');
+          cbConsolidatedData.existingInvoiceNumber = res.data.invoiceNumber;
+          cbConsolidatedData.existingBillNumber = res.data.billNumber;
+          cbConsolidatedData.existingBillId = res.data.id;
+          cbConsolidatedData.existingAmountPaid = res.data.amountPaid;
+          cbConsolidatedData.existingBalance = res.data.balance;
+          cbConsolidatedData.existingPaymentStatus = res.data.paymentStatus;
+          cbConsolidatedData.existingPaymentMethod = res.data.paymentMethod;
+
+          const isNowPaid = (res.data.balance <= 0);
+
+          // Update display immediately
+          const invEl = document.getElementById('cbDisplayInvoiceNumber');
+          if (invEl) invEl.innerText = res.data.invoiceNumber;
+
+          const balEl = document.getElementById('cbOverallBalanceAmt');
+          if (balEl) {
+            balEl.innerText = '₹' + formatCurrency(res.data.balance);
+            balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+          }
+
+          const statusBadge = document.getElementById('cbOverallStatusBadge');
+          if (statusBadge) {
+            statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
+            statusBadge.textContent = res.data.paymentStatus;
+            statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : (res.data.amountPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid'));
+          }
+
+          await loadBillingSummaryData();
+          updateBillingKpiValues();
+
+          if (typeof showSuccessState === 'function') {
+            showSuccessState({
+              paymentStatus: res.data.paymentStatus,
+              amountPaid: res.data.amountPaid,
+              balanceAmount: res.data.balance,
+              invoiceNumber: res.data.invoiceNumber
+            });
+          }
+        } else {
+          showToast('Could not generate Central Bill: ' + (res?.message || 'Error'), 'danger');
+          if (typeof onError === 'function') onError();
+        }
+      } catch (err) {
+        showToast('Network or server error while generating Central Bill.', 'danger');
+        if (typeof onError === 'function') onError();
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          delete submitBtn.dataset.processing;
+          submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Submit';
+        }
+      }
+    };
+
+    showPaymentConfirmationModal({
+      title: 'Confirm Payment',
+      billRef: 'Consolidated Bill: ' + activeBillingPatient.fullName,
+      paymentAmount: amountPaid,
+      remainingBalance: remBal,
+      moduleType: 'MAIN',
+      printButtonLabel: 'Print Invoice',
+      onConfirm: async (showSuccessState, onError) => {
+        await doCreateBill(showSuccessState, onError);
+      },
+      onPrint: () => {
+        if (cbConsolidatedData.existingBillId) {
+          printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
+        }
+      }
+    });
   }
 
   // Central Billing History View
@@ -14924,9 +15198,11 @@ function renderPharmacyModule(activeTab = 'billing') {
     deleteOperationalExpense: deleteOperationalExpense,
     openPaymentDoneModal: openPaymentDoneModal,
     executeBillPayment: executeBillPayment,
-    refreshCurrentBillingCategory: refreshCurrentBillingCategory
+    refreshCurrentBillingCategory: refreshCurrentBillingCategory,
+    showPaymentConfirmationModal: showPaymentConfirmationModal
   };
 })();
 window.AdminModule = Admin;
+window.Admin = Admin;
 
 
