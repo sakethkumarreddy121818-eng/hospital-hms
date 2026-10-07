@@ -6,14 +6,213 @@
 const SuperAdmin = (function () {
   'use strict';
 
-  let currentTab = 'hospitals';
+  let currentTab = null;
   let activeSearch = '';
   let activeStatusFilter = 'ALL';
   let hospitalsData = [];
+  let saHistoryIndex = 1;
+  let isNavigatingHistory = false;
 
   function init() {
+    initSuperAdminSidebar();
     setupSidebarNavigation();
-    renderView('hospitals');
+
+    // Check initial hash if user refreshed or navigated directly
+    let initialTab = 'hospitals';
+    const hash = window.location.hash.replace(/^#/, '');
+    if (['hospitals', 'notifications', 'audit', 'backup'].includes(hash)) {
+      initialTab = hash;
+    }
+
+    try {
+      window.history.replaceState(
+        { role: 'SUPER_ADMIN', mod: initialTab, sub: 'main', index: 1, isCareVistaNav: true },
+        '',
+        '#' + initialTab
+      );
+    } catch (e) {}
+
+    currentTab = null;
+    navigateToTab(initialTab, false);
+  }
+
+  function syncSuperAdminSidebarCollapsedClass() {
+    const isCollapsed = localStorage.getItem('cv_superadmin_sidebar_collapsed') === 'true' ||
+      document.getElementById('appSidebar')?.classList.contains('cv-sidebar-collapsed');
+    document.body.classList.toggle('cv-sidebar-collapsed-mode', !!isCollapsed);
+  }
+
+  function initSuperAdminSidebar() {
+    const collapseBtn = document.getElementById('sidebarCollapseBtn');
+    const sidebar = document.getElementById('appSidebar') || document.querySelector('.cv-sidebar');
+    if (!sidebar) return;
+
+    // Restore persisted sidebar state for Super Admin
+    const isCollapsed = localStorage.getItem('cv_superadmin_sidebar_collapsed') === 'true';
+    if (isCollapsed) {
+      sidebar.classList.add('cv-sidebar-collapsed');
+    } else {
+      sidebar.classList.remove('cv-sidebar-collapsed');
+    }
+    syncSuperAdminSidebarCollapsedClass();
+
+    if (collapseBtn) {
+      collapseBtn.onclick = (e) => {
+        e.preventDefault();
+        sidebar.classList.toggle('cv-sidebar-collapsed');
+        const nowCollapsed = sidebar.classList.contains('cv-sidebar-collapsed');
+        localStorage.setItem('cv_superadmin_sidebar_collapsed', nowCollapsed ? 'true' : 'false');
+        syncSuperAdminSidebarCollapsedClass();
+      };
+    }
+
+    // Header Global Operations / SAAS PLATFORM Area Internal Navigation
+    const sidebarHeader = document.querySelector('.cv-sidebar-header');
+    if (sidebarHeader) {
+      sidebarHeader.style.cursor = 'pointer';
+      sidebarHeader.onclick = (e) => {
+        if (e.target.closest('#sidebarCollapseBtn')) return;
+        e.preventDefault();
+        navigateToTab('hospitals');
+      };
+    }
+
+    const tenantNameEl = document.getElementById('sidebarTenantName');
+    if (tenantNameEl) {
+      tenantNameEl.textContent = 'Global Operations';
+      tenantNameEl.style.cursor = 'pointer';
+      tenantNameEl.setAttribute('title', 'Go to Super Admin Portal');
+      tenantNameEl.onclick = (e) => {
+        e.preventDefault();
+        navigateToTab('hospitals');
+      };
+    }
+
+    const tenantBadgeEl = document.getElementById('sidebarTenantBadge');
+    if (tenantBadgeEl) {
+      tenantBadgeEl.textContent = 'SAAS PLATFORM';
+      tenantBadgeEl.style.cursor = 'pointer';
+      tenantBadgeEl.setAttribute('title', 'Go to Super Admin Portal');
+      tenantBadgeEl.onclick = (e) => {
+        e.preventDefault();
+        navigateToTab('hospitals');
+      };
+    }
+
+    updateSuperAdminBackButton();
+  }
+
+  function updateSuperAdminBackButton() {
+    let btn = document.getElementById('cvFloatingBackBtn');
+    let wrap = document.getElementById('sidebarBackWrap');
+    if (!btn) return;
+
+    btn.onclick = (e) => {
+      e.preventDefault();
+      navigateBack();
+    };
+
+    const hasOpenModal = !!document.getElementById('activeModalContainer');
+    const isRoot = (currentTab === 'hospitals' && !hasOpenModal);
+    if (isRoot) {
+      btn.style.display = 'none';
+      if (wrap) wrap.style.display = 'none';
+    } else {
+      btn.style.display = 'inline-flex';
+      if (wrap) wrap.style.display = 'flex';
+    }
+    syncSuperAdminSidebarCollapsedClass();
+  }
+
+  function navigateBack() {
+    const existing = document.getElementById('activeModalContainer');
+    if (existing) {
+      closeModal();
+      if (window.location.hash.includes('details')) {
+        if (saHistoryIndex > 1) {
+          window.history.back();
+          return;
+        } else {
+          try {
+            window.history.replaceState({ role: 'SUPER_ADMIN', mod: 'hospitals', sub: 'main', index: 1, isCareVistaNav: true }, '', '#hospitals');
+          } catch (e) {}
+        }
+      }
+      updateSuperAdminBackButton();
+      return;
+    }
+
+    if (saHistoryIndex > 1) {
+      window.history.back();
+    } else {
+      navigateToTab('hospitals', false);
+    }
+  }
+
+  function navigateToTab(tab, recordHistory = true) {
+    if (currentTab === tab && !document.getElementById('activeModalContainer')) {
+      return;
+    }
+    closeModal();
+    currentTab = tab;
+
+    const navList = document.getElementById('sidebarNavList');
+    if (navList) {
+      navList.querySelectorAll('.cv-nav-item').forEach((i) => {
+        i.classList.toggle('active', i.dataset.tab === tab);
+      });
+    }
+
+    if (!isNavigatingHistory && recordHistory) {
+      saHistoryIndex++;
+      try {
+        window.history.pushState(
+          { role: 'SUPER_ADMIN', mod: tab, sub: 'main', index: saHistoryIndex, isCareVistaNav: true },
+          '',
+          '#' + tab
+        );
+      } catch (e) {}
+    }
+
+    renderView(tab);
+    updateSuperAdminBackButton();
+  }
+
+  function handlePopstate(e) {
+    const state = e.state;
+    closeModal();
+    isNavigatingHistory = true;
+    try {
+      if (state && state.role === 'SUPER_ADMIN') {
+        saHistoryIndex = state.index || saHistoryIndex;
+        if (state.sub === 'details' && state.id) {
+          if (currentTab !== 'hospitals') {
+            navigateToTab('hospitals', false);
+          }
+          showHospitalDetails(state.id, false);
+        } else {
+          navigateToTab(state.mod || 'hospitals', false);
+        }
+      } else {
+        const hash = window.location.hash.replace(/^#/, '');
+        if (hash.startsWith('hospitals/details') && hash.includes('id=')) {
+          const id = hash.split('id=')[1];
+          if (id) {
+            navigateToTab('hospitals', false);
+            showHospitalDetails(id, false);
+            return;
+          }
+        }
+        if (['hospitals', 'notifications', 'audit', 'backup'].includes(hash)) {
+          navigateToTab(hash, false);
+        } else {
+          navigateToTab('hospitals', false);
+        }
+      }
+    } finally {
+      isNavigatingHistory = false;
+      updateSuperAdminBackButton();
+    }
   }
 
   function setupSidebarNavigation() {
@@ -21,31 +220,29 @@ const SuperAdmin = (function () {
     if (!navList) return;
 
     navList.innerHTML = `
-      <li><a class="cv-nav-item active" data-tab="hospitals" id="navHospitalsTab">
+      <li><a class="cv-nav-item active" data-tab="hospitals" id="navHospitalsTab" title="Hospitals & Admins" data-tooltip="Hospitals & Admins">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-        Hospitals & Admins
+        <span>Hospitals &amp; Admins</span>
       </a></li>
-      <li><a class="cv-nav-item" data-tab="notifications" id="navNotificationsTab">
+      <li><a class="cv-nav-item" data-tab="notifications" id="navNotificationsTab" title="Notification Center" data-tooltip="Notification Center">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-        Notification Center <span id="badgeNotifCount" class="cv-badge" style="background:#fecaca; color:#dc2626; margin-left:auto; display:none;">0</span>
+        <span>Notification Center</span> <span id="badgeNotifCount" class="cv-badge" style="background:#fecaca; color:#dc2626; margin-left:auto; display:none;">0</span>
       </a></li>
-      <li><a class="cv-nav-item" data-tab="audit" id="navAuditTab">
+      <li><a class="cv-nav-item" data-tab="audit" id="navAuditTab" title="Audit History" data-tooltip="Audit History">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
-        Audit History
+        <span>Audit History</span>
       </a></li>
-      <li><a class="cv-nav-item" data-tab="backup" id="navBackupTab">
+      <li><a class="cv-nav-item" data-tab="backup" id="navBackupTab" title="Backup / Billing History" data-tooltip="Backup / Billing History">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        Backup / Billing History
+        <span>Backup / Billing History</span>
       </a></li>
     `;
 
     navList.querySelectorAll('.cv-nav-item').forEach((item) => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
-        navList.querySelectorAll('.cv-nav-item').forEach((i) => i.classList.remove('active'));
-        item.classList.add('active');
         const tab = item.dataset.tab;
-        renderView(tab);
+        navigateToTab(tab);
       });
     });
 
@@ -137,8 +334,7 @@ const SuperAdmin = (function () {
     // Event listeners
     document.getElementById('btnAddHospital').onclick = () => showAddHospitalModal();
     document.getElementById('btnDownloadBackupTop').onclick = () => {
-      document.querySelectorAll('#sidebarNavList .cv-nav-item').forEach(i => i.classList.toggle('active', i.dataset.tab === 'backup'));
-      renderView('backup');
+      navigateToTab('backup');
     };
 
     const searchInput = document.getElementById('hospitalSearchInput');
@@ -426,7 +622,17 @@ const SuperAdmin = (function () {
   // ====================================================================
   // 3. COMPLETE HOSPITAL DETAILS MODAL (Section 9)
   // ====================================================================
-  async function showHospitalDetails(id) {
+  async function showHospitalDetails(id, recordHistory = true) {
+    if (!isNavigatingHistory && recordHistory) {
+      saHistoryIndex++;
+      try {
+        window.history.pushState(
+          { role: 'SUPER_ADMIN', mod: 'hospitals', sub: 'details', id: id, index: saHistoryIndex, isCareVistaNav: true },
+          '',
+          '#hospitals/details?id=' + id
+        );
+      } catch (e) {}
+    }
     const res = await Api.get(`/api/superadmin/hospitals/${id}`);
     if (!res.ok || !res.data) {
       showToast('Could not load hospital details', 'danger');
@@ -519,6 +725,7 @@ const SuperAdmin = (function () {
     `;
 
     openModal(modalHtml);
+    updateSuperAdminBackButton();
   }
 
   // ====================================================================
@@ -1480,6 +1687,7 @@ const SuperAdmin = (function () {
   function closeModal() {
     const existing = document.getElementById('activeModalContainer');
     if (existing) existing.remove();
+    updateSuperAdminBackButton();
   }
 
   function showToast(msg, type = 'success') {
@@ -1533,6 +1741,9 @@ const SuperAdmin = (function () {
 
   return {
     init: init,
+    navigateToTab: navigateToTab,
+    handlePopstate: handlePopstate,
+    navigateBack: navigateBack,
     showAddHospitalModal: showAddHospitalModal,
     showHospitalDetails: showHospitalDetails,
     showOpLimitModal: showOpLimitModal,

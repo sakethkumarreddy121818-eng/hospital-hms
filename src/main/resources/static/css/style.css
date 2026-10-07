@@ -4039,3 +4039,31 @@ body.cv-dashboard-active #app {
   background: #f8fafc;
 }
 
+/* ====================================================================
+   MONEY MANAGEMENT & SKELETON LOADING UTILITIES
+   ==================================================================== */
+@keyframes cvSkeletonPulse {
+  0% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+  100% { opacity: 0.55; }
+}
+
+.cv-skeleton-pulse {
+  animation: cvSkeletonPulse 1.6s ease-in-out infinite;
+}
+
+.cv-skeleton-bar {
+  background: #e2e8f0;
+  border-radius: 4px;
+  animation: cvSkeletonPulse 1.6s ease-in-out infinite;
+}
+
+.cv-skeleton-card {
+  background: #ffffff;
+  border: 1px solid var(--cv-border);
+  border-radius: var(--cv-radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--cv-shadow-xs);
+}
+
+

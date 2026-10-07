@@ -457,29 +457,49 @@ public class BillingService {
         Patient patient = patientRepository.findById(request.getPatientId())
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
 
-        // Generate sequential unique Central Bill and Invoice numbers
         LocalDate today = LocalDate.now();
-        String datePrefix = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long nextSeq = centralBillRepository.countByTenantIdAndBillDate(tenant.getId(), today) + 1;
 
-        String billNumber;
-        do {
-            billNumber = String.format("CB-%s-%04d", datePrefix, nextSeq);
-            nextSeq++;
-        } while (centralBillRepository.existsByBillNumber(billNumber));
+        // Check if an existing Central Bill / Invoice was specified to be updated
+        CentralBill bill = null;
+        boolean isNew = false;
 
-        long invSeq = nextSeq - 1;
-        String invoiceNumber;
-        do {
-            invoiceNumber = String.format("INV-%s-%04d", datePrefix, invSeq);
-            invSeq++;
-        } while (centralBillRepository.existsByInvoiceNumber(invoiceNumber));
+        if (request.getBillId() != null) {
+            bill = centralBillRepository.findById(request.getBillId()).orElse(null);
+        }
+        if (bill == null && request.getInvoiceNumber() != null && !request.getInvoiceNumber().trim().isEmpty()) {
+            bill = centralBillRepository.findByTenantIdAndInvoiceNumber(tenant.getId(), request.getInvoiceNumber().trim()).orElse(null);
+        }
+        if (bill == null && request.getBillNumber() != null && !request.getBillNumber().trim().isEmpty()) {
+            bill = centralBillRepository.findByTenantIdAndBillNumber(tenant.getId(), request.getBillNumber().trim()).orElse(null);
+        }
 
-        CentralBill bill = new CentralBill();
-        bill.setTenant(tenant);
-        bill.setBillNumber(billNumber);
-        bill.setInvoiceNumber(invoiceNumber);
-        bill.setPatient(patient);
+        if (bill == null) {
+            isNew = true;
+            String datePrefix = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            long nextSeq = centralBillRepository.countByTenantIdAndBillDate(tenant.getId(), today) + 1;
+
+            String billNumber;
+            do {
+                billNumber = String.format("CB-%s-%04d", datePrefix, nextSeq);
+                nextSeq++;
+            } while (centralBillRepository.existsByBillNumber(billNumber));
+
+            long invSeq = nextSeq - 1;
+            String invoiceNumber;
+            do {
+                invoiceNumber = String.format("INV-%s-%04d", datePrefix, invSeq);
+                invSeq++;
+            } while (centralBillRepository.existsByInvoiceNumber(invoiceNumber));
+
+            bill = new CentralBill();
+            bill.setTenant(tenant);
+            bill.setBillNumber(billNumber);
+            bill.setInvoiceNumber(invoiceNumber);
+            bill.setPatient(patient);
+            bill.setBillDate(today);
+            bill.setBillTime(LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")));
+        }
+
         bill.setPatientName(request.getPatientName() != null ? request.getPatientName() : patient.getFullName());
         bill.setUhid(request.getUhid() != null ? request.getUhid() : patient.getUhid());
         bill.setOpId(request.getOpId());
@@ -488,8 +508,6 @@ public class BillingService {
         bill.setDoctorName(request.getDoctorName());
         bill.setDepartment(request.getDepartment());
         bill.setGstNumber(request.getGstNumber());
-        bill.setBillDate(today);
-        bill.setBillTime(LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")));
 
         BigDecimal subtotal = request.getSubtotal() != null ? request.getSubtotal() : BigDecimal.ZERO;
         BigDecimal discountPct = request.getDiscountPct() != null ? request.getDiscountPct() : BigDecimal.ZERO;
@@ -502,8 +520,18 @@ public class BillingService {
                 net.multiply(gstPct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
         BigDecimal finalTotal = request.getFinalTotal() != null ? request.getFinalTotal() : net.add(gstAmount);
-        BigDecimal amountPaid = request.getAmountPaid() != null ? request.getAmountPaid() : BigDecimal.ZERO;
-        BigDecimal balance = finalTotal.subtract(amountPaid);
+        BigDecimal paymentAmt = request.getAmountPaid() != null ? request.getAmountPaid() : BigDecimal.ZERO;
+
+        BigDecimal newPaid;
+        BigDecimal newBal;
+        if (isNew) {
+            newPaid = paymentAmt;
+            newBal = finalTotal.subtract(newPaid).max(BigDecimal.ZERO);
+        } else {
+            BigDecimal previousPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+            newPaid = previousPaid.add(paymentAmt);
+            newBal = finalTotal.subtract(newPaid).max(BigDecimal.ZERO);
+        }
 
         bill.setSubtotal(subtotal);
         bill.setDiscountPct(discountPct);
@@ -512,12 +540,12 @@ public class BillingService {
         bill.setGstPct(gstPct);
         bill.setGstAmount(gstAmount);
         bill.setFinalTotal(finalTotal);
-        bill.setAmountPaid(amountPaid);
-        bill.setBalance(balance);
+        bill.setAmountPaid(newPaid);
+        bill.setBalance(newBal);
 
-        if (balance.compareTo(BigDecimal.ZERO) <= 0) {
+        if (newBal.compareTo(BigDecimal.ZERO) <= 0) {
             bill.setPaymentStatus("PAID");
-        } else if (amountPaid.compareTo(BigDecimal.ZERO) > 0) {
+        } else if (newPaid.compareTo(BigDecimal.ZERO) > 0) {
             bill.setPaymentStatus("PARTIALLY PAID");
         } else {
             bill.setPaymentStatus("UNPAID");
@@ -527,6 +555,7 @@ public class BillingService {
         bill.setConsolidatedNotes(request.getNotes());
 
         if (request.getItems() != null && !request.getItems().isEmpty()) {
+            bill.getItems().clear();
             for (CentralBillRequestDto.ItemDto dtoItem : request.getItems()) {
                 CentralBillItem item = new CentralBillItem();
                 item.setModuleType(dtoItem.getModuleType() != null ? dtoItem.getModuleType() : "GENERAL");
@@ -539,18 +568,18 @@ public class BillingService {
 
         CentralBill savedBill = centralBillRepository.save(bill);
 
-        if (amountPaid.compareTo(BigDecimal.ZERO) > 0) {
+        if (paymentAmt.compareTo(BigDecimal.ZERO) > 0) {
             PaymentRecord pr = new PaymentRecord(
                     tenant,
                     "TXN-" + System.currentTimeMillis(),
                     patient,
                     patient.getFullName(),
                     "CENTRAL",
-                    amountPaid,
+                    paymentAmt,
                     bill.getPaymentMethod(),
                     today
             );
-            pr.setNotes("Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
+            pr.setNotes("Payment on Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
             paymentRecordRepository.save(pr);
         }
 
@@ -881,6 +910,26 @@ public class BillingService {
 
         String moduleType = (request.getModuleType() != null) ? request.getModuleType().trim().toUpperCase() : "";
         Long billId = request.getBillId();
+        if (billId == null && request.getBillNumber() != null && !request.getBillNumber().trim().isEmpty()) {
+            String bNum = request.getBillNumber().trim();
+            if ("CENTRAL".equals(moduleType) || "MAIN".equals(moduleType)) {
+                CentralBill cb = centralBillRepository.findByTenantIdAndInvoiceNumber(tenantId, bNum)
+                        .orElse(centralBillRepository.findByTenantIdAndBillNumber(tenantId, bNum).orElse(null));
+                if (cb != null) billId = cb.getId();
+            } else if ("OP".equals(moduleType)) {
+                OpRegistration op = opRegistrationRepository.findFirstByTenantIdAndOpId(tenantId, bNum).orElse(null);
+                if (op != null) billId = op.getId();
+            } else if ("IP".equals(moduleType)) {
+                IpAdmission ip = ipAdmissionRepository.findFirstByTenantIdAndIpId(tenantId, bNum).orElse(null);
+                if (ip != null) billId = ip.getId();
+            } else if ("PHARMACY".equals(moduleType)) {
+                PharmacyBill pb = pharmacyBillRepository.findFirstByTenantIdAndBillNumber(tenantId, bNum).orElse(null);
+                if (pb != null) billId = pb.getId();
+            } else if ("LAB".equals(moduleType) || "LABORATORY".equals(moduleType)) {
+                LabOrder lab = labOrderRepository.findByTenantIdAndOrderNumber(tenantId, bNum).orElse(null);
+                if (lab != null) billId = lab.getId();
+            }
+        }
         if (billId == null) {
             throw new IllegalArgumentException("Bill ID is required to record payment.");
         }

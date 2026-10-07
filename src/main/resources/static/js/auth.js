@@ -171,6 +171,26 @@ const Auth = (function () {
 
   function showLogin() {
     document.body.classList.remove('cv-dashboard-active');
+    document.body.classList.remove('cv-sidebar-collapsed-mode');
+    const appSidebar = document.getElementById('appSidebar');
+    if (appSidebar) {
+      appSidebar.classList.remove('cv-sidebar-collapsed');
+    }
+    const navList = document.getElementById('sidebarNavList');
+    if (navList) navList.innerHTML = '';
+    const backBtn = document.getElementById('cvFloatingBackBtn');
+    const backWrap = document.getElementById('sidebarBackWrap');
+    if (backBtn) backBtn.style.display = 'none';
+    if (backWrap) backWrap.style.display = 'none';
+
+    // Remove any active modals
+    const modalContainers = document.querySelectorAll('#activeModalContainer, .cv-modal-backdrop, .cv-op-modal-backdrop');
+    modalContainers.forEach(m => m.remove());
+
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch (e) {}
+
     document.getElementById('loginView').style.display = 'flex';
     document.getElementById('dashboardView').classList.remove('active');
     clearAlert();

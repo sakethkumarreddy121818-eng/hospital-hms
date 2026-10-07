@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public class CentralBillRequestDto {
+    private Long billId;
+    private String billNumber;
+    private String invoiceNumber;
     private Long patientId;
     private BigDecimal subtotal;
     private BigDecimal discountPct;
@@ -42,6 +45,12 @@ public class CentralBillRequestDto {
     }
 
     // Getters and Setters
+    public Long getBillId() { return billId; }
+    public void setBillId(Long billId) { this.billId = billId; }
+    public String getBillNumber() { return billNumber; }
+    public void setBillNumber(String billNumber) { this.billNumber = billNumber; }
+    public String getInvoiceNumber() { return invoiceNumber; }
+    public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }
     public Long getPatientId() { return patientId; }
     public void setPatientId(Long patientId) { this.patientId = patientId; }
     public BigDecimal getSubtotal() { return subtotal; }

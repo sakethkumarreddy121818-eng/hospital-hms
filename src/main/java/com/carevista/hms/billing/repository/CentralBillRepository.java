@@ -22,4 +22,6 @@ public interface CentralBillRepository extends JpaRepository<CentralBill, Long> 
     long countByTenantIdAndBillDate(Long tenantId, LocalDate billDate);
     boolean existsByBillNumber(String billNumber);
     boolean existsByInvoiceNumber(String invoiceNumber);
+    Optional<CentralBill> findByTenantIdAndInvoiceNumber(Long tenantId, String invoiceNumber);
+    Optional<CentralBill> findByTenantIdAndBillNumber(Long tenantId, String billNumber);
 }
