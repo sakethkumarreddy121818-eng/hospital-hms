@@ -197,10 +197,9 @@ public class IpService {
         Bed bed = bedRepository.findFirstByTenantIdAndId(tenantId, req.getBedId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Selected bed not found"));
 
-        if (!"AVAILABLE".equalsIgnoreCase(bed.getStatus())) {
+        if (!"AVAILABLE".equalsIgnoreCase(bed.getStatus()) || bed.getCurrentAdmission() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Bed " + bed.getBedNumber() + " is currently " + bed.getStatus() +
-                    " and cannot be assigned. Please choose another bed.");
+                    "Bed is no longer available. Please refresh and select another bed.");
         }
 
         // 1b. Verify Doctor Availability (Strictly AVAILABLE only)

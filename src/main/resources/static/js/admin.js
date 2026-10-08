@@ -4078,9 +4078,15 @@ const Admin = (function () {
 
           <!-- 4. Room & Bed Allocation with Real Pricing -->
           <div class="cv-op-section-card">
-            <div class="cv-op-section-header">
+            <div class="cv-op-section-header" style="display:flex; justify-content:space-between; align-items:center;">
               <span>4. Room &amp; Bed Allocation</span>
-              <span class="cv-op-section-badge" style="background:#ecfdf5; color:#059669;">Real-Time Availability</span>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button type="button" class="cv-btn-secondary" id="btnRefreshIpRoomAlloc" style="padding:0.2rem 0.55rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.25rem;" title="Refresh available rooms and beds from MySQL">
+                  <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  Refresh Availability
+                </button>
+                <span class="cv-op-section-badge" style="background:#ecfdf5; color:#059669;">Real-Time Availability</span>
+              </div>
             </div>
 
             <div class="cv-form-group">
@@ -4160,6 +4166,35 @@ const Admin = (function () {
 
     document.getElementById('btnResetIpForm')?.addEventListener('click', () => {
       resetIpForm();
+    });
+
+    document.getElementById('btnRefreshIpRoomAlloc')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshIpRoomAlloc');
+      const prevVal = document.getElementById('ipRoomSelect')?.value;
+      if (btn) {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="cv-spinner" style="width:11px; height:11px; border-width:2px; display:inline-block; margin-right:3px;"></span> Refreshing...`;
+      }
+      try {
+        await loadIpRoomsDropdown();
+        if (prevVal) {
+          const roomSel = document.getElementById('ipRoomSelect');
+          if (roomSel) {
+            roomSel.value = prevVal;
+            await onIpRoomSelectionChanged(prevVal);
+          }
+        }
+        showToast('Room and bed availability refreshed from database.', 'success');
+      } catch (err) {
+        console.error('Error refreshing room allocation dropdown:', err);
+        showToast('Failed to refresh room availability.', 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh Availability`;
+        }
+      }
     });
   }
 
@@ -4365,21 +4400,29 @@ const Admin = (function () {
       const res = await Api.get('/api/ip/rooms');
       if (res.ok && res.data) {
         ipRoomsList = res.data;
+        const currentVal = roomSelect.value;
         roomSelect.innerHTML = `
           <option value="">-- Choose Room / Ward --</option>
           ${res.data.map(r => {
-            const availCount = r.availableBedsCount || 0;
+            const availCount = (r.availableBedsCount != null) ? r.availableBedsCount : (r.availableBeds != null ? r.availableBeds : 0);
+            const totalCount = (r.totalBedsCount != null) ? r.totalBedsCount : (r.totalBeds != null ? r.totalBeds : (r.beds ? r.beds.length : 0));
             const typeLabel = r.roomType ? r.roomType.replace('_', ' ') : 'General';
             return `<option value="${r.id}" data-price="${r.dailyPrice || 0}">
-              Room ${escapeHtml(r.roomNumber)} &bull; ${escapeHtml(typeLabel)} &bull; Available Beds: ${availCount} / ${r.totalBedsCount}
+              Room ${escapeHtml(r.roomNumber)} &bull; ${escapeHtml(typeLabel)} &bull; Available Beds: ${availCount} / ${totalCount}
             </option>`;
           }).join('')}
         `;
+        if (currentVal) {
+          roomSelect.value = currentVal;
+        }
 
-        roomSelect.addEventListener('change', () => {
-          const roomId = roomSelect.value;
-          onIpRoomSelectionChanged(roomId);
-        });
+        if (!roomSelect.dataset.listenerAttached) {
+          roomSelect.dataset.listenerAttached = 'true';
+          roomSelect.addEventListener('change', () => {
+            const roomId = roomSelect.value;
+            onIpRoomSelectionChanged(roomId);
+          });
+        }
       }
     } catch (e) {
       console.error('Error loading rooms:', e);
@@ -4575,6 +4618,7 @@ const Admin = (function () {
           const adm = res.data;
           alert(`IP admission created successfully.\n\nAdmission Number: ${adm.ipId}\nPatient: ${adm.patientName} (UHID: ${adm.uhid})\nBed: ${adm.bedNumber} (Room: ${adm.roomNumber})\nStatus: OCCUPIED`);
           resetIpForm();
+          if (typeof loadRoomsData === 'function') loadRoomsData();
           switchIpTab('inpatients');
         } else {
           const errMsg = res.message || 'Failed to create IP admission. The selected bed may have been reserved by another user.';
@@ -5076,6 +5120,10 @@ const Admin = (function () {
             <svg class="cv-patient-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             <input type="text" id="ipRoomSearchBox" class="cv-patient-search-input" placeholder="Search room/bed..." style="padding:0.4rem 0.5rem 0.4rem 2rem; font-size:0.82rem;">
           </div>
+          <button type="button" class="cv-btn-secondary" id="btnRefreshRooms" style="padding:0.45rem 0.85rem; font-size:0.82rem; display:flex; align-items:center; gap:0.35rem;" title="Refresh room and bed availability from MySQL">
+            <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh
+          </button>
           <button type="button" class="cv-btn-primary" id="btnOpenAddRoomModal" style="padding:0.45rem 0.95rem; font-size:0.82rem; display:flex; align-items:center; gap:0.35rem;">
             <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
             Configure New Room
@@ -5113,6 +5161,27 @@ const Admin = (function () {
     document.getElementById('ipRoomSearchBox')?.addEventListener('input', (e) => {
       ipRoomSearchQuery = e.target.value.toLowerCase().trim();
       filterRoomsGrid();
+    });
+
+    document.getElementById('btnRefreshRooms')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshRooms');
+      if (btn) {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="cv-spinner" style="width:13px; height:13px; border-width:2px; display:inline-block; margin-right:4px;"></span> Refreshing...`;
+      }
+      try {
+        await loadRoomsData();
+        showToast('Room & bed availability updated from database.', 'success');
+      } catch (err) {
+        console.error('Error refreshing rooms:', err);
+        showToast('Failed to refresh rooms data.', 'danger');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh`;
+        }
+      }
     });
 
     document.getElementById('btnOpenAddRoomModal')?.addEventListener('click', () => {
@@ -5161,11 +5230,20 @@ const Admin = (function () {
 
     // Filter by Availability Status
     if (ipActiveRoomStatusFilter === 'AVAILABLE_ONLY') {
-      filtered = filtered.filter(r => (r.availableBedsCount || 0) > 0);
+      filtered = filtered.filter(r => {
+        const avail = (r.availableBedsCount != null) ? r.availableBedsCount : (r.availableBeds != null ? r.availableBeds : 0);
+        return avail > 0;
+      });
     } else if (ipActiveRoomStatusFilter === 'OCCUPIED_ONLY') {
-      filtered = filtered.filter(r => (r.occupiedBedsCount || 0) > 0);
+      filtered = filtered.filter(r => {
+        const occ = (r.occupiedBedsCount != null) ? r.occupiedBedsCount : (r.occupiedBeds != null ? r.occupiedBeds : 0);
+        return occ > 0;
+      });
     } else if (ipActiveRoomStatusFilter === 'FULL_ONLY') {
-      filtered = filtered.filter(r => (r.availableBedsCount || 0) === 0);
+      filtered = filtered.filter(r => {
+        const avail = (r.availableBedsCount != null) ? r.availableBedsCount : (r.availableBeds != null ? r.availableBeds : 0);
+        return avail === 0;
+      });
     }
 
     // Search query
@@ -5199,7 +5277,11 @@ const Admin = (function () {
       const typeKey = (room.roomType || 'GENERAL_WARD').toLowerCase();
       const typeClass = `cv-type-${typeKey}`;
       const typeLabel = room.roomType ? room.roomType.replace('_', ' ') : 'General Ward';
-      const occPct = room.totalBedsCount > 0 ? Math.round((room.occupiedBedsCount / room.totalBedsCount) * 100) : 0;
+      const total = room.totalBedsCount != null ? room.totalBedsCount : (room.totalBeds != null ? room.totalBeds : (room.beds ? room.beds.length : 0));
+      const occ = room.occupiedBedsCount != null ? room.occupiedBedsCount : (room.occupiedBeds != null ? room.occupiedBeds : 0);
+      const avail = room.availableBedsCount != null ? room.availableBedsCount : (room.availableBeds != null ? room.availableBeds : 0);
+      const maint = room.maintenanceBedsCount != null ? room.maintenanceBedsCount : (room.maintenanceBeds != null ? room.maintenanceBeds : 0);
+      const occPct = total > 0 ? Math.round((occ / total) * 100) : 0;
 
       return `
         <div class="cv-room-card">
@@ -5213,8 +5295,8 @@ const Admin = (function () {
 
           <div class="cv-room-occ-bar-wrap">
             <div class="cv-room-occ-label">
-              <span>Beds: <strong>${room.totalBedsCount} Total</strong></span>
-              <span><strong>${room.occupiedBedsCount}</strong> Occ &bull; <strong style="color:#059669;">${room.availableBedsCount}</strong> Avail</span>
+              <span>Beds: <strong>${total} Total</strong></span>
+              <span><strong>${occ}</strong> Occ &bull; <strong style="color:#059669;">${avail}</strong> Avail${maint > 0 ? ` &bull; <strong style="color:#64748b;">${maint}</strong> Maint` : ''}</span>
             </div>
             <div class="cv-progress-bar">
               <div class="cv-progress-fill" style="width:${occPct}%;"></div>
@@ -5239,20 +5321,23 @@ const Admin = (function () {
                 statusLabel = 'MAINTENANCE';
               }
 
+              const rawBedNum = String(bed.bedNumber || '').trim();
+              const displayBedNum = rawBedNum.toLowerCase().startsWith('bed ') ? rawBedNum : `Bed ${rawBedNum}`;
+
               return `
                 <div class="cv-bed-chip ${bClass}" ${bStatus === 'OCCUPIED' && bed.admissionId ? `style="cursor:pointer;" onclick="Admin.showBedPaymentModal(${bed.id}, ${bed.admissionId})"` : ''} title="${bStatus === 'OCCUPIED' ? 'Click to view / collect bed payment' : ''}">
                   <div class="cv-bed-head">
-                    <span>Bed ${escapeHtml(bed.bedNumber)}</span>
-                    <span style="font-size:0.7rem;">${statusLabel}</span>
+                    <span class="cv-bed-head-num">${escapeHtml(displayBedNum)}</span>
+                    <span class="cv-bed-head-status">${statusLabel}</span>
                   </div>
                   ${bStatus === 'OCCUPIED' && bed.assignedPatientName ? `
                     <div class="cv-bed-patient-text" title="Patient: ${escapeHtml(bed.assignedPatientName)}">
                       &bull; ${escapeHtml(bed.assignedPatientName)}
                     </div>
                     ${(bed.balanceAmount != null && bed.balanceAmount > 0) ? `
-                      <div style="margin-top:4px; font-size:0.72rem; color:#dc2626; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
-                        <span>Due: &#8377;${formatCurrency(bed.balanceAmount)}</span>
-                        <span class="cv-btn-primary" style="padding:1px 6px; font-size:0.68rem; border-radius:3px; line-height:1.2;">Collect</span>
+                      <div style="margin-top:4px; font-size:0.72rem; color:#dc2626; font-weight:700; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.25rem; min-width:0;">
+                        <span style="overflow-wrap:break-word;">Due: &#8377;${formatCurrency(bed.balanceAmount)}</span>
+                        <span class="cv-btn-primary" style="padding:1px 6px; font-size:0.68rem; border-radius:3px; line-height:1.2; flex-shrink:0;">Collect</span>
                       </div>
                     ` : `
                       <div style="margin-top:2px; font-size:0.7rem; color:#059669; font-weight:600;">
@@ -5260,7 +5345,7 @@ const Admin = (function () {
                       </div>
                     `}
                   ` : `
-                    <div class="cv-bed-price-text">&#8377;${formatCurrency(bed.dailyPrice)}/day</div>
+                    <div class="cv-bed-price-text">&#8377;${formatCurrency(bed.dailyPrice || room.dailyPrice || 0)}/day</div>
                   `}
                 </div>
               `;
@@ -5641,6 +5726,8 @@ const Admin = (function () {
             alert(`Patient ${adm.patientName} discharged successfully.\nBed ${adm.bedNumber} released back to AVAILABLE.`);
             close();
             loadCurrentInpatients();
+            if (typeof loadRoomsData === 'function') loadRoomsData();
+            if (typeof loadIpHistory === 'function') loadIpHistory();
           } else {
             btn.disabled = false;
             btn.textContent = 'Confirm Discharge & Release Bed';

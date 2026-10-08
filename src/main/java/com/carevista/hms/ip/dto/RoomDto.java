@@ -17,6 +17,8 @@ public class RoomDto {
     private int totalBeds;
     private int occupiedBeds;
     private int availableBeds;
+    private int maintenanceBeds;
+    private int reservedBeds;
     private List<BedDto> beds = new ArrayList<>();
 
     public RoomDto() {}
@@ -37,18 +39,31 @@ public class RoomDto {
             dto.setTotalBeds(beds.size());
             int occ = 0;
             int avail = 0;
+            int maint = 0;
+            int resv = 0;
             for (BedDto b : beds) {
-                if ("OCCUPIED".equalsIgnoreCase(b.getStatus())) occ++;
-                else if ("AVAILABLE".equalsIgnoreCase(b.getStatus())) avail++;
+                if ("OCCUPIED".equalsIgnoreCase(b.getStatus())) {
+                    occ++;
+                } else if ("AVAILABLE".equalsIgnoreCase(b.getStatus())) {
+                    avail++;
+                } else if ("MAINTENANCE".equalsIgnoreCase(b.getStatus())) {
+                    maint++;
+                } else if ("RESERVED".equalsIgnoreCase(b.getStatus())) {
+                    resv++;
+                }
             }
             dto.setOccupiedBeds(occ);
             dto.setAvailableBeds(avail);
+            dto.setMaintenanceBeds(maint);
+            dto.setReservedBeds(resv);
         }
         return dto;
     }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getRoomId() { return id; }
 
     public String getRoomNumber() { return roomNumber; }
     public void setRoomNumber(String roomNumber) { this.roomNumber = roomNumber; }
@@ -70,12 +85,28 @@ public class RoomDto {
 
     public int getTotalBeds() { return totalBeds; }
     public void setTotalBeds(int totalBeds) { this.totalBeds = totalBeds; }
+    public int getTotalBedsCount() { return totalBeds; }
+    public void setTotalBedsCount(int totalBedsCount) { this.totalBeds = totalBedsCount; }
 
     public int getOccupiedBeds() { return occupiedBeds; }
     public void setOccupiedBeds(int occupiedBeds) { this.occupiedBeds = occupiedBeds; }
+    public int getOccupiedBedsCount() { return occupiedBeds; }
+    public void setOccupiedBedsCount(int occupiedBedsCount) { this.occupiedBeds = occupiedBedsCount; }
 
     public int getAvailableBeds() { return availableBeds; }
     public void setAvailableBeds(int availableBeds) { this.availableBeds = availableBeds; }
+    public int getAvailableBedsCount() { return availableBeds; }
+    public void setAvailableBedsCount(int availableBedsCount) { this.availableBeds = availableBedsCount; }
+
+    public int getMaintenanceBeds() { return maintenanceBeds; }
+    public void setMaintenanceBeds(int maintenanceBeds) { this.maintenanceBeds = maintenanceBeds; }
+    public int getMaintenanceBedsCount() { return maintenanceBeds; }
+    public void setMaintenanceBedsCount(int maintenanceBedsCount) { this.maintenanceBeds = maintenanceBedsCount; }
+
+    public int getReservedBeds() { return reservedBeds; }
+    public void setReservedBeds(int reservedBeds) { this.reservedBeds = reservedBeds; }
+    public int getReservedBedsCount() { return reservedBeds; }
+    public void setReservedBedsCount(int reservedBedsCount) { this.reservedBeds = reservedBedsCount; }
 
     public List<BedDto> getBeds() { return beds; }
     public void setBeds(List<BedDto> beds) { this.beds = beds; }
