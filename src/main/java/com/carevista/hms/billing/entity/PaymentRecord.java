@@ -48,6 +48,36 @@ public class PaymentRecord {
     @Column(name = "notes", length = 255)
     private String notes;
 
+    @Column(name = "bill_id")
+    private Long billId;
+
+    @Column(name = "bill_number", length = 100)
+    private String billNumber;
+
+    @Column(name = "invoice_number", length = 100)
+    private String invoiceNumber;
+
+    @Column(name = "uhid", length = 50)
+    private String uhid;
+
+    @Column(name = "op_id", length = 50)
+    private String opId;
+
+    @Column(name = "ip_id", length = 50)
+    private String ipId;
+
+    @Column(name = "total_paid", precision = 12, scale = 2)
+    private BigDecimal totalPaid;
+
+    @Column(name = "remaining_balance", precision = 12, scale = 2)
+    private BigDecimal remainingBalance;
+
+    @Column(name = "payment_status", length = 50)
+    private String paymentStatus;
+
+    @Column(name = "payment_time", length = 30)
+    private String paymentTime;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -94,6 +124,36 @@ public class PaymentRecord {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Long getBillId() { return billId; }
+    public void setBillId(Long billId) { this.billId = billId; }
+
+    public String getBillNumber() { return billNumber; }
+    public void setBillNumber(String billNumber) { this.billNumber = billNumber; }
+
+    public String getInvoiceNumber() { return invoiceNumber; }
+    public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }
+
+    public String getUhid() { return uhid; }
+    public void setUhid(String uhid) { this.uhid = uhid; }
+
+    public String getOpId() { return opId; }
+    public void setOpId(String opId) { this.opId = opId; }
+
+    public String getIpId() { return ipId; }
+    public void setIpId(String ipId) { this.ipId = ipId; }
+
+    public BigDecimal getTotalPaid() { return totalPaid; }
+    public void setTotalPaid(BigDecimal totalPaid) { this.totalPaid = totalPaid; }
+
+    public BigDecimal getRemainingBalance() { return remainingBalance; }
+    public void setRemainingBalance(BigDecimal remainingBalance) { this.remainingBalance = remainingBalance; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    public String getPaymentTime() { return paymentTime; }
+    public void setPaymentTime(String paymentTime) { this.paymentTime = paymentTime; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

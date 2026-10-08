@@ -309,6 +309,16 @@ public class IpService {
                     admission.getPaymentMethod(),
                     LocalDate.now()
             );
+            paymentRecord.setBillId(admission.getId());
+            paymentRecord.setBillNumber(ipId);
+            paymentRecord.setInvoiceNumber(ipId);
+            paymentRecord.setUhid(patient.getUhid());
+            paymentRecord.setIpId(ipId);
+            paymentRecord.setOpId(admission.getOpId());
+            paymentRecord.setTotalPaid(deposit);
+            paymentRecord.setRemainingBalance(admission.getBalanceAmount());
+            paymentRecord.setPaymentStatus(admission.getPaymentStatus());
+            paymentRecord.setPaymentTime(admissionTime);
             paymentRecord.setNotes("IP Admission Initial Deposit - " + ipId + " (Room " + room.getRoomNumber() + ", " + bed.getBedNumber() + ")");
             paymentRecordRepository.save(paymentRecord);
         }
@@ -360,6 +370,16 @@ public class IpService {
                     req.getFinalPaymentMethod() != null ? req.getFinalPaymentMethod().toUpperCase() : "CASH",
                     LocalDate.now()
             );
+            dischargePayment.setBillId(admission.getId());
+            dischargePayment.setBillNumber(admission.getIpId());
+            dischargePayment.setInvoiceNumber(admission.getIpId());
+            dischargePayment.setUhid(admission.getPatient() != null ? admission.getPatient().getUhid() : null);
+            dischargePayment.setIpId(admission.getIpId());
+            dischargePayment.setOpId(admission.getOpId());
+            dischargePayment.setTotalPaid(admission.getPaidAmount() != null ? admission.getPaidAmount().add(req.getAdditionalCharges()) : req.getAdditionalCharges());
+            dischargePayment.setRemainingBalance(BigDecimal.ZERO);
+            dischargePayment.setPaymentStatus("PAID");
+            dischargePayment.setPaymentTime(admission.getDischargeTime());
             dischargePayment.setNotes("IP Discharge Final Settlement - " + admission.getIpId());
             paymentRecordRepository.save(dischargePayment);
         }

@@ -28,4 +28,9 @@ public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Lo
     List<PaymentRecord> findByPaymentDateBetweenOrderByPaymentDateDescCreatedAtDesc(LocalDate startDate, LocalDate endDate);
     List<PaymentRecord> findByTenantIdAndPaymentDateBetweenOrderByPaymentDateDescCreatedAtDesc(Long tenantId, LocalDate startDate, LocalDate endDate);
     List<PaymentRecord> findAllByOrderByPaymentDateDescCreatedAtDesc();
+
+    List<PaymentRecord> findByTenantIdAndModuleTypeOrderByCreatedAtDesc(Long tenantId, String moduleType);
+    List<PaymentRecord> findByTenantIdAndBillIdAndModuleTypeOrderByCreatedAtDesc(Long tenantId, Long billId, String moduleType);
+    List<PaymentRecord> findByTenantIdAndBillNumberOrderByCreatedAtDesc(Long tenantId, String billNumber);
+    List<PaymentRecord> findByTenantIdAndPatientIdOrderByCreatedAtDesc(Long tenantId, Long patientId);
 }

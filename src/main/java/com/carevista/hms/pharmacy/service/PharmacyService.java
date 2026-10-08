@@ -464,6 +464,16 @@ public class PharmacyService {
                     bill.getPaymentMethod(),
                     LocalDate.now()
             );
+            paymentRecord.setBillId(bill.getId());
+            paymentRecord.setBillNumber(billNumber);
+            paymentRecord.setInvoiceNumber(billNumber);
+            paymentRecord.setUhid(patient != null ? patient.getUhid() : bill.getUhid());
+            paymentRecord.setOpId(bill.getOpId());
+            paymentRecord.setIpId(bill.getIpId());
+            paymentRecord.setTotalPaid(paid);
+            paymentRecord.setRemainingBalance(balance);
+            paymentRecord.setPaymentStatus(pStatus);
+            paymentRecord.setPaymentTime(bill.getBillTime());
             paymentRecord.setNotes("Pharmacy Bill Settlement: " + billNumber);
             paymentRecordRepository.save(paymentRecord);
         }

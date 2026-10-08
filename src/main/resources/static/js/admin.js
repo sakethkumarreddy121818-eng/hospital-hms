@@ -2379,6 +2379,7 @@ const Admin = (function () {
   let opSearchDebounce = null;
   let opLoadedPatient = null;
   let opAvailableDoctors = [];
+  let activeRegisteredOp = null;
 
   function renderOpModule(activeTab = 'register') {
     const mainContent = document.getElementById('dashboardMain');
@@ -2650,7 +2651,7 @@ const Admin = (function () {
 
             <div class="cv-form-group" style="margin-bottom:0;">
               <label class="cv-form-label" for="opFeeInput">Consultation Fee (&#8377;)</label>
-              <input type="text" id="opFeeInput" class="cv-input cv-op-input-readonly" readonly value="0.00">
+              <input type="number" id="opFeeInput" class="cv-input" value="0.00" min="0" step="any">
             </div>
           </div>
 
@@ -2679,7 +2680,26 @@ const Admin = (function () {
               <span class="cv-op-section-badge" style="background:#ecfdf5; color:#059669;">Real-Time MySQL Persistence</span>
             </div>
 
-            <div class="cv-op-fields-row" style="grid-template-columns: repeat(3, 1fr);">
+            <div id="opBillingSummaryRow" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; margin-bottom:1rem; background:#f8fafc; padding:0.75rem 1rem; border-radius:6px; border:1px solid #e2e8f0;">
+              <div>
+                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Total Bill (Fee)</div>
+                <div id="opDisplayTotalFee" style="font-size:1.1rem; font-weight:800; color:#0f172a;">₹0.00</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Total Paid</div>
+                <div id="opDisplayTotalPaid" style="font-size:1.1rem; font-weight:800; color:#059669;">₹0.00</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Remaining Balance</div>
+                <div id="opDisplayRemainingBal" style="font-size:1.1rem; font-weight:800; color:var(--cv-danger);">₹0.00</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Payment Status</div>
+                <div id="opDisplayStatusBadge" style="margin-top:0.2rem;"><span class="cv-payment-balance-badge cv-badge-unpaid">UNPAID</span></div>
+              </div>
+            </div>
+
+            <div class="cv-op-fields-row" style="grid-template-columns: 1fr 1.5fr 1fr;">
               <div class="cv-form-group">
                 <label class="cv-form-label" for="opPaymentMethod">Payment Method *</label>
                 <select id="opPaymentMethod" class="cv-input" required>
@@ -2691,14 +2711,19 @@ const Admin = (function () {
               </div>
 
               <div class="cv-form-group">
-                <label class="cv-form-label" for="opAmountPaid">Amount to Collect (&#8377;) *</label>
-                <input type="number" id="opAmountPaid" class="cv-input" value="0.00" min="0" step="1" required>
+                <label class="cv-form-label" for="opAmountPaid">Amount Paid / Collect (&#8377;) *</label>
+                <div style="display:flex; gap:0.4rem; align-items:center;">
+                  <input type="number" id="opAmountPaid" class="cv-input" value="0.00" min="0" step="any" required style="flex:1;">
+                  <button type="button" id="btnOpDirectPaid" class="cv-btn-paid" style="height:42px; padding:0 1.25rem;">
+                    PAID
+                  </button>
+                </div>
                 <span class="cv-feedback-error" id="errAmount">Please enter a valid consultation amount.</span>
               </div>
 
               <div class="cv-form-group">
                 <label class="cv-form-label" for="opPaymentStatusDisplay">Payment Status</label>
-                <input type="text" id="opPaymentStatusDisplay" class="cv-input cv-op-input-readonly" readonly value="PAID - Recorded">
+                <input type="text" id="opPaymentStatusDisplay" class="cv-input cv-op-input-readonly" readonly value="UNPAID">
               </div>
             </div>
           </div>
@@ -2843,7 +2868,38 @@ const Admin = (function () {
     if (clearBtn) clearBtn.style.display = 'none';
   }
 
+  function updateOpSummaryDisplay() {
+    const feeEl = document.getElementById('opFeeInput');
+    const paidInput = document.getElementById('opAmountPaid');
+    const feeVal = feeEl ? parseFloat(feeEl.value) || 0 : 0;
+    const currentPaid = activeRegisteredOp ? (activeRegisteredOp.paidAmount || 0) : 0;
+    const payingNow = paidInput ? parseFloat(paidInput.value) || 0 : 0;
+
+    const totalBill = activeRegisteredOp ? (activeRegisteredOp.consultationFee || feeVal) : feeVal;
+    const totalPaid = activeRegisteredOp ? currentPaid : payingNow;
+    const remaining = activeRegisteredOp ? (activeRegisteredOp.balanceAmount != null ? activeRegisteredOp.balanceAmount : Math.max(0, totalBill - totalPaid)) : Math.max(0, totalBill - totalPaid);
+
+    const dispFee = document.getElementById('opDisplayTotalFee');
+    const dispPaid = document.getElementById('opDisplayTotalPaid');
+    const dispBal = document.getElementById('opDisplayRemainingBal');
+    const dispBadge = document.getElementById('opDisplayStatusBadge');
+    const statusInput = document.getElementById('opPaymentStatusDisplay');
+
+    if (dispFee) dispFee.textContent = '₹' + formatCurrency(totalBill);
+    if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(totalPaid);
+    if (dispBal) dispBal.textContent = '₹' + formatCurrency(remaining);
+
+    const statusText = (remaining <= 0 && totalBill > 0) ? 'PAID' : (totalPaid > 0 ? 'PARTIALLY PAID' : 'UNPAID');
+    const badgeClass = (remaining <= 0 && totalBill > 0) ? 'cv-badge-paid' : (totalPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+
+    if (dispBadge) {
+      dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${badgeClass}">${statusText}</span>`;
+    }
+    if (statusInput) statusInput.value = statusText;
+  }
+
   function resetOpForm() {
+    activeRegisteredOp = null;
     opLoadedPatient = null;
     const form = document.getElementById('opRegistrationForm');
     if (form) form.reset();
@@ -2869,6 +2925,14 @@ const Admin = (function () {
       alertBox.style.display = 'none';
       alertBox.textContent = '';
     }
+
+    const btnPaid = document.getElementById('btnOpDirectPaid');
+    if (btnPaid) {
+      btnPaid.disabled = false;
+      btnPaid.innerHTML = 'PAID';
+      delete btnPaid.dataset.processing;
+    }
+    updateOpSummaryDisplay();
   }
 
   async function loadDoctorDropdown() {
@@ -2915,6 +2979,7 @@ const Admin = (function () {
             document.getElementById('opFeeInput').value = '0.00';
             document.getElementById('opAmountPaid').value = '0.00';
           }
+          updateOpSummaryDisplay();
         });
       } else {
         docSelect.innerHTML = `<option value="">No doctors registered for this hospital</option>`;
@@ -2927,106 +2992,217 @@ const Admin = (function () {
 
   function setupOpFormSubmission() {
     const form = document.getElementById('opRegistrationForm');
-    if (!form) return;
+    const btnDirectPaid = document.getElementById('btnOpDirectPaid');
+    const feeInput = document.getElementById('opFeeInput');
+    const amountPaidInput = document.getElementById('opAmountPaid');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    feeInput?.addEventListener('input', updateOpSummaryDisplay);
+    amountPaidInput?.addEventListener('input', updateOpSummaryDisplay);
 
+    async function processOpPaidAction(triggerBtn) {
       const alertBox = document.getElementById('opFormAlert');
       if (alertBox) {
         alertBox.style.display = 'none';
         alertBox.textContent = '';
       }
 
-      // 1. Gather Inputs
-      const patientName = document.getElementById('opPatientName').value.trim();
-      const ageStr = document.getElementById('opPatientAge').value.trim();
-      const gender = document.getElementById('opPatientGender').value.trim();
-      const phone = document.getElementById('opPatientPhone').value.trim();
-      const email = document.getElementById('opPatientEmail').value.trim();
-      const doctorName = document.getElementById('opDoctorSelect').value.trim();
-      const department = document.getElementById('opDepartmentInput').value.trim();
-      const address = document.getElementById('opAddressInput').value.trim();
-      const notes = document.getElementById('opNotesInput').value.trim();
-      const paymentMethod = document.getElementById('opPaymentMethod').value.trim();
-      const amountStr = document.getElementById('opAmountPaid').value.trim();
-      const existingUhid = opLoadedPatient ? opLoadedPatient.uhid : document.getElementById('opPatientUhid').value.trim();
+      // Check double-click prevention
+      if (triggerBtn) {
+        if (triggerBtn.disabled || triggerBtn.dataset.processing === 'true') return;
+      }
 
-      // 2. Validate
+      const amountPaidStr = document.getElementById('opAmountPaid')?.value;
+      if (amountPaidStr === undefined || amountPaidStr === null || String(amountPaidStr).trim() === '') {
+        showToast('Please enter an amount to pay.', 'danger');
+        return;
+      }
+
+      const numAmt = parseFloat(amountPaidStr);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Payment amount must be greater than zero.', 'danger');
+        return;
+      }
+
+      const paymentMethod = document.getElementById('opPaymentMethod')?.value || 'CASH';
+
+      // ====================================================================
+      // SUBSEQUENT PAYMENT ON EXISTING REGISTERED OP
+      // ====================================================================
+      if (activeRegisteredOp) {
+        const curBal = (activeRegisteredOp.balanceAmount != null)
+          ? parseFloat(activeRegisteredOp.balanceAmount)
+          : Math.max(0, (activeRegisteredOp.consultationFee || 0) - (activeRegisteredOp.paidAmount || 0));
+
+        if (curBal <= 0) {
+          showToast('This OP bill is already fully paid.', 'info');
+          return;
+        }
+
+        if (numAmt > curBal + 0.001) {
+          showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+          return;
+        }
+
+        if (triggerBtn) {
+          triggerBtn.disabled = true;
+          triggerBtn.dataset.processing = 'true';
+          triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
+        }
+
+        try {
+          const res = await Api.post('/api/billing/payment', {
+            moduleType: 'OP',
+            billId: activeRegisteredOp.id,
+            billNumber: activeRegisteredOp.opId,
+            paymentAmount: numAmt,
+            paymentMethod: paymentMethod,
+            notes: 'OP registration payment installment'
+          });
+
+          if (res && res.success && res.data) {
+            const d = res.data;
+            activeRegisteredOp.paidAmount = d.amountPaid;
+            activeRegisteredOp.balanceAmount = d.balanceAmount;
+            activeRegisteredOp.paymentStatus = d.paymentStatus;
+            activeRegisteredOp.paymentMethod = d.paymentMethod;
+
+            const isNowPaid = (d.balanceAmount <= 0);
+
+            // Update UI elements immediately
+            const dispPaid = document.getElementById('opDisplayTotalPaid');
+            const dispBal = document.getElementById('opDisplayRemainingBal');
+            const dispBadge = document.getElementById('opDisplayStatusBadge');
+            const statusInput = document.getElementById('opPaymentStatusDisplay');
+
+            if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(d.amountPaid);
+            if (dispBal) dispBal.textContent = '₹' + formatCurrency(d.balanceAmount);
+            if (dispBadge) {
+              dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${d.paymentStatus}</span>`;
+            }
+            if (statusInput) statusInput.value = d.paymentStatus;
+
+            const amtInput = document.getElementById('opAmountPaid');
+            if (amtInput) {
+              if (isNowPaid) {
+                amtInput.value = '0.00';
+              } else {
+                amtInput.value = d.balanceAmount.toFixed(2);
+              }
+            }
+
+            if (triggerBtn) {
+              triggerBtn.disabled = isNowPaid;
+              delete triggerBtn.dataset.processing;
+              triggerBtn.innerHTML = isNowPaid ? 'PAID' : 'PAID';
+            }
+
+            showToast(`Payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(d.amountPaid)}, Balance: ₹${formatCurrency(d.balanceAmount)}`, 'success');
+
+            // Refresh OP history in background
+            if (typeof loadOpHistoryList === 'function') {
+              loadOpHistoryList();
+            }
+          } else {
+            showToast((res && res.message) ? res.message : 'Payment failed.', 'danger');
+            if (triggerBtn) {
+              triggerBtn.disabled = false;
+              delete triggerBtn.dataset.processing;
+              triggerBtn.innerHTML = 'PAID';
+            }
+          }
+        } catch (err) {
+          showToast('Payment processing error: ' + (err.message || err), 'danger');
+          if (triggerBtn) {
+            triggerBtn.disabled = false;
+            delete triggerBtn.dataset.processing;
+            triggerBtn.innerHTML = 'PAID';
+          }
+        }
+        return;
+      }
+
+      // ====================================================================
+      // INITIAL OP REGISTRATION + INITIAL PAYMENT
+      // ====================================================================
+      const patientName = document.getElementById('opPatientName')?.value.trim();
+      const ageStr = document.getElementById('opPatientAge')?.value.trim();
+      const gender = document.getElementById('opPatientGender')?.value.trim();
+      const phone = document.getElementById('opPatientPhone')?.value.trim();
+      const email = document.getElementById('opPatientEmail')?.value.trim();
+      const doctorName = document.getElementById('opDoctorSelect')?.value.trim();
+      const department = document.getElementById('opDepartmentInput')?.value.trim();
+      const address = document.getElementById('opAddressInput')?.value.trim();
+      const notes = document.getElementById('opNotesInput')?.value.trim();
+      const feeStr = document.getElementById('opFeeInput')?.value.trim() || '0';
+      const existingUhid = opLoadedPatient ? opLoadedPatient.uhid : document.getElementById('opPatientUhid')?.value.trim();
+
       let isValid = true;
       document.querySelectorAll('.cv-feedback-error').forEach(el => el.classList.remove('show'));
       document.querySelectorAll('.cv-input').forEach(el => el.classList.remove('is-invalid'));
 
       if (!patientName) {
-        document.getElementById('opPatientName').classList.add('is-invalid');
-        document.getElementById('errPatientName').classList.add('show');
+        document.getElementById('opPatientName')?.classList.add('is-invalid');
+        document.getElementById('errPatientName')?.classList.add('show');
         isValid = false;
       }
 
       const ageNum = parseInt(ageStr, 10);
       if (isNaN(ageNum) || ageNum < 0 || ageNum > 130) {
-        document.getElementById('opPatientAge').classList.add('is-invalid');
-        document.getElementById('errPatientAge').classList.add('show');
+        document.getElementById('opPatientAge')?.classList.add('is-invalid');
+        document.getElementById('errPatientAge')?.classList.add('show');
         isValid = false;
       }
 
       if (!gender) {
-        document.getElementById('opPatientGender').classList.add('is-invalid');
-        document.getElementById('errPatientGender').classList.add('show');
+        document.getElementById('opPatientGender')?.classList.add('is-invalid');
+        document.getElementById('errPatientGender')?.classList.add('show');
         isValid = false;
       }
 
       if (!phone || phone.length < 7) {
-        document.getElementById('opPatientPhone').classList.add('is-invalid');
-        document.getElementById('errPatientPhone').classList.add('show');
+        document.getElementById('opPatientPhone')?.classList.add('is-invalid');
+        document.getElementById('errPatientPhone')?.classList.add('show');
         isValid = false;
       }
 
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        document.getElementById('opPatientEmail').classList.add('is-invalid');
-        document.getElementById('errPatientEmail').classList.add('show');
+        document.getElementById('opPatientEmail')?.classList.add('is-invalid');
+        document.getElementById('errPatientEmail')?.classList.add('show');
         isValid = false;
       }
 
       if (!doctorName) {
-        document.getElementById('opDoctorSelect').classList.add('is-invalid');
-        document.getElementById('errDoctor').classList.add('show');
+        document.getElementById('opDoctorSelect')?.classList.add('is-invalid');
+        document.getElementById('errDoctor')?.classList.add('show');
         isValid = false;
-      } else {
-        // Enforce doctor availability on client
-        const matchedDoc = opAvailableDoctors.find(d => d.name === doctorName);
-        if (matchedDoc && matchedDoc.status !== 'AVAILABLE') {
-          document.getElementById('opDoctorSelect').classList.add('is-invalid');
-          const errDoc = document.getElementById('errDoctor');
-          errDoc.textContent = `Selected doctor is currently unavailable (${matchedDoc.status.replace('_', ' ')}).`;
-          errDoc.classList.add('show');
-          isValid = false;
-        }
       }
 
-      const feeNum = parseFloat(amountStr);
-      if (isNaN(feeNum) || feeNum < 0) {
-        document.getElementById('opAmountPaid').classList.add('is-invalid');
-        document.getElementById('errAmount').classList.add('show');
+      const totalFee = parseFloat(feeStr);
+      if (isNaN(totalFee) || totalFee < 0) {
+        showToast('Please enter a valid consultation fee.', 'danger');
+        isValid = false;
+      }
+
+      if (numAmt > totalFee + 0.001) {
+        showToast(`Payment amount cannot exceed consultation fee of ₹${formatCurrency(totalFee)}.`, 'danger');
         isValid = false;
       }
 
       if (!isValid) {
         if (alertBox) {
           alertBox.className = 'cv-alert cv-alert-danger show';
-          alertBox.textContent = 'Please correct the highlighted validation errors before registering.';
+          alertBox.textContent = 'Please correct the highlighted validation errors before submitting payment.';
         }
         return;
       }
 
-      // 3. Submit to Backend
-      const btn = document.getElementById('btnRegisterOpSubmit');
-      const spinner = document.getElementById('opRegisterSpinner');
-      const btnText = document.getElementById('opRegisterBtnText');
+      if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.dataset.processing = 'true';
+        triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Processing...';
+      }
 
-      btn.disabled = true;
-      spinner?.classList.add('show');
-      if (btnText) btnText.textContent = 'Saving to Database...';
+      const statusVal = (numAmt >= totalFee && totalFee > 0) ? 'PAID' : (numAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID');
 
       const payload = {
         patientName: patientName,
@@ -3037,51 +3213,104 @@ const Admin = (function () {
         address: address || null,
         existingUhid: existingUhid || null,
         doctorName: doctorName,
-        department: department,
-        consultationFee: feeNum,
+        department: department || 'General Medicine',
+        consultationFee: totalFee,
+        paidAmount: numAmt,
         paymentMethod: paymentMethod,
+        paymentStatus: statusVal,
         notes: notes || null
       };
 
       try {
         const res = await Api.post('/api/op/register', payload);
 
-        btn.disabled = false;
-        spinner?.classList.remove('show');
-        if (btnText) btnText.textContent = 'Register OP (Outpatient)';
-
         if (res.ok && res.data) {
+          activeRegisteredOp = res.data;
           const registeredOp = res.data;
+
+          const isNowPaid = (registeredOp.balanceAmount <= 0);
+
+          // Update UI immediately
+          const dispFee = document.getElementById('opDisplayTotalFee');
+          const dispPaid = document.getElementById('opDisplayTotalPaid');
+          const dispBal = document.getElementById('opDisplayRemainingBal');
+          const dispBadge = document.getElementById('opDisplayStatusBadge');
+          const statusInput = document.getElementById('opPaymentStatusDisplay');
+
+          if (dispFee) dispFee.textContent = '₹' + formatCurrency(registeredOp.consultationFee);
+          if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(registeredOp.paidAmount);
+          if (dispBal) dispBal.textContent = '₹' + formatCurrency(registeredOp.balanceAmount);
+          if (dispBadge) {
+            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${registeredOp.paymentStatus}</span>`;
+          }
+          if (statusInput) statusInput.value = registeredOp.paymentStatus;
+
+          const amtInput = document.getElementById('opAmountPaid');
+          if (amtInput) {
+            if (isNowPaid) {
+              amtInput.value = '0.00';
+            } else {
+              amtInput.value = registeredOp.balanceAmount.toFixed(2);
+            }
+          }
 
           if (alertBox) {
             alertBox.className = 'cv-alert cv-alert-success show';
             alertBox.innerHTML = `
-              <strong>OP Registration completed successfully!</strong><br>
-              OP ID: <strong>${registeredOp.opId}</strong> &bull; UHID: <strong>${registeredOp.uhid}</strong> &bull; Patient: <strong>${registeredOp.patientName}</strong> &bull; Doctor: <strong>${registeredOp.doctorName}</strong>
+              <strong>OP Registration & Payment Recorded!</strong><br>
+              OP ID: <strong>${registeredOp.opId}</strong> &bull; UHID: <strong>${registeredOp.uhid}</strong> &bull; Patient: <strong>${registeredOp.patientName}</strong><br>
+              Paid: <strong>₹${formatCurrency(registeredOp.paidAmount)}</strong> &bull; Remaining: <strong>₹${formatCurrency(registeredOp.balanceAmount)}</strong> &bull; Status: <strong>${registeredOp.paymentStatus}</strong>
             `;
           }
 
-          // Reset form inputs
-          resetOpForm();
+          showToast(`OP registered and payment of ₹${formatCurrency(numAmt)} saved to database.`, 'success');
 
-          // Automatically prompt receipt modal for printing
-          showOpReceiptModal(registeredOp.id);
+          if (triggerBtn) {
+            triggerBtn.disabled = isNowPaid;
+            delete triggerBtn.dataset.processing;
+            triggerBtn.innerHTML = 'PAID';
+          }
+
+          // Refresh history without full browser reload
+          if (typeof loadOpHistoryList === 'function') {
+            loadOpHistoryList();
+          }
         } else {
           if (alertBox) {
             alertBox.className = 'cv-alert cv-alert-danger show';
             alertBox.textContent = res.message || 'Failed to complete OP registration. Please check inputs.';
           }
+          if (triggerBtn) {
+            triggerBtn.disabled = false;
+            delete triggerBtn.dataset.processing;
+            triggerBtn.innerHTML = 'PAID';
+          }
         }
       } catch (networkErr) {
-        btn.disabled = false;
-        spinner?.classList.remove('show');
-        if (btnText) btnText.textContent = 'Register OP (Outpatient)';
         if (alertBox) {
           alertBox.className = 'cv-alert cv-alert-danger show';
           alertBox.textContent = 'Network error while contacting the server.';
         }
+        if (triggerBtn) {
+          triggerBtn.disabled = false;
+          delete triggerBtn.dataset.processing;
+          triggerBtn.innerHTML = 'PAID';
+        }
       }
+    }
+
+    btnDirectPaid?.addEventListener('click', (e) => {
+      e.preventDefault();
+      processOpPaidAction(btnDirectPaid);
     });
+
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btnRegisterOpSubmit');
+        processOpPaidAction(submitBtn);
+      });
+    }
   }
 
   // ====================================================================
@@ -3233,6 +3462,9 @@ const Admin = (function () {
           <button type="button" class="cv-btn-secondary btn-view-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem; margin-right:0.3rem;">
             View
           </button>
+          <button type="button" class="cv-btn-secondary btn-payments-op" data-id="${item.id}" data-opid="${item.opId}" style="padding:0.35rem 0.65rem; font-size:0.78rem; margin-right:0.3rem; color:#0284c7;">
+            Payments
+          </button>
           <button type="button" class="cv-btn-primary btn-receipt-op" data-id="${item.id}" style="padding:0.35rem 0.65rem; font-size:0.78rem;">
             Receipt
           </button>
@@ -3242,6 +3474,10 @@ const Admin = (function () {
 
     tbody.querySelectorAll('.btn-view-op').forEach(btn => {
       btn.addEventListener('click', () => showOpDetailsModal(btn.dataset.id));
+    });
+
+    tbody.querySelectorAll('.btn-payments-op').forEach(btn => {
+      btn.addEventListener('click', () => showBillPaymentsModal('OP', btn.dataset.id, btn.dataset.opid));
     });
 
     tbody.querySelectorAll('.btn-receipt-op').forEach(btn => {
@@ -3375,11 +3611,14 @@ const Admin = (function () {
                 <span class="cv-receipt-fee-amount">&#8377;${formatCurrency(op.consultationFee)}</span>
               </div>
             </div>
-            <div class="cv-op-modal-footer">
-              <button type="button" class="cv-btn-secondary" id="btnCloseDetailsModal">Close</button>
-              <button type="button" class="cv-btn-primary" id="btnReceiptFromDetails">
-                Print OP Receipt
-              </button>
+            <div class="cv-op-modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnOpDetailsPayHistory">Payment History</button>
+              <div style="display:flex; gap:0.75rem;">
+                <button type="button" class="cv-btn-secondary" id="btnCloseDetailsModal">Close</button>
+                <button type="button" class="cv-btn-primary" id="btnReceiptFromDetails">
+                  Print OP Receipt
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3388,6 +3627,9 @@ const Admin = (function () {
       const close = () => { modalHost.innerHTML = ''; };
       document.getElementById('btnCloseOpDetails')?.addEventListener('click', close);
       document.getElementById('btnCloseDetailsModal')?.addEventListener('click', close);
+      document.getElementById('btnOpDetailsPayHistory')?.addEventListener('click', () => {
+        showBillPaymentsModal('OP', op.id, op.opId);
+      });
       document.getElementById('btnReceiptFromDetails')?.addEventListener('click', () => {
         showOpReceiptModal(id);
       });
@@ -5098,11 +5340,15 @@ const Admin = (function () {
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
                 <span style="color:#64748b;">Amount Paid So Far:</span>
-                <strong style="color:#059669;">₹${formatCurrency(paidAmount)}</strong>
+                <strong id="bedPayDisplayPaidSoFar" style="color:#059669;">₹${formatCurrency(paidAmount)}</strong>
               </div>
               <div style="display:flex; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:0.4rem; margin-top:0.4rem;">
                 <span style="color:#64748b; font-weight:700;">Outstanding Balance:</span>
-                <strong style="color:var(--cv-danger); font-size:1.05rem;">₹${formatCurrency(balanceAmount)}</strong>
+                <strong id="bedPayDisplayBalance" style="color:var(--cv-danger); font-size:1.05rem;">₹${formatCurrency(balanceAmount)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.35rem;">
+                <span style="color:#64748b; font-size:0.78rem;">Payment Status:</span>
+                <span id="bedPayDisplayStatus"><span class="cv-payment-balance-badge ${balanceAmount <= 0 ? 'cv-badge-paid' : 'cv-badge-part'}">${adm.paymentStatus || (balanceAmount <= 0 ? 'PAID' : 'PARTIALLY PAID')}</span></span>
               </div>
             </div>
 
@@ -5111,9 +5357,14 @@ const Admin = (function () {
               <label for="bedPayAmountInput" style="display:block; font-size:0.8rem; font-weight:700; color:#334155; text-transform:uppercase; margin-bottom:0.35rem;">
                 Amount Paid / Enter Amount <span style="color:#dc2626;">*</span>
               </label>
-              <div style="position:relative;">
-                <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
-                <input type="number" id="bedPayAmountInput" class="cv-form-input" style="padding-left:1.8rem; height:42px; font-size:1.05rem; font-weight:700;" placeholder="0.00" value="${balanceAmount}" min="0.01" max="${balanceAmount}" step="any">
+              <div style="display:flex; gap:0.4rem; align-items:center;">
+                <div style="position:relative; flex:1;">
+                  <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
+                  <input type="number" id="bedPayAmountInput" class="cv-form-input" style="padding-left:1.8rem; height:42px; font-size:1.05rem; font-weight:700;" placeholder="0.00" value="${balanceAmount}" min="0.01" max="${balanceAmount}" step="any">
+                </div>
+                <button type="button" class="cv-btn-paid" id="btnBedPayDirect" style="height:42px; padding:0 1.25rem;">
+                  PAID
+                </button>
               </div>
             </div>
 
@@ -5131,13 +5382,18 @@ const Admin = (function () {
             </div>
           </div>
 
-          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:flex-end; gap:0.75rem;">
-            <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
-              Cancel
+          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+            <button type="button" class="cv-btn-secondary" id="btnBedPayHistory" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
+              Payment History
             </button>
-            <button type="button" class="cv-btn-primary" id="btnBedPaySubmit" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
-              Submit
-            </button>
+            <div style="display:flex; gap:0.75rem;">
+              <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
+                Close
+              </button>
+              <button type="button" class="cv-btn-paid" id="btnBedPaySubmit" style="padding:0.5rem 1.4rem; font-size:0.88rem; font-weight:700;">
+                PAID
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -5147,88 +5403,126 @@ const Admin = (function () {
       const closeBedModal = () => backdrop.remove();
       document.getElementById('btnBedPayClose')?.addEventListener('click', closeBedModal);
       document.getElementById('btnBedPayCancel')?.addEventListener('click', closeBedModal);
+      document.getElementById('btnBedPayHistory')?.addEventListener('click', () => {
+        showBillPaymentsModal('IP', admissionId, adm.ipId);
+      });
 
-      document.getElementById('btnBedPaySubmit')?.addEventListener('click', () => {
+      async function executeBedPaymentDirect(triggerBtn) {
+        if (triggerBtn) {
+          if (triggerBtn.disabled || triggerBtn.dataset.processing === 'true') return;
+        }
+
         const amtInput = document.getElementById('bedPayAmountInput');
         const rawVal = amtInput ? amtInput.value : '';
         const method = document.getElementById('bedPayMethodSelect')?.value || 'CASH';
 
         if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
-          alert('Please enter a payment amount.');
+          showToast('Please enter a payment amount.', 'danger');
           return;
         }
         const enteredAmt = parseFloat(rawVal);
         if (isNaN(enteredAmt) || enteredAmt <= 0) {
-          alert('Payment amount must be a valid positive number greater than 0.');
+          showToast('Payment amount must be a valid positive number greater than 0.', 'danger');
           return;
         }
-        if (enteredAmt > balanceAmount + 0.001) {
-          alert(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(balanceAmount)}.`);
+        const curBal = (adm.balanceAmount != null) ? parseFloat(adm.balanceAmount) : balanceAmount;
+        if (enteredAmt > curBal + 0.001) {
+          showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
           return;
         }
 
-        const remBal = Math.max(0, parseFloat((balanceAmount - enteredAmt).toFixed(2)));
+        if (triggerBtn) {
+          triggerBtn.disabled = true;
+          triggerBtn.dataset.processing = 'true';
+          triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
+        }
 
-        // Hide bed pay modal while confirmation is open
-        backdrop.style.display = 'none';
+        try {
+          const payRes = await Api.post('/api/billing/payment', {
+            moduleType: 'IP',
+            billId: admissionId,
+            billNumber: adm.ipId,
+            paymentAmount: enteredAmt,
+            paymentMethod: method,
+            notes: 'IP room/bed payment collected'
+          });
 
-        showPaymentConfirmationModal({
-          title: 'Confirm Room / Bed Payment',
-          billRef: 'IP Bill: ' + (adm.ipId || 'IP-' + admissionId),
-          paymentAmount: enteredAmt,
-          remainingBalance: remBal,
-          moduleType: 'IP',
-          printButtonLabel: 'Print Bill',
-          onCancel: () => {
-            // Restore bed payment modal
-            backdrop.style.display = 'flex';
-          },
-          onConfirm: async (showSuccessState, unlockBtn) => {
-            try {
-              const payRes = await Api.post('/api/billing/payment', {
-                moduleType: 'IP',
-                billId: admissionId,
-                billNumber: adm.ipId,
-                paymentAmount: enteredAmt,
-                paymentMethod: method,
-                notes: 'IP room/bed payment collected'
-              });
+          if (payRes && payRes.ok && payRes.data) {
+            const data = payRes.data;
+            adm.paidAmount = data.amountPaid;
+            adm.depositAmount = data.amountPaid;
+            adm.balanceAmount = data.balanceAmount;
+            adm.paymentStatus = data.paymentStatus;
+            adm.paymentMethod = data.paymentMethod;
 
-              if (payRes && payRes.ok && payRes.data) {
-                backdrop.remove();
-                showSuccessState(payRes.data);
-                loadRoomsData();
-                if (document.getElementById('ipInpatientsTableBody')) {
-                  loadCurrentInpatients();
-                }
-              } else {
-                unlockBtn();
-                alert(payRes?.message || 'Payment processing failed.');
-                backdrop.style.display = 'flex';
-              }
-            } catch (err) {
-              unlockBtn();
-              alert('Error processing payment: ' + (err.message || err));
-              backdrop.style.display = 'flex';
+            const isNowPaid = (data.balanceAmount <= 0);
+
+            // Update in-modal display immediately
+            const paidDisplay = document.getElementById('bedPayDisplayPaidSoFar');
+            const balDisplay = document.getElementById('bedPayDisplayBalance');
+            const statusDisplay = document.getElementById('bedPayDisplayStatus');
+
+            if (paidDisplay) paidDisplay.textContent = '₹' + formatCurrency(data.amountPaid);
+            if (balDisplay) {
+              balDisplay.textContent = '₹' + formatCurrency(data.balanceAmount);
+              balDisplay.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
             }
-          },
-          onPrint: (resultData) => {
-            const updatedAdm = {
-              ...adm,
-              paidAmount: resultData?.amountPaid != null ? resultData.amountPaid : (paidAmount + enteredAmt),
-              depositAmount: resultData?.amountPaid != null ? resultData.amountPaid : (paidAmount + enteredAmt),
-              balanceAmount: resultData?.balanceAmount != null ? resultData.balanceAmount : remBal,
-              paymentStatus: resultData?.paymentStatus || (remBal <= 0 ? 'PAID' : 'PARTIALLY PAID'),
-              paymentMethod: method
-            };
-            openBillPrintWindow(buildIpBillPrintHtml({
-              fullName: adm.patientName,
-              uhid: adm.uhid,
-              phone: adm.phone
-            }, updatedAdm));
+            if (statusDisplay) {
+              statusDisplay.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${data.paymentStatus}</span>`;
+            }
+
+            if (amtInput) {
+              if (isNowPaid) {
+                amtInput.value = '0.00';
+                amtInput.disabled = true;
+              } else {
+                amtInput.value = data.balanceAmount.toFixed(2);
+                amtInput.max = data.balanceAmount.toFixed(2);
+              }
+            }
+
+            if (triggerBtn) {
+              triggerBtn.disabled = isNowPaid;
+              delete triggerBtn.dataset.processing;
+              triggerBtn.innerHTML = 'PAID';
+            }
+            const btnOther = (triggerBtn.id === 'btnBedPayDirect') ? document.getElementById('btnBedPaySubmit') : document.getElementById('btnBedPayDirect');
+            if (btnOther) {
+              btnOther.disabled = isNowPaid;
+              delete btnOther.dataset.processing;
+              btnOther.innerHTML = 'PAID';
+            }
+
+            showToast(`Payment of ₹${formatCurrency(enteredAmt)} recorded. Remaining: ₹${formatCurrency(data.balanceAmount)}`, 'success');
+
+            // Refresh background views without page reload
+            loadRoomsData();
+            if (document.getElementById('ipInpatientsTableBody')) {
+              loadCurrentInpatients();
+            }
+            if (typeof loadIpHistory === 'function') {
+              loadIpHistory();
+            }
+          } else {
+            showToast(payRes?.message || 'Payment processing failed.', 'danger');
+            if (triggerBtn) {
+              triggerBtn.disabled = false;
+              delete triggerBtn.dataset.processing;
+              triggerBtn.innerHTML = 'PAID';
+            }
           }
-        });
-      });
+        } catch (err) {
+          showToast('Error processing payment: ' + (err.message || err), 'danger');
+          if (triggerBtn) {
+            triggerBtn.disabled = false;
+            delete triggerBtn.dataset.processing;
+            triggerBtn.innerHTML = 'PAID';
+          }
+        }
+      }
+
+      document.getElementById('btnBedPayDirect')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPayDirect')));
+      document.getElementById('btnBedPaySubmit')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPaySubmit')));
 
     } catch (e) {
       console.error(e);
@@ -5678,6 +5972,7 @@ const Admin = (function () {
   let pharBillItems = [];
   let pharPatientSearchDebounce = null;
   let pharAllSalesHistory = [];
+  let pharActiveSavedBill = null;
 
   async function cvFetch(url, options = {}) {
     if (options.method === 'POST') {
@@ -6028,7 +6323,12 @@ function renderPharmacyModule(activeTab = 'billing') {
                   <span class="cv-calc-label" style="font-weight:700; color:#0f172a;">Amount Paid (₹) <span style="color:var(--cv-danger);">*</span></span>
                   <button type="button" id="btnPharPayFull" class="cv-link-btn" title="Set paid amount equal to total">Pay Full</button>
                 </div>
-                <input type="number" id="pharPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:26px; width:110px; font-weight:700; font-size:0.9rem; text-align:right; color:#0f172a;">
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                  <input type="number" id="pharPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:30px; width:100px; font-weight:700; font-size:0.9rem; text-align:right; color:#0f172a;">
+                  <button type="button" id="btnPharDirectPaid" class="cv-btn-paid" style="height:30px; padding:0 0.9rem; font-size:0.8rem;">
+                    PAID
+                  </button>
+                </div>
               </div>
 
               <div class="cv-calc-row">
@@ -6434,6 +6734,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     document.getElementById('btnPharResetBill')?.addEventListener('click', () => {
       if (confirm('Are you sure you want to reset this bill? All selected medicines will be cleared.')) {
         pharBillItems = [];
+        pharActiveSavedBill = null;
         clearPharmacyPatient();
         renderPharmacyBillingTab();
       }
@@ -6441,10 +6742,247 @@ function renderPharmacyModule(activeTab = 'billing') {
 
     // 8. Generate & Save Bill
     document.getElementById('btnPharGenerateBill')?.addEventListener('click', generatePharmacyBill);
+
+    // 9. Direct PAID Button Handler (Single-Click Real MySQL Payment Collection)
+    document.getElementById('btnPharDirectPaid')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || btn.dataset.processing === 'true') return;
+
+      const amtVal = document.getElementById('pharPaidAmount')?.value;
+      if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
+        showToast('Please enter an amount to pay.', 'danger');
+        return;
+      }
+      const numAmt = parseFloat(amtVal);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Payment amount must be greater than zero.', 'danger');
+        return;
+      }
+
+      // SUBSEQUENT PAYMENT ON ALREADY GENERATED PHARMACY BILL
+      if (pharActiveSavedBill) {
+        const curBal = (pharActiveSavedBill.balanceAmount != null)
+          ? parseFloat(pharActiveSavedBill.balanceAmount)
+          : Math.max(0, (pharActiveSavedBill.finalTotal || pharActiveSavedBill.totalAmount || 0) - (pharActiveSavedBill.paidAmount || 0));
+
+        if (curBal <= 0) {
+          showToast('This pharmacy bill is already fully paid.', 'info');
+          return;
+        }
+        if (numAmt > curBal + 0.001) {
+          showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+          return;
+        }
+
+        await executeBillPayment({
+          moduleType: 'PHARMACY',
+          billId: pharActiveSavedBill.id,
+          billNumber: pharActiveSavedBill.billNumber,
+          amount: numAmt,
+          balance: curBal,
+          paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
+          buttonEl: btn,
+          onSuccess: async (data) => {
+            pharActiveSavedBill.paidAmount = data.amountPaid;
+            pharActiveSavedBill.balanceAmount = data.balanceAmount;
+            pharActiveSavedBill.paymentStatus = data.paymentStatus;
+            pharActiveSavedBill.paymentMethod = data.paymentMethod;
+
+            const isNowPaid = (data.balanceAmount <= 0);
+            const balElem = document.getElementById('pharBalanceAmount');
+            if (balElem) balElem.textContent = '₹' + formatCurrency(data.balanceAmount);
+
+            const statusBadge = document.getElementById('pharPaymentStatusBadge');
+            if (statusBadge) {
+              statusBadge.textContent = data.paymentStatus;
+              statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-partial'}`;
+            }
+
+            const amtInput = document.getElementById('pharPaidAmount');
+            if (amtInput) {
+              amtInput.value = isNowPaid ? '0.00' : data.balanceAmount.toFixed(2);
+              amtInput.disabled = isNowPaid;
+            }
+
+            if (btn) {
+              btn.disabled = isNowPaid;
+              delete btn.dataset.processing;
+              btn.innerHTML = 'PAID';
+            }
+
+            showToast(`Pharmacy payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
+
+            if (pharAllSalesHistory && pharAllSalesHistory.length > 0) {
+              try {
+                const hRes = await cvFetch('/api/pharmacy/bills/history');
+                if (hRes && hRes.success && Array.isArray(hRes.data)) pharAllSalesHistory = hRes.data;
+              } catch (_) {}
+            }
+          }
+        });
+        return;
+      }
+
+      // INITIAL PHARMACY BILL GENERATION + PAYMENT RECORDING
+      let patientName = '';
+      let uhid = '';
+      let phone = '';
+      let opId = '';
+      let ipId = '';
+      let doctorName = '';
+      let department = '';
+      let patientId = null;
+
+      if (pharSelectedPatient) {
+        patientId = pharSelectedPatient.id;
+        patientName = pharSelectedPatient.fullName || pharSelectedPatient.name || '';
+        uhid = pharSelectedPatient.uhid || '';
+        phone = pharSelectedPatient.phone || '';
+        opId = pharSelectedPatient.opId || '';
+        ipId = pharSelectedPatient.ipId || '';
+        doctorName = pharSelectedPatient.doctorName || '';
+        department = pharSelectedPatient.department || '';
+      } else {
+        const walkinName = document.getElementById('pharWalkinName')?.value?.trim();
+        const walkinPhone = document.getElementById('pharWalkinPhone')?.value?.trim();
+        if (!walkinName) {
+          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
+          document.getElementById('pharPatientSearchInput')?.focus();
+          return;
+        }
+        patientName = walkinName;
+        phone = walkinPhone || '';
+        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
+      }
+
+      if (!pharBillItems || pharBillItems.length === 0) {
+        showToast('Please add at least one medicine to the bill.', 'danger');
+        return;
+      }
+
+      for (const item of pharBillItems) {
+        if (item.quantity <= 0) {
+          showToast(`Invalid quantity for medicine ${item.medicineName}.`, 'danger');
+          return;
+        }
+        if (item.quantity > item.maxStock) {
+          showToast(`Only ${item.maxStock} units available for ${item.medicineName}.`, 'danger');
+          return;
+        }
+      }
+
+      let subtotal = 0;
+      const requestItems = pharBillItems.map(item => {
+        const q = parseInt(item.quantity);
+        const p = parseFloat(item.unitPrice);
+        const tot = parseFloat((q * p).toFixed(2));
+        subtotal += tot;
+        return {
+          medicineId: item.medicineId,
+          medicineCode: item.medicineCode,
+          medicineName: item.medicineName,
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+          quantity: q,
+          unitPrice: p,
+          totalPrice: tot
+        };
+      });
+
+      const discountPct = parseFloat(document.getElementById('pharDiscountPct')?.value) || 0;
+      const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
+      const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
+      const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
+      const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
+      const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
+
+      if (numAmt > finalTotal + 0.001) {
+        showToast(`Payment amount cannot exceed the bill total of ₹${formatCurrency(finalTotal)}.`, 'danger');
+        return;
+      }
+
+      const payload = {
+        patientId: patientId,
+        patientName: patientName,
+        uhid: uhid,
+        phone: phone,
+        opId: opId,
+        ipId: ipId,
+        doctorName: doctorName,
+        department: department,
+        discountPercentage: discountPct,
+        discountAmount: discountAmount,
+        gstNumber: document.getElementById('pharGstNumber')?.value?.trim() || '22AAAAA0000A1Z5',
+        gstPercentage: gstPct,
+        gstAmount: gstAmount,
+        paidAmount: numAmt,
+        paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
+        notes: document.getElementById('pharNotes')?.value?.trim() || '',
+        items: requestItems
+      };
+
+      btn.disabled = true;
+      btn.dataset.processing = 'true';
+      btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
+
+      try {
+        const res = await Api.post('/api/pharmacy/bills/create', payload);
+        if (res && res.success && res.data) {
+          const savedBill = res.data;
+          pharActiveSavedBill = savedBill;
+
+          // Clear cart items to prevent duplicate medicine deduction
+          pharBillItems = [];
+          const tbody = document.getElementById('pharBillTableBody');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Bill ${escapeHtml(savedBill.billNumber)} generated and saved to MySQL.</td></tr>`;
+
+          const isNowPaid = (savedBill.balanceAmount <= 0);
+
+          const balElem = document.getElementById('pharBalanceAmount');
+          if (balElem) balElem.textContent = '₹' + formatCurrency(savedBill.balanceAmount);
+
+          const statusBadge = document.getElementById('pharPaymentStatusBadge');
+          if (statusBadge) {
+            statusBadge.textContent = savedBill.paymentStatus;
+            statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-partial'}`;
+          }
+
+          const amtInput = document.getElementById('pharPaidAmount');
+          if (amtInput) {
+            amtInput.value = isNowPaid ? '0.00' : savedBill.balanceAmount.toFixed(2);
+            amtInput.disabled = isNowPaid;
+          }
+
+          btn.disabled = isNowPaid;
+          delete btn.dataset.processing;
+          btn.innerHTML = 'PAID';
+
+          showToast(`Pharmacy payment of ₹${formatCurrency(numAmt)} recorded for Bill ${savedBill.billNumber}. Total Paid: ₹${formatCurrency(savedBill.paidAmount)}, Balance: ₹${formatCurrency(savedBill.balanceAmount)}`, 'success');
+
+          if (pharAllSalesHistory && pharAllSalesHistory.length > 0) {
+            try {
+              const hRes = await cvFetch('/api/pharmacy/bills/history');
+              if (hRes && hRes.success && Array.isArray(hRes.data)) pharAllSalesHistory = hRes.data;
+            } catch (_) {}
+          }
+        } else {
+          showToast((res && res.message) ? res.message : 'Failed to save pharmacy payment.', 'danger');
+          btn.disabled = false;
+          delete btn.dataset.processing;
+          btn.innerHTML = 'PAID';
+        }
+      } catch (err) {
+        showToast('Error recording pharmacy payment: ' + (err.message || err), 'danger');
+        btn.disabled = false;
+        delete btn.dataset.processing;
+        btn.innerHTML = 'PAID';
+      }
+    });
   }
 
   function selectPharmacyPatient(p) {
     pharSelectedPatient = p;
+    pharActiveSavedBill = null;
     const searchInput = document.getElementById('pharPatientSearchInput');
     const dropdown = document.getElementById('pharPatientDropdown');
     const container = document.getElementById('pharPatientAutofillContainer');
@@ -6459,6 +6997,7 @@ function renderPharmacyModule(activeTab = 'billing') {
 
   function clearPharmacyPatient() {
     pharSelectedPatient = null;
+    pharActiveSavedBill = null;
     const searchInput = document.getElementById('pharPatientSearchInput');
     const container = document.getElementById('pharPatientAutofillContainer');
     if (searchInput) searchInput.value = '';
@@ -7021,10 +7560,13 @@ function renderPharmacyModule(activeTab = 'billing') {
               ${escapeHtml(b.paymentStatus)}
             </span>
           </td>
-          <td style="text-align:center;">
+          <td style="text-align:center; white-space:nowrap;">
             <button type="button" class="cv-btn-secondary btn-view-phar-invoice" data-bill-id="${b.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
               <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               Invoice
+            </button>
+            <button type="button" class="cv-btn-secondary btn-payments-phar" data-bill-id="${b.id}" data-bill-no="${escapeHtml(b.billNumber)}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
+              Payments
             </button>
           </td>
         </tr>
@@ -7047,6 +7589,14 @@ function renderPharmacyModule(activeTab = 'billing') {
           console.error('Error loading invoice:', err);
           alert('Could not retrieve invoice.');
         }
+      });
+    });
+
+    document.querySelectorAll('.btn-payments-phar').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const billId = e.currentTarget.getAttribute('data-bill-id');
+        const billNo = e.currentTarget.getAttribute('data-bill-no');
+        showBillPaymentsModal('PHARMACY', billId, billNo);
       });
     });
   }
@@ -7856,6 +8406,7 @@ function renderPharmacyModule(activeTab = 'billing') {
   let labProcessingOrders = [];
   let labActiveFilter = 'ALL';
   let labCurrentProcessingSearch = '';
+  let labActiveSavedOrder = null;
 
   function renderLaboratoryModule(activeTab = 'orders') {
     const mainContent = document.getElementById('dashboardMain');
@@ -8158,7 +8709,12 @@ function renderPharmacyModule(activeTab = 'billing') {
                       Pay Full Amount
                     </button>
                   </div>
-                  <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a;">
+                  <div style="display:flex; gap:0.4rem; align-items:center;">
+                    <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
+                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1.15rem;">
+                      PAID
+                    </button>
+                  </div>
                 </div>
 
                 <div class="cv-balance-card">
@@ -8437,6 +8993,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     document.getElementById('btnLabResetOrder')?.addEventListener('click', () => {
       if (confirm('Reset the laboratory order form?')) {
         labOrderItems = [];
+        labActiveSavedOrder = null;
         labSelectedPatient = null;
         renderLabOrdersTab();
       }
@@ -8444,6 +9001,216 @@ function renderPharmacyModule(activeTab = 'billing') {
 
     // 8. Create Lab Order
     document.getElementById('btnLabCreateOrder')?.addEventListener('click', createLabOrder);
+
+    // 9. Direct PAID Button Handler (Single-Click Real MySQL Payment Collection)
+    document.getElementById('btnLabDirectPaid')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || btn.dataset.processing === 'true') return;
+
+      const amtVal = document.getElementById('labPaidAmount')?.value;
+      if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
+        showToast('Please enter an amount to pay.', 'danger');
+        return;
+      }
+      const numAmt = parseFloat(amtVal);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Payment amount must be greater than zero.', 'danger');
+        return;
+      }
+
+      // SUBSEQUENT PAYMENT ON ALREADY CREATED LAB ORDER
+      if (labActiveSavedOrder) {
+        const curBal = (labActiveSavedOrder.balanceAmount != null)
+          ? parseFloat(labActiveSavedOrder.balanceAmount)
+          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - (labActiveSavedOrder.paidAmount || 0));
+
+        if (curBal <= 0) {
+          showToast('This laboratory order is already fully paid.', 'info');
+          return;
+        }
+        if (numAmt > curBal + 0.001) {
+          showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+          return;
+        }
+
+        await executeBillPayment({
+          moduleType: 'LABORATORY',
+          billId: labActiveSavedOrder.id,
+          billNumber: labActiveSavedOrder.orderNumber,
+          amount: numAmt,
+          balance: curBal,
+          paymentMethod: document.getElementById('labPaymentMethod')?.value || 'CASH',
+          buttonEl: btn,
+          onSuccess: async (data) => {
+            labActiveSavedOrder.paidAmount = data.amountPaid;
+            labActiveSavedOrder.balanceAmount = data.balanceAmount;
+            labActiveSavedOrder.paymentStatus = data.paymentStatus;
+            labActiveSavedOrder.paymentMethod = data.paymentMethod;
+
+            const isNowPaid = (data.balanceAmount <= 0);
+            const balElem = document.getElementById('labBalanceAmount');
+            if (balElem) balElem.textContent = '₹' + formatCurrency(data.balanceAmount);
+
+            const statusBadge = document.getElementById('labPaymentStatusBadge');
+            if (statusBadge) {
+              statusBadge.textContent = data.paymentStatus;
+              statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
+            }
+
+            const amtInput = document.getElementById('labPaidAmount');
+            if (amtInput) {
+              amtInput.value = isNowPaid ? '0.00' : data.balanceAmount.toFixed(2);
+              amtInput.disabled = isNowPaid;
+            }
+
+            if (btn) {
+              btn.disabled = isNowPaid;
+              delete btn.dataset.processing;
+              btn.innerHTML = 'PAID';
+            }
+
+            showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
+          }
+        });
+        return;
+      }
+
+      // INITIAL LAB ORDER CREATION + PAYMENT RECORDING
+      let patientName = '';
+      let uhid = '';
+      let phone = '';
+      let opId = '';
+      let ipId = '';
+      let doctorName = '';
+      let department = '';
+      let patientId = null;
+
+      if (labSelectedPatient) {
+        patientId = labSelectedPatient.id;
+        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
+        uhid = labSelectedPatient.uhid || '';
+        phone = labSelectedPatient.phone || '';
+        opId = labSelectedPatient.opId || '';
+        ipId = labSelectedPatient.ipId || '';
+        doctorName = labSelectedPatient.doctorName || '';
+        department = labSelectedPatient.department || '';
+      } else {
+        const walkinName = document.getElementById('labWalkinName')?.value?.trim();
+        const walkinPhone = document.getElementById('labWalkinPhone')?.value?.trim();
+        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
+        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
+
+        if (!walkinName) {
+          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
+          document.getElementById('labPatientSearchInput')?.focus();
+          return;
+        }
+        patientName = walkinName;
+        phone = walkinPhone || '';
+        doctorName = walkinDoctor || 'Dr. On Duty';
+        department = walkinDept || 'Diagnostics';
+        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
+      }
+
+      if (!labOrderItems || labOrderItems.length === 0) {
+        showToast('Please add at least one laboratory test to the order.', 'danger');
+        return;
+      }
+
+      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
+      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
+      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
+      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
+      const notes = document.getElementById('labNotes')?.value?.trim() || '';
+
+      const subtotal = labOrderItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
+      const discountAmount = parseFloat(((subtotal * discountPercentage) / 100).toFixed(2));
+      const netAmount = Math.max(0, subtotal - discountAmount);
+      const gstAmount = parseFloat(((netAmount * gstPercentage) / 100).toFixed(2));
+      const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
+
+      if (numAmt > finalTotal + 0.001) {
+        showToast(`Payment amount cannot exceed the order total of ₹${formatCurrency(finalTotal)}.`, 'danger');
+        return;
+      }
+
+      const payload = {
+        patientId: patientId,
+        patientName: patientName,
+        uhid: uhid,
+        phone: phone,
+        opId: opId,
+        ipId: ipId,
+        doctorName: doctorName,
+        department: department,
+        discountPercentage: discountPercentage,
+        gstPercentage: gstPercentage,
+        gstin: gstin,
+        paidAmount: numAmt,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        items: labOrderItems.map(item => ({
+          testId: item.testId,
+          testCode: item.testCode,
+          testName: item.testName,
+          category: item.category,
+          sampleType: item.sampleType,
+          price: item.price,
+          referenceRange: item.referenceRange,
+          unit: item.unit
+        }))
+      };
+
+      btn.disabled = true;
+      btn.dataset.processing = 'true';
+      btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
+
+      try {
+        const res = await Api.post('/api/laboratory/orders', payload);
+        if (res && res.success && res.data) {
+          const createdOrder = res.data;
+          labActiveSavedOrder = createdOrder;
+
+          // Clear items to prevent duplicate order generation on next click
+          labOrderItems = [];
+          const tbody = document.getElementById('labOrderTableBody');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved to MySQL.</td></tr>`;
+
+          const isNowPaid = (createdOrder.balanceAmount <= 0);
+
+          const balElem = document.getElementById('labBalanceAmount');
+          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
+
+          const statusBadge = document.getElementById('labPaymentStatusBadge');
+          if (statusBadge) {
+            statusBadge.textContent = createdOrder.paymentStatus;
+            statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
+          }
+
+          const amtInput = document.getElementById('labPaidAmount');
+          if (amtInput) {
+            amtInput.value = isNowPaid ? '0.00' : createdOrder.balanceAmount.toFixed(2);
+            amtInput.disabled = isNowPaid;
+          }
+
+          btn.disabled = isNowPaid;
+          delete btn.dataset.processing;
+          btn.innerHTML = 'PAID';
+
+          showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} recorded for Order ${createdOrder.orderNumber}. Total Paid: ₹${formatCurrency(createdOrder.paidAmount)}, Balance: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'success');
+        } else {
+          showToast((res && res.message) ? res.message : 'Failed to save laboratory payment.', 'danger');
+          btn.disabled = false;
+          delete btn.dataset.processing;
+          btn.innerHTML = 'PAID';
+        }
+      } catch (err) {
+        showToast('Error recording laboratory payment: ' + (err.message || err), 'danger');
+        btn.disabled = false;
+        delete btn.dataset.processing;
+        btn.innerHTML = 'PAID';
+      }
+    });
 
     // Bind table events
     bindLabTableEvents();
@@ -8478,6 +9245,7 @@ function renderPharmacyModule(activeTab = 'billing') {
 
   function selectLabPatient(p) {
     labSelectedPatient = p;
+    labActiveSavedOrder = null;
     const searchInput = document.getElementById('labPatientSearchInput');
     const dropdown = document.getElementById('labPatientDropdown');
     const container = document.getElementById('labPatientAutofillContainer');
@@ -8492,6 +9260,7 @@ function renderPharmacyModule(activeTab = 'billing') {
 
   function clearLabPatient() {
     labSelectedPatient = null;
+    labActiveSavedOrder = null;
     const searchInput = document.getElementById('labPatientSearchInput');
     const container = document.getElementById('labPatientAutofillContainer');
     if (searchInput) searchInput.value = '';
@@ -9002,6 +9771,9 @@ function renderPharmacyModule(activeTab = 'billing') {
               <button type="button" class="cv-btn-secondary btn-lab-print" data-id="${order.id}" style="padding:0.25rem 0.55rem; font-size:0.75rem; font-weight:600;">
                 Report
               </button>
+              <button type="button" class="cv-btn-secondary btn-lab-payments" data-id="${order.id}" data-num="${escapeHtml(order.orderNumber)}" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:#0284c7; font-weight:600;" title="View Payment History">
+                Payments
+              </button>
               <button type="button" class="cv-btn-secondary btn-lab-details" data-id="${order.id}" style="padding:0.25rem 0.45rem; font-size:0.75rem;" title="View Details">
                 &hellip;
               </button>
@@ -9031,6 +9803,14 @@ function renderPharmacyModule(activeTab = 'billing') {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
         showPrintableLabReportModal(id);
+      });
+    });
+
+    tbody.querySelectorAll('.btn-lab-payments').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const num = btn.getAttribute('data-num');
+        showBillPaymentsModal('LABORATORY', id, num);
       });
     });
 
@@ -10900,6 +11680,235 @@ function renderPharmacyModule(activeTab = 'billing') {
   }
 
   // ----------------------------------------------------------
+  // UNIVERSAL PAYMENT TRANSACTION HISTORY MODAL
+  // Displays real MySQL transactions for OP, IP, Pharmacy, Lab, Central
+  // ----------------------------------------------------------
+  async function showBillPaymentsModal(moduleType, billId, billRef) {
+    const prev = document.getElementById('cvBillPaymentsModalOverlay');
+    if (prev) prev.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cv-modal-backdrop show';
+    overlay.id = 'cvBillPaymentsModalOverlay';
+    overlay.style.zIndex = '1060';
+
+    overlay.innerHTML = `
+      <div class="cv-modal" style="max-width: 860px; width: 95%; max-height: 90vh; overflow-y: auto; border-radius: 12px; background: #ffffff; box-shadow: 0 25px 50px rgba(0,0,0,0.25); border: 1px solid #cbd5e1;">
+        <div class="cv-modal-header" style="background: #f8fafc; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:var(--cv-primary); text-transform:uppercase; letter-spacing:0.04em;">
+              Payment Audit History &bull; ${escapeHtml(moduleType || 'BILLING')}
+            </div>
+            <h3 style="margin:0.2rem 0 0 0; font-size:1.15rem; font-weight:800; color:#0f172a;">
+              Transaction History &bull; <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(billRef || ('ID: ' + billId))}</span>
+            </h3>
+          </div>
+          <button type="button" class="cv-modal-close" id="btnCloseBillPaymentsModal" style="cursor:pointer; font-size:1.5rem;" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="cv-modal-body" style="padding: 1.4rem;" id="cvBillPaymentsModalBody">
+          <div style="display:flex; justify-content:center; align-items:center; min-height:160px;">
+            <div class="cv-spinner" style="width:24px; height:24px;"></div>
+          </div>
+        </div>
+
+        <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:0.75rem; color:var(--cv-text-muted);">
+            Real MySQL Transactions &bull; Multi-Tenant Isolated
+          </div>
+          <button type="button" class="cv-btn-secondary" id="btnCloseBillPaymentsFooter" style="padding:0.45rem 1.2rem; font-size:0.85rem; font-weight:600;">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeModal = () => overlay.remove();
+    document.getElementById('btnCloseBillPaymentsModal')?.addEventListener('click', closeModal);
+    document.getElementById('btnCloseBillPaymentsFooter')?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    await refreshModalPaymentsContent();
+
+    async function refreshModalPaymentsContent() {
+      const modalBody = document.getElementById('cvBillPaymentsModalBody');
+      if (!modalBody) return;
+
+      try {
+        const qParams = new URLSearchParams();
+        if (moduleType) qParams.append('moduleType', moduleType);
+        if (billId) qParams.append('billId', billId);
+        if (billRef) qParams.append('billNumber', billRef);
+
+        const res = await Api.get('/api/billing/payments/history?' + qParams.toString());
+        const records = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+
+        if (records.length === 0) {
+          modalBody.innerHTML = `
+            <div style="text-align:center; padding:2.5rem 1rem; color:var(--cv-text-muted);">
+              <svg style="width:40px; height:40px; margin-bottom:0.75rem; color:#94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <h4 style="font-size:1rem; font-weight:700; color:#334155; margin:0 0 0.25rem 0;">No Payment Records Found</h4>
+              <p style="font-size:0.82rem; margin:0;">No payments have been recorded for ${escapeHtml(billRef || ('ID: ' + billId))} yet.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const latest = records[0];
+        const totalPaid = latest.totalPaid != null ? latest.totalPaid : records.reduce((s, r) => s + (r.amount || 0), 0);
+        const remainingBal = latest.remainingBalance != null ? latest.remainingBalance : 0;
+        const curStatus = latest.paymentStatus || (remainingBal <= 0 ? 'PAID' : 'PARTIALLY PAID');
+        const isPaid = (remainingBal <= 0);
+
+        modalBody.innerHTML = `
+          <!-- Summary Strip -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:0.75rem; margin-bottom:1.25rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.9rem;">
+            <div>
+              <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase;">Patient</div>
+              <div style="font-size:0.92rem; font-weight:700; color:#0f172a; margin-top:0.2rem;">${escapeHtml(latest.patientName || 'Patient')}</div>
+              <div style="font-size:0.72rem; color:var(--cv-primary); font-family:monospace;">${escapeHtml(latest.uhid || '')}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase;">Bill / Ref ID</div>
+              <div style="font-size:0.92rem; font-weight:700; font-family:monospace; color:#0f172a; margin-top:0.2rem;">${escapeHtml(latest.billNumber || latest.invoiceNumber || billRef || '—')}</div>
+              <div style="font-size:0.72rem; color:#64748b;">${escapeHtml(latest.opId || latest.ipId || moduleType || '')}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase;">Total Collected</div>
+              <div style="font-size:1.15rem; font-weight:800; color:#059669; margin-top:0.2rem;">₹${formatCurrency(totalPaid)}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase;">Remaining Balance</div>
+              <div style="font-size:1.15rem; font-weight:800; color:${remainingBal > 0 ? 'var(--cv-danger)' : '#059669'}; margin-top:0.2rem;">₹${formatCurrency(remainingBal)}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase;">Status</div>
+              <div style="margin-top:0.25rem;">
+                <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : 'cv-badge-part'}" style="font-size:0.75rem; padding:0.2rem 0.6rem;">${escapeHtml(curStatus)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transactions Table -->
+          <div class="cv-bill-table-wrapper" style="margin-top:0; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+            <table class="cv-bill-table" style="margin-bottom:0; font-size:0.82rem;">
+              <thead>
+                <tr style="background:#f1f5f9;">
+                  <th style="width:36px; text-align:center;">#</th>
+                  <th>Transaction ID</th>
+                  <th>Date &amp; Time</th>
+                  <th>Payment Mode</th>
+                  <th style="text-align:right;">Amount Received (₹)</th>
+                  <th style="text-align:right;">Total Paid (₹)</th>
+                  <th style="text-align:right;">Remaining (₹)</th>
+                  <th style="text-align:center;">Status</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${records.map((r, idx) => `
+                  <tr>
+                    <td style="text-align:center; font-weight:600; color:#64748b;">${idx + 1}</td>
+                    <td><span style="font-family:monospace; font-weight:700; color:var(--cv-primary); font-size:0.75rem;">${escapeHtml(r.transactionId || '—')}</span></td>
+                    <td>
+                      <div style="font-weight:600; color:#0f172a;">${escapeHtml(r.paymentDate || '')}</div>
+                      <div style="font-size:0.72rem; color:#64748b;">${escapeHtml(r.paymentTime || '')}</div>
+                    </td>
+                    <td><span style="font-weight:600; font-size:0.75rem; background:#f1f5f9; padding:0.15rem 0.4rem; border-radius:4px;">${escapeHtml(r.paymentMethod || 'CASH')}</span></td>
+                    <td style="text-align:right; font-weight:800; color:#059669;">+ ₹${formatCurrency(r.amount || 0)}</td>
+                    <td style="text-align:right; font-weight:600; color:#0f172a;">₹${formatCurrency(r.totalPaid != null ? r.totalPaid : r.amount)}</td>
+                    <td style="text-align:right; font-weight:700; color:${(r.remainingBalance || 0) > 0 ? 'var(--cv-danger)' : '#059669'};">₹${formatCurrency(r.remainingBalance || 0)}</td>
+                    <td style="text-align:center;">
+                      <span class="cv-payment-balance-badge ${(r.remainingBalance || 0) <= 0 ? 'cv-badge-paid' : 'cv-badge-part'}" style="font-size:0.68rem; padding:0.1rem 0.4rem;">
+                        ${escapeHtml(r.paymentStatus || 'PAID')}
+                      </span>
+                    </td>
+                    <td style="font-size:0.75rem; color:#64748b; max-width:180px; white-space:normal;">${escapeHtml(r.notes || '—')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Inline Direct Payment Collection (if outstanding balance exists) -->
+          ${!isPaid ? `
+            <div style="margin-top:1.25rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:1rem;">
+              <div style="font-size:0.8rem; font-weight:800; color:#0f172a; text-transform:uppercase; margin-bottom:0.6rem;">
+                Collect Remaining Balance &bull; Direct Payment
+              </div>
+              <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                <div style="position:relative; width:160px;">
+                  <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
+                  <input type="number" id="modalHistoryPayAmount" class="cv-form-input" style="padding-left:1.6rem; height:38px; font-weight:700; font-size:0.95rem;" value="${remainingBal.toFixed(2)}" min="0.01" max="${remainingBal.toFixed(2)}" step="any">
+                </div>
+                <select id="modalHistoryPayMethod" class="cv-form-select" style="height:38px; width:140px; font-size:0.84rem;">
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
+                  <option value="UPI">UPI / QR</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                </select>
+                <input type="text" id="modalHistoryPayNotes" class="cv-form-input" style="height:38px; flex:1; min-width:140px; font-size:0.82rem;" placeholder="Payment installment notes...">
+                <button type="button" id="btnModalHistoryDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1.25rem;">
+                  PAID
+                </button>
+              </div>
+            </div>
+          ` : ''}
+        `;
+
+        if (!isPaid) {
+          document.getElementById('btnModalHistoryDirectPaid')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (btn.disabled || btn.dataset.processing === 'true') return;
+
+            const amtVal = document.getElementById('modalHistoryPayAmount')?.value;
+            const mthVal = document.getElementById('modalHistoryPayMethod')?.value || 'CASH';
+            const notesVal = document.getElementById('modalHistoryPayNotes')?.value?.trim() || '';
+
+            if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
+              showToast('Please enter an amount to pay.', 'danger');
+              return;
+            }
+            const numAmt = parseFloat(amtVal);
+            if (isNaN(numAmt) || numAmt <= 0) {
+              showToast('Payment amount must be greater than zero.', 'danger');
+              return;
+            }
+            if (numAmt > remainingBal + 0.001) {
+              showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(remainingBal)}.`, 'danger');
+              return;
+            }
+
+            await executeBillPayment({
+              moduleType: moduleType,
+              billId: billId,
+              billNumber: billRef,
+              amount: numAmt,
+              balance: remainingBal,
+              paymentMethod: mthVal,
+              notes: notesVal,
+              buttonEl: btn,
+              onSuccess: async () => {
+                await refreshModalPaymentsContent();
+                // Refresh background lists if present
+                if (typeof loadOpHistoryList === 'function' && moduleType === 'OP') loadOpHistoryList();
+                if (typeof renderMainBillingHistoryView === 'function' && moduleType === 'CENTRAL') renderMainBillingHistoryView();
+              }
+            });
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching bill payments:', err);
+        modalBody.innerHTML = `<div class="cv-alert cv-alert-danger">Failed to load payment history records from server.</div>`;
+      }
+    }
+  }
+
+  // ----------------------------------------------------------
   // CENTRAL BILLING PAYMENT CONFIRMATION & PRINT MODAL ENGINE
   // Shows clean confirmation popup before saving to MySQL.
   // After confirmation, shows success state with optional Print.
@@ -11403,9 +12412,8 @@ function renderPharmacyModule(activeTab = 'billing') {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-primary" id="btnOpSubmitPayment_${o.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
-                  <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  Submit
+                <button type="button" class="cv-btn-paid" id="btnOpSubmitPayment_${o.id}" style="height:36px; padding:0 1.25rem;">
+                  PAID
                 </button>
               </div>
             </div>
@@ -11445,72 +12453,55 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
-
-          showPaymentConfirmationModal({
-            title: 'Confirm Payment',
-            billRef: 'OP Bill: ' + o.opId,
-            paymentAmount: numAmt,
-            remainingBalance: remBal,
+          await executeBillPayment({
             moduleType: 'OP',
-            printButtonLabel: 'Print Bill',
-            onConfirm: async (showSuccessState) => {
-              await executeBillPayment({
-                moduleType: 'OP',
-                billId: o.id,
-                billNumber: o.opId,
-                amount: numAmt,
-                balance: curBal,
-                paymentMethod: mthVal,
-                buttonEl: btn,
-                onSuccess: async (data) => {
-                  o.paidAmount = data.amountPaid;
-                  o.balanceAmount = data.balanceAmount;
-                  o.paymentStatus = data.paymentStatus;
-                  o.paymentMethod = data.paymentMethod;
-                  if (activeOpRecord && activeOpRecord.id === o.id) {
-                    activeOpRecord.paidAmount = data.amountPaid;
-                    activeOpRecord.balanceAmount = data.balanceAmount;
-                    activeOpRecord.paymentStatus = data.paymentStatus;
-                    activeOpRecord.paymentMethod = data.paymentMethod;
+            billId: o.id,
+            billNumber: o.opId,
+            amount: numAmt,
+            balance: curBal,
+            paymentMethod: mthVal,
+            buttonEl: btn,
+            onSuccess: async (data) => {
+              o.paidAmount = data.amountPaid;
+              o.balanceAmount = data.balanceAmount;
+              o.paymentStatus = data.paymentStatus;
+              o.paymentMethod = data.paymentMethod;
+              if (activeOpRecord && activeOpRecord.id === o.id) {
+                activeOpRecord.paidAmount = data.amountPaid;
+                activeOpRecord.balanceAmount = data.balanceAmount;
+                activeOpRecord.paymentStatus = data.paymentStatus;
+                activeOpRecord.paymentMethod = data.paymentMethod;
+              }
+              const isNowPaid = (data.balanceAmount <= 0);
+              const paidEl = document.getElementById(`opSummaryPaid_${o.id}`);
+              const balEl = document.getElementById(`opSummaryBal_${o.id}`);
+              const statusEl = document.getElementById(`opSummaryStatus_${o.id}`);
+              const methodEl = document.getElementById(`opSummaryMethod_${o.id}`);
+              const payArea = document.getElementById(`opPaymentArea_${o.id}`);
+              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+              if (balEl) {
+                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+              }
+              if (statusEl) {
+                statusEl.textContent = data.paymentStatus;
+                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+              }
+              if (methodEl) methodEl.textContent = data.paymentMethod;
+              if (payArea) {
+                if (isNowPaid) {
+                  payArea.innerHTML = '<div style="margin-top:0.5rem; color:#059669; font-weight:700; font-size:0.85rem;">Bill is Fully Settled (PAID)</div>';
+                } else {
+                  if (amtInput) {
+                    amtInput.value = data.balanceAmount.toFixed(2);
+                    amtInput.max = data.balanceAmount.toFixed(2);
                   }
-                  const isNowPaid = (data.balanceAmount <= 0);
-                  const paidEl = document.getElementById(`opSummaryPaid_${o.id}`);
-                  const balEl = document.getElementById(`opSummaryBal_${o.id}`);
-                  const statusEl = document.getElementById(`opSummaryStatus_${o.id}`);
-                  const methodEl = document.getElementById(`opSummaryMethod_${o.id}`);
-                  const payArea = document.getElementById(`opPaymentArea_${o.id}`);
-                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-                  if (balEl) {
-                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-                  }
-                  if (statusEl) {
-                    statusEl.textContent = data.paymentStatus;
-                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-                  }
-                  if (methodEl) methodEl.textContent = data.paymentMethod;
-                  if (payArea) {
-                    if (isNowPaid) {
-                      payArea.innerHTML = '';
-                    } else {
-                      if (amtInput) {
-                        amtInput.value = data.balanceAmount.toFixed(2);
-                        amtInput.max = data.balanceAmount.toFixed(2);
-                      }
-                      const areaBal = document.getElementById(`opAreaBal_${o.id}`);
-                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    }
-                  }
-                  await loadBillingSummaryData();
-                  updateBillingKpiValues();
-
-                  showSuccessState(data);
+                  const areaBal = document.getElementById(`opAreaBal_${o.id}`);
+                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
                 }
-              });
-            },
-            onPrint: () => {
-              printDedicatedDocument(buildOpBillPrintHtml(patient, o));
+              }
+              await loadBillingSummaryData();
+              updateBillingKpiValues();
             }
           });
         });
@@ -11986,9 +12977,8 @@ function renderPharmacyModule(activeTab = 'billing') {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-primary" id="btnIpSubmitPayment_${ip.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
-                  <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  Submit
+                <button type="button" class="cv-btn-paid" id="btnIpSubmitPayment_${ip.id}" style="height:36px; padding:0 1.25rem;">
+                  PAID
                 </button>
               </div>
             </div>
@@ -12028,74 +13018,57 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
-
-          showPaymentConfirmationModal({
-            title: 'Confirm Payment',
-            billRef: 'IP Admission: ' + ip.ipId,
-            paymentAmount: numAmt,
-            remainingBalance: remBal,
+          await executeBillPayment({
             moduleType: 'IP',
-            printButtonLabel: 'Print Bill',
-            onConfirm: async (showSuccessState) => {
-              await executeBillPayment({
-                moduleType: 'IP',
-                billId: ip.id,
-                billNumber: ip.ipId,
-                amount: numAmt,
-                balance: curBal,
-                paymentMethod: mthVal,
-                buttonEl: btn,
-                onSuccess: async (data) => {
-                  ip.paidAmount = data.amountPaid;
-                  ip.depositAmount = data.amountPaid;
-                  ip.balanceAmount = data.balanceAmount;
-                  ip.paymentStatus = data.paymentStatus;
-                  ip.paymentMethod = data.paymentMethod;
-                  if (activeIpRecord && activeIpRecord.id === ip.id) {
-                    activeIpRecord.paidAmount = data.amountPaid;
-                    activeIpRecord.depositAmount = data.amountPaid;
-                    activeIpRecord.balanceAmount = data.balanceAmount;
-                    activeIpRecord.paymentStatus = data.paymentStatus;
-                    activeIpRecord.paymentMethod = data.paymentMethod;
+            billId: ip.id,
+            billNumber: ip.ipId,
+            amount: numAmt,
+            balance: curBal,
+            paymentMethod: mthVal,
+            buttonEl: btn,
+            onSuccess: async (data) => {
+              ip.paidAmount = data.amountPaid;
+              ip.depositAmount = data.amountPaid;
+              ip.balanceAmount = data.balanceAmount;
+              ip.paymentStatus = data.paymentStatus;
+              ip.paymentMethod = data.paymentMethod;
+              if (activeIpRecord && activeIpRecord.id === ip.id) {
+                activeIpRecord.paidAmount = data.amountPaid;
+                activeIpRecord.depositAmount = data.amountPaid;
+                activeIpRecord.balanceAmount = data.balanceAmount;
+                activeIpRecord.paymentStatus = data.paymentStatus;
+                activeIpRecord.paymentMethod = data.paymentMethod;
+              }
+              const isNowPaid = (data.balanceAmount <= 0);
+              const paidEl = document.getElementById(`ipSummaryPaid_${ip.id}`);
+              const balEl = document.getElementById(`ipSummaryBal_${ip.id}`);
+              const statusEl = document.getElementById(`ipSummaryStatus_${ip.id}`);
+              const methodEl = document.getElementById(`ipSummaryMethod_${ip.id}`);
+              const payArea = document.getElementById(`ipPaymentArea_${ip.id}`);
+              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+              if (balEl) {
+                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+              }
+              if (statusEl) {
+                statusEl.textContent = data.paymentStatus;
+                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+              }
+              if (methodEl) methodEl.textContent = data.paymentMethod;
+              if (payArea) {
+                if (isNowPaid) {
+                  payArea.innerHTML = '<div style="margin-top:0.5rem; color:#059669; font-weight:700; font-size:0.85rem;">Bill is Fully Settled (PAID)</div>';
+                } else {
+                  if (amtInput) {
+                    amtInput.value = data.balanceAmount.toFixed(2);
+                    amtInput.max = data.balanceAmount.toFixed(2);
                   }
-                  const isNowPaid = (data.balanceAmount <= 0);
-                  const paidEl = document.getElementById(`ipSummaryPaid_${ip.id}`);
-                  const balEl = document.getElementById(`ipSummaryBal_${ip.id}`);
-                  const statusEl = document.getElementById(`ipSummaryStatus_${ip.id}`);
-                  const methodEl = document.getElementById(`ipSummaryMethod_${ip.id}`);
-                  const payArea = document.getElementById(`ipPaymentArea_${ip.id}`);
-                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-                  if (balEl) {
-                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-                  }
-                  if (statusEl) {
-                    statusEl.textContent = data.paymentStatus;
-                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-                  }
-                  if (methodEl) methodEl.textContent = data.paymentMethod;
-                  if (payArea) {
-                    if (isNowPaid) {
-                      payArea.innerHTML = '';
-                    } else {
-                      if (amtInput) {
-                        amtInput.value = data.balanceAmount.toFixed(2);
-                        amtInput.max = data.balanceAmount.toFixed(2);
-                      }
-                      const areaBal = document.getElementById(`ipAreaBal_${ip.id}`);
-                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    }
-                  }
-                  await loadBillingSummaryData();
-                  updateBillingKpiValues();
-
-                  showSuccessState(data);
+                  const areaBal = document.getElementById(`ipAreaBal_${ip.id}`);
+                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
                 }
-              });
-            },
-            onPrint: () => {
-              printDedicatedDocument(buildIpBillPrintHtml(patient, ip));
+              }
+              await loadBillingSummaryData();
+              updateBillingKpiValues();
             }
           });
         });
@@ -12571,9 +13544,8 @@ function renderPharmacyModule(activeTab = 'billing') {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-primary" id="btnPhSubmitPayment_${b.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
-                  <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  Submit
+                <button type="button" class="cv-btn-paid" id="btnPhSubmitPayment_${b.id}" style="height:36px; padding:0 1.25rem;">
+                  PAID
                 </button>
               </div>
             </div>
@@ -12613,72 +13585,55 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
-
-          showPaymentConfirmationModal({
-            title: 'Confirm Payment',
-            billRef: 'Pharmacy Bill: ' + b.billNumber,
-            paymentAmount: numAmt,
-            remainingBalance: remBal,
+          await executeBillPayment({
             moduleType: 'PHARMACY',
-            printButtonLabel: 'Print Bill',
-            onConfirm: async (showSuccessState) => {
-              await executeBillPayment({
-                moduleType: 'PHARMACY',
-                billId: b.id,
-                billNumber: b.billNumber,
-                amount: numAmt,
-                balance: curBal,
-                paymentMethod: mthVal,
-                buttonEl: btn,
-                onSuccess: async (data) => {
-                  b.paidAmount = data.amountPaid;
-                  b.balanceAmount = data.balanceAmount;
-                  b.paymentStatus = data.paymentStatus;
-                  b.paymentMethod = data.paymentMethod;
-                  if (activePhRecord && activePhRecord.id === b.id) {
-                    activePhRecord.paidAmount = data.amountPaid;
-                    activePhRecord.balanceAmount = data.balanceAmount;
-                    activePhRecord.paymentStatus = data.paymentStatus;
-                    activePhRecord.paymentMethod = data.paymentMethod;
+            billId: b.id,
+            billNumber: b.billNumber,
+            amount: numAmt,
+            balance: curBal,
+            paymentMethod: mthVal,
+            buttonEl: btn,
+            onSuccess: async (data) => {
+              b.paidAmount = data.amountPaid;
+              b.balanceAmount = data.balanceAmount;
+              b.paymentStatus = data.paymentStatus;
+              b.paymentMethod = data.paymentMethod;
+              if (activePhRecord && activePhRecord.id === b.id) {
+                activePhRecord.paidAmount = data.amountPaid;
+                activePhRecord.balanceAmount = data.balanceAmount;
+                activePhRecord.paymentStatus = data.paymentStatus;
+                activePhRecord.paymentMethod = data.paymentMethod;
+              }
+              const isNowPaid = (data.balanceAmount <= 0);
+              const paidEl = document.getElementById(`phSummaryPaid_${b.id}`);
+              const balEl = document.getElementById(`phSummaryBal_${b.id}`);
+              const statusEl = document.getElementById(`phSummaryStatus_${b.id}`);
+              const methodEl = document.getElementById(`phSummaryMethod_${b.id}`);
+              const payArea = document.getElementById(`phPaymentArea_${b.id}`);
+              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+              if (balEl) {
+                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+              }
+              if (statusEl) {
+                statusEl.textContent = data.paymentStatus;
+                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+              }
+              if (methodEl) methodEl.textContent = data.paymentMethod;
+              if (payArea) {
+                if (isNowPaid) {
+                  payArea.innerHTML = '<div style="margin-top:0.5rem; color:#059669; font-weight:700; font-size:0.85rem;">Bill is Fully Settled (PAID)</div>';
+                } else {
+                  if (amtInput) {
+                    amtInput.value = data.balanceAmount.toFixed(2);
+                    amtInput.max = data.balanceAmount.toFixed(2);
                   }
-                  const isNowPaid = (data.balanceAmount <= 0);
-                  const paidEl = document.getElementById(`phSummaryPaid_${b.id}`);
-                  const balEl = document.getElementById(`phSummaryBal_${b.id}`);
-                  const statusEl = document.getElementById(`phSummaryStatus_${b.id}`);
-                  const methodEl = document.getElementById(`phSummaryMethod_${b.id}`);
-                  const payArea = document.getElementById(`phPaymentArea_${b.id}`);
-                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-                  if (balEl) {
-                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-                  }
-                  if (statusEl) {
-                    statusEl.textContent = data.paymentStatus;
-                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-                  }
-                  if (methodEl) methodEl.textContent = data.paymentMethod;
-                  if (payArea) {
-                    if (isNowPaid) {
-                      payArea.innerHTML = '';
-                    } else {
-                      if (amtInput) {
-                        amtInput.value = data.balanceAmount.toFixed(2);
-                        amtInput.max = data.balanceAmount.toFixed(2);
-                      }
-                      const areaBal = document.getElementById(`phAreaBal_${b.id}`);
-                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    }
-                  }
-                  await loadBillingSummaryData();
-                  updateBillingKpiValues();
-
-                  showSuccessState(data);
+                  const areaBal = document.getElementById(`phAreaBal_${b.id}`);
+                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
                 }
-              });
-            },
-            onPrint: () => {
-              printDedicatedDocument(buildPharmacyBillPrintHtml(patient, b));
+              }
+              await loadBillingSummaryData();
+              updateBillingKpiValues();
             }
           });
         });
@@ -13139,9 +14094,8 @@ function renderPharmacyModule(activeTab = 'billing') {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-primary" id="btnLabSubmitPayment_${l.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
-                  <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                  Submit
+                <button type="button" class="cv-btn-paid" id="btnLabSubmitPayment_${l.id}" style="height:36px; padding:0 1.25rem; font-size:0.85rem; font-weight:700;">
+                  PAID
                 </button>
               </div>
             </div>
@@ -13181,72 +14135,55 @@ function renderPharmacyModule(activeTab = 'billing') {
             return;
           }
 
-          const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
-
-          showPaymentConfirmationModal({
-            title: 'Confirm Payment',
-            billRef: 'Lab Order: ' + l.orderNumber,
-            paymentAmount: numAmt,
-            remainingBalance: remBal,
+          await executeBillPayment({
             moduleType: 'LABORATORY',
-            printButtonLabel: 'Print Bill',
-            onConfirm: async (showSuccessState) => {
-              await executeBillPayment({
-                moduleType: 'LABORATORY',
-                billId: l.id,
-                billNumber: l.orderNumber,
-                amount: numAmt,
-                balance: curBal,
-                paymentMethod: mthVal,
-                buttonEl: btn,
-                onSuccess: async (data) => {
-                  l.paidAmount = data.amountPaid;
-                  l.balanceAmount = data.balanceAmount;
-                  l.paymentStatus = data.paymentStatus;
-                  l.paymentMethod = data.paymentMethod;
-                  if (activeLabRecord && activeLabRecord.id === l.id) {
-                    activeLabRecord.paidAmount = data.amountPaid;
-                    activeLabRecord.balanceAmount = data.balanceAmount;
-                    activeLabRecord.paymentStatus = data.paymentStatus;
-                    activeLabRecord.paymentMethod = data.paymentMethod;
+            billId: l.id,
+            billNumber: l.orderNumber,
+            amount: numAmt,
+            balance: curBal,
+            paymentMethod: mthVal,
+            buttonEl: btn,
+            onSuccess: async (data) => {
+              l.paidAmount = data.amountPaid;
+              l.balanceAmount = data.balanceAmount;
+              l.paymentStatus = data.paymentStatus;
+              l.paymentMethod = data.paymentMethod;
+              if (activeLabRecord && activeLabRecord.id === l.id) {
+                activeLabRecord.paidAmount = data.amountPaid;
+                activeLabRecord.balanceAmount = data.balanceAmount;
+                activeLabRecord.paymentStatus = data.paymentStatus;
+                activeLabRecord.paymentMethod = data.paymentMethod;
+              }
+              const isNowPaid = (data.balanceAmount <= 0);
+              const paidEl = document.getElementById(`labSummaryPaid_${l.id}`);
+              const balEl = document.getElementById(`labSummaryBal_${l.id}`);
+              const statusEl = document.getElementById(`labSummaryStatus_${l.id}`);
+              const methodEl = document.getElementById(`labSummaryMethod_${l.id}`);
+              const payArea = document.getElementById(`labPaymentArea_${l.id}`);
+              if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+              if (balEl) {
+                balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
+                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+              }
+              if (statusEl) {
+                statusEl.textContent = data.paymentStatus;
+                statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+              }
+              if (methodEl) methodEl.textContent = data.paymentMethod;
+              if (payArea) {
+                if (isNowPaid) {
+                  payArea.innerHTML = '';
+                } else {
+                  if (amtInput) {
+                    amtInput.value = data.balanceAmount.toFixed(2);
+                    amtInput.max = data.balanceAmount.toFixed(2);
                   }
-                  const isNowPaid = (data.balanceAmount <= 0);
-                  const paidEl = document.getElementById(`labSummaryPaid_${l.id}`);
-                  const balEl = document.getElementById(`labSummaryBal_${l.id}`);
-                  const statusEl = document.getElementById(`labSummaryStatus_${l.id}`);
-                  const methodEl = document.getElementById(`labSummaryMethod_${l.id}`);
-                  const payArea = document.getElementById(`labPaymentArea_${l.id}`);
-                  if (paidEl) paidEl.textContent = '₹' + formatCurrency(data.amountPaid);
-                  if (balEl) {
-                    balEl.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-                  }
-                  if (statusEl) {
-                    statusEl.textContent = data.paymentStatus;
-                    statusEl.className = 'cv-payment-balance-badge ' + (isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-                  }
-                  if (methodEl) methodEl.textContent = data.paymentMethod;
-                  if (payArea) {
-                    if (isNowPaid) {
-                      payArea.innerHTML = '';
-                    } else {
-                      if (amtInput) {
-                        amtInput.value = data.balanceAmount.toFixed(2);
-                        amtInput.max = data.balanceAmount.toFixed(2);
-                      }
-                      const areaBal = document.getElementById(`labAreaBal_${l.id}`);
-                      if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
-                    }
-                  }
-                  await loadBillingSummaryData();
-                  updateBillingKpiValues();
-
-                  showSuccessState(data);
+                  const areaBal = document.getElementById(`labAreaBal_${l.id}`);
+                  if (areaBal) areaBal.textContent = '₹' + formatCurrency(data.balanceAmount);
                 }
-              });
-            },
-            onPrint: () => {
-              printDedicatedDocument(buildLabBillPrintHtml(patient, l));
+              }
+              await loadBillingSummaryData();
+              updateBillingKpiValues();
             }
           });
         });
@@ -13753,7 +14690,12 @@ function renderPharmacyModule(activeTab = 'billing') {
                 <label style="font-size:0.75rem; font-weight:700; color:var(--cv-text-muted); text-transform:uppercase;">AMOUNT PAID (₹) *</label>
                 <button type="button" id="btnCbPayFullAmount" style="background:none; border:none; color:var(--cv-primary); font-size:0.75rem; font-weight:700; cursor:pointer; text-decoration:underline;">Pay Full</button>
               </div>
-              <input type="number" id="cbOverallPaidAmount" class="cv-form-input" min="0" step="0.01" value="${hasExistingInvoice ? (cbConsolidatedData.existingBalance || 0).toFixed(2) : '0.00'}" style="height:44px; font-weight:800; font-size:1.2rem; text-align:right;">
+              <div style="display:flex; gap:0.4rem; align-items:center;">
+                <input type="number" id="cbOverallPaidAmount" class="cv-form-input" min="0" step="0.01" value="${hasExistingInvoice ? (cbConsolidatedData.existingBalance || 0).toFixed(2) : '0.00'}" style="height:44px; font-weight:800; font-size:1.2rem; text-align:right; flex:1;">
+                <button type="button" id="btnCbPaidDirect" class="cv-btn-paid" style="height:44px; padding:0 1.25rem;">
+                  PAID
+                </button>
+              </div>
             </div>
 
             <!-- Balance Due & Payment Status -->
@@ -13812,9 +14754,8 @@ function renderPharmacyModule(activeTab = 'billing') {
             </div>
 
             <!-- SUBMIT BUTTON -->
-            <button type="button" class="cv-btn-primary" id="btnCbSubmitBill" style="width:100%; height:46px; font-weight:800; font-size:0.95rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:0.25rem;">
-              <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              Submit
+            <button type="button" class="cv-btn-paid" id="btnCbSubmitBill" style="width:100%; height:46px; font-weight:800; font-size:0.95rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; margin-top:0.25rem;">
+              PAID
             </button>
           </div>
         </div>
@@ -13901,6 +14842,7 @@ function renderPharmacyModule(activeTab = 'billing') {
 
     // Submit Central Bill Button
     document.getElementById('btnCbSubmitBill')?.addEventListener('click', handleGenerateCentralBill);
+    document.getElementById('btnCbPaidDirect')?.addEventListener('click', handleGenerateCentralBill);
 
     calculateCbTotals();
   }
@@ -13976,6 +14918,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
 
     const submitBtn = document.getElementById('btnCbSubmitBill');
+    const directBtn = document.getElementById('btnCbPaidDirect');
     if (submitBtn && (submitBtn.disabled || submitBtn.dataset.processing === 'true')) {
       return;
     }
@@ -13984,7 +14927,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     const notes = document.getElementById('cbOverallNotes')?.value.trim() || '';
     const amountPaidStr = document.getElementById('cbOverallPaidAmount')?.value;
 
-    // CASE A: EXISTING BILL / INVOICE ALREADY EXISTS -> PROCESS PAYMENT ON EXISTING BILL
+    // CASE A: EXISTING BILL / INVOICE ALREADY EXISTS -> PROCESS PAYMENT ON EXISTING BILL DIRECTLY
     if (cbConsolidatedData.existingBillId) {
       if (amountPaidStr === undefined || amountPaidStr === null || String(amountPaidStr).trim() === '') {
         showToast('Please enter a payment amount.', 'danger');
@@ -14006,81 +14949,67 @@ function renderPharmacyModule(activeTab = 'billing') {
         return;
       }
 
-      const remBal = Math.max(0, parseFloat((curBal - numAmt).toFixed(2)));
+      await executeBillPayment({
+        moduleType: 'CENTRAL',
+        billId: cbConsolidatedData.existingBillId,
+        billNumber: cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber,
+        amount: numAmt,
+        balance: curBal,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        buttonEl: submitBtn,
+        onSuccess: async (data) => {
+          cbConsolidatedData.existingAmountPaid = data.amountPaid;
+          cbConsolidatedData.existingBalance = data.balanceAmount;
+          cbConsolidatedData.existingPaymentStatus = data.paymentStatus;
+          cbConsolidatedData.existingPaymentMethod = data.paymentMethod;
 
-      showPaymentConfirmationModal({
-        title: 'Confirm Payment',
-        billRef: 'Invoice: ' + (cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber),
-        paymentAmount: numAmt,
-        remainingBalance: remBal,
-        moduleType: 'MAIN',
-        printButtonLabel: 'Print Invoice',
-        onConfirm: async (showSuccessState) => {
-          await executeBillPayment({
-            moduleType: 'CENTRAL',
-            billId: cbConsolidatedData.existingBillId,
-            billNumber: cbConsolidatedData.existingInvoiceNumber || cbConsolidatedData.existingBillNumber,
-            amount: numAmt,
-            balance: curBal,
-            paymentMethod: paymentMethod,
-            notes: notes,
-            buttonEl: submitBtn,
-            onSuccess: async (data) => {
-              cbConsolidatedData.existingAmountPaid = data.amountPaid;
-              cbConsolidatedData.existingBalance = data.balanceAmount;
-              cbConsolidatedData.existingPaymentStatus = data.paymentStatus;
-              cbConsolidatedData.existingPaymentMethod = data.paymentMethod;
+          const isNowPaid = (data.balanceAmount <= 0);
 
-              const isNowPaid = (data.balanceAmount <= 0);
+          // Update UI immediately without refresh
+          const prevPaidEl = document.getElementById('cbDisplayPreviouslyPaid');
+          if (prevPaidEl) prevPaidEl.textContent = '₹' + formatCurrency(data.amountPaid);
 
-              // Update UI immediately without refresh
-              const prevPaidEl = document.getElementById('cbDisplayPreviouslyPaid');
-              if (prevPaidEl) prevPaidEl.textContent = '₹' + formatCurrency(data.amountPaid);
+          const balEl = document.getElementById('cbOverallBalanceAmt');
+          if (balEl) {
+            balEl.innerText = '₹' + formatCurrency(data.balanceAmount);
+            balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+          }
 
-              const balEl = document.getElementById('cbOverallBalanceAmt');
-              if (balEl) {
-                balEl.innerText = '₹' + formatCurrency(data.balanceAmount);
-                balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-              }
+          const statusBadge = document.getElementById('cbOverallStatusBadge');
+          if (statusBadge) {
+            statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
+            statusBadge.textContent = data.paymentStatus;
+            statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
+          }
 
-              const statusBadge = document.getElementById('cbOverallStatusBadge');
-              if (statusBadge) {
-                statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
-                statusBadge.textContent = data.paymentStatus;
-                statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : 'cv-badge-part');
-              }
-
-              const paidInput = document.getElementById('cbOverallPaidAmount');
-              if (paidInput) {
-                if (isNowPaid) {
-                  paidInput.value = '0.00';
-                  paidInput.disabled = true;
-                } else {
-                  paidInput.value = data.balanceAmount.toFixed(2);
-                  paidInput.max = data.balanceAmount.toFixed(2);
-                }
-              }
-
-              if (isNowPaid && submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Fully Paid (PAID)';
-              }
-
-              await loadBillingSummaryData();
-              updateBillingKpiValues();
-
-              showSuccessState(data);
+          const paidInput = document.getElementById('cbOverallPaidAmount');
+          if (paidInput) {
+            if (isNowPaid) {
+              paidInput.value = '0.00';
+              paidInput.disabled = true;
+            } else {
+              paidInput.value = data.balanceAmount.toFixed(2);
+              paidInput.max = data.balanceAmount.toFixed(2);
             }
-          });
-        },
-        onPrint: () => {
-          printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
+          }
+
+          if (isNowPaid) {
+            if (submitBtn) {
+              submitBtn.disabled = true;
+              submitBtn.innerHTML = 'Fully Paid (PAID)';
+            }
+            if (directBtn) directBtn.disabled = true;
+          }
+
+          await loadBillingSummaryData();
+          updateBillingKpiValues();
         }
       });
       return;
     }
 
-    // CASE B: FIRST TIME GENERATING CENTRAL BILL
+    // CASE B: FIRST TIME GENERATING CENTRAL BILL + DIRECT PAYMENT COLLECTION
     const subtotal = cbConsolidatedData.overallSubtotal || 0;
     if (subtotal <= 0) {
       showToast('No billable charges exist for this patient across OP, IP, Pharmacy, or Laboratory.', 'danger');
@@ -14139,89 +15068,80 @@ function renderPharmacyModule(activeTab = 'billing') {
       items
     };
 
-    const remBal = Math.max(0, parseFloat((finalTotal - amountPaid).toFixed(2)));
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.dataset.processing = 'true';
+      submitBtn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:0.4rem;"></span> Recording...';
+    }
+    if (directBtn) directBtn.disabled = true;
 
-    const doCreateBill = async (showSuccessState, onError) => {
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.dataset.processing = 'true';
-        submitBtn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:0.4rem;"></span> Processing...';
-      }
+    try {
+      const res = await Api.post('/api/billing/central/create', payload);
+      if (res && res.success) {
+        showToast(res.message || 'Central Bill & Payment recorded successfully.', 'success');
+        cbConsolidatedData.existingInvoiceNumber = res.data.invoiceNumber;
+        cbConsolidatedData.existingBillNumber = res.data.billNumber;
+        cbConsolidatedData.existingBillId = res.data.id;
+        cbConsolidatedData.existingAmountPaid = res.data.amountPaid;
+        cbConsolidatedData.existingBalance = res.data.balance;
+        cbConsolidatedData.existingPaymentStatus = res.data.paymentStatus;
+        cbConsolidatedData.existingPaymentMethod = res.data.paymentMethod;
 
-      try {
-        const res = await Api.post('/api/billing/central/create', payload);
-        if (res && res.success) {
-          showToast(res.message || 'Central Bill generated successfully.', 'success');
-          cbConsolidatedData.existingInvoiceNumber = res.data.invoiceNumber;
-          cbConsolidatedData.existingBillNumber = res.data.billNumber;
-          cbConsolidatedData.existingBillId = res.data.id;
-          cbConsolidatedData.existingAmountPaid = res.data.amountPaid;
-          cbConsolidatedData.existingBalance = res.data.balance;
-          cbConsolidatedData.existingPaymentStatus = res.data.paymentStatus;
-          cbConsolidatedData.existingPaymentMethod = res.data.paymentMethod;
+        const isNowPaid = (res.data.balance <= 0);
 
-          const isNowPaid = (res.data.balance <= 0);
+        // Update display immediately
+        const invEl = document.getElementById('cbDisplayInvoiceNumber');
+        if (invEl) invEl.innerText = res.data.invoiceNumber;
 
-          // Update display immediately
-          const invEl = document.getElementById('cbDisplayInvoiceNumber');
-          if (invEl) invEl.innerText = res.data.invoiceNumber;
-
-          const balEl = document.getElementById('cbOverallBalanceAmt');
-          if (balEl) {
-            balEl.innerText = '₹' + formatCurrency(res.data.balance);
-            balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
-          }
-
-          const statusBadge = document.getElementById('cbOverallStatusBadge');
-          if (statusBadge) {
-            statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
-            statusBadge.textContent = res.data.paymentStatus;
-            statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : (res.data.amountPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid'));
-          }
-
-          await loadBillingSummaryData();
-          updateBillingKpiValues();
-
-          if (typeof showSuccessState === 'function') {
-            showSuccessState({
-              paymentStatus: res.data.paymentStatus,
-              amountPaid: res.data.amountPaid,
-              balanceAmount: res.data.balance,
-              invoiceNumber: res.data.invoiceNumber
-            });
-          }
-        } else {
-          showToast('Could not generate Central Bill: ' + (res?.message || 'Error'), 'danger');
-          if (typeof onError === 'function') onError();
+        const balEl = document.getElementById('cbOverallBalanceAmt');
+        if (balEl) {
+          balEl.innerText = '₹' + formatCurrency(res.data.balance);
+          balEl.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
         }
-      } catch (err) {
-        showToast('Network or server error while generating Central Bill.', 'danger');
-        if (typeof onError === 'function') onError();
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          delete submitBtn.dataset.processing;
-          submitBtn.innerHTML = '<svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Submit';
-        }
-      }
-    };
 
-    showPaymentConfirmationModal({
-      title: 'Confirm Payment',
-      billRef: 'Consolidated Bill: ' + activeBillingPatient.fullName,
-      paymentAmount: amountPaid,
-      remainingBalance: remBal,
-      moduleType: 'MAIN',
-      printButtonLabel: 'Print Invoice',
-      onConfirm: async (showSuccessState, onError) => {
-        await doCreateBill(showSuccessState, onError);
-      },
-      onPrint: () => {
-        if (cbConsolidatedData.existingBillId) {
-          printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
+        const statusBadge = document.getElementById('cbOverallStatusBadge');
+        if (statusBadge) {
+          statusBadge.classList.remove('cv-badge-unpaid', 'cv-badge-part', 'cv-badge-paid');
+          statusBadge.textContent = res.data.paymentStatus;
+          statusBadge.classList.add(isNowPaid ? 'cv-badge-paid' : (res.data.amountPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid'));
         }
+
+        const paidInput = document.getElementById('cbOverallPaidAmount');
+        if (paidInput) {
+          if (isNowPaid) {
+            paidInput.value = '0.00';
+            paidInput.disabled = true;
+          } else {
+            paidInput.value = res.data.balance.toFixed(2);
+            paidInput.max = res.data.balance.toFixed(2);
+          }
+        }
+
+        if (isNowPaid) {
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Fully Paid (PAID)';
+          }
+          if (directBtn) directBtn.disabled = true;
+        }
+
+        await loadBillingSummaryData();
+        updateBillingKpiValues();
+      } else {
+        showToast('Could not generate Central Bill: ' + (res?.message || 'Error'), 'danger');
       }
-    });
+    } catch (err) {
+      showToast('Network or server error while generating Central Bill.', 'danger');
+    } finally {
+      if (submitBtn && (!cbConsolidatedData.existingBalance || cbConsolidatedData.existingBalance > 0)) {
+        submitBtn.disabled = false;
+        delete submitBtn.dataset.processing;
+        submitBtn.innerHTML = 'PAID';
+      }
+      if (directBtn && (!cbConsolidatedData.existingBalance || cbConsolidatedData.existingBalance > 0)) {
+        directBtn.disabled = false;
+      }
+    }
   }
 
   // Central Billing History View
@@ -14398,6 +15318,7 @@ function renderPharmacyModule(activeTab = 'billing') {
             <div style="display:flex; gap:0.35rem;">
               <button class="cv-btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="AdminModule.showCentralInvoiceModal(${b.id})">Invoice</button>
               <button class="cv-btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="window.open('/api/billing/central/' + ${b.id} + '/pdf', '_blank')">PDF</button>
+              <button class="cv-btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="AdminModule.showBillPaymentsModal('CENTRAL', ${b.id}, '${escapeHtml(b.invoiceNumber || b.billNumber || '')}')">Payments</button>
             </div>
           </td>
         </tr>
@@ -15957,7 +16878,8 @@ function renderPharmacyModule(activeTab = 'billing') {
     executeBillPayment: executeBillPayment,
     refreshCurrentBillingCategory: refreshCurrentBillingCategory,
     showPaymentConfirmationModal: showPaymentConfirmationModal,
-    showBedPaymentModal: showBedPaymentModal
+    showBedPaymentModal: showBedPaymentModal,
+    showBillPaymentsModal: showBillPaymentsModal
   };
 })();
 window.AdminModule = Admin;

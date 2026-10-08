@@ -141,11 +141,18 @@ public class OpService {
         String payMethod = (request.getPaymentMethod() != null && !request.getPaymentMethod().trim().isEmpty())
                 ? request.getPaymentMethod().trim().toUpperCase() : "CASH";
 
-        String status = (request.getPaymentStatus() != null && !request.getPaymentStatus().trim().isEmpty())
-                ? request.getPaymentStatus().trim().toUpperCase() : "PAID";
+        String reqStatus = request.getPaymentStatus();
         BigDecimal paid = request.getPaidAmount() != null ? request.getPaidAmount() :
-                ("PAID".equalsIgnoreCase(status) ? fee : BigDecimal.ZERO);
+                ("PAID".equalsIgnoreCase(reqStatus) ? fee : BigDecimal.ZERO);
         BigDecimal bal = fee.subtract(paid).max(BigDecimal.ZERO);
+        String status;
+        if (bal.compareTo(BigDecimal.ZERO) == 0 && fee.compareTo(BigDecimal.ZERO) > 0) {
+            status = "PAID";
+        } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
+            status = "PARTIALLY PAID";
+        } else {
+            status = "UNPAID";
+        }
 
         // 6. Save OP Registration
         OpRegistration op = new OpRegistration(
@@ -178,6 +185,15 @@ public class OpService {
                     payMethod,
                     visitDate
             );
+            paymentRecord.setBillId(savedOp.getId());
+            paymentRecord.setBillNumber(opId);
+            paymentRecord.setInvoiceNumber(opId);
+            paymentRecord.setUhid(patient.getUhid());
+            paymentRecord.setOpId(opId);
+            paymentRecord.setTotalPaid(paid);
+            paymentRecord.setRemainingBalance(bal);
+            paymentRecord.setPaymentStatus(status);
+            paymentRecord.setPaymentTime(regTime);
             paymentRecord.setNotes("OP Registration: " + opId + " | Doctor: " + doctor.getName());
             paymentRecordRepository.save(paymentRecord);
         }

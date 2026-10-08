@@ -4066,4 +4066,46 @@ body.cv-dashboard-active #app {
   box-shadow: var(--cv-shadow-xs);
 }
 
+/* ====================================================================
+   DIRECT PAID BUTTON & PAYMENT COLLECTION SYSTEM
+   ==================================================================== */
+.cv-btn-paid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: #059669;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 1.15rem;
+  border-radius: var(--cv-radius-md, 6px);
+  border: 1px solid #047857;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25);
+  user-select: none;
+}
+.cv-btn-paid:hover:not(:disabled) {
+  background: #047857;
+  border-color: #065f46;
+  box-shadow: 0 3px 8px rgba(5, 150, 105, 0.35);
+  transform: translateY(-1px);
+}
+.cv-btn-paid:active:not(:disabled) {
+  transform: translateY(0);
+}
+.cv-btn-paid:disabled {
+  background: #9ca3af !important;
+  border-color: #9ca3af !important;
+  color: #f3f4f6 !important;
+  cursor: not-allowed !important;
+  opacity: 0.75;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+
 

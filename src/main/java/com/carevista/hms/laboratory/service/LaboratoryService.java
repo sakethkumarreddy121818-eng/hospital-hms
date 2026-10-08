@@ -409,6 +409,7 @@ public class LaboratoryService {
 
         // 5. Save Central Billing / Payment Record if payment collected
         if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
+            String orderTimeStr = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"));
             PaymentRecord paymentRecord = new PaymentRecord(
                     tenant,
                     orderNumber,
@@ -419,6 +420,16 @@ public class LaboratoryService {
                     order.getPaymentMethod(),
                     LocalDate.now()
             );
+            paymentRecord.setBillId(order.getId());
+            paymentRecord.setBillNumber(orderNumber);
+            paymentRecord.setInvoiceNumber(orderNumber);
+            paymentRecord.setUhid(patient != null ? patient.getUhid() : order.getUhid());
+            paymentRecord.setOpId(order.getOpId());
+            paymentRecord.setIpId(order.getIpId());
+            paymentRecord.setTotalPaid(paidAmount);
+            paymentRecord.setRemainingBalance(order.getBalanceAmount());
+            paymentRecord.setPaymentStatus(order.getPaymentStatus());
+            paymentRecord.setPaymentTime(orderTimeStr);
             paymentRecord.setNotes("Lab Order Collection: " + orderNumber + " (" + testSummary + ")");
             paymentRecordRepository.save(paymentRecord);
         }

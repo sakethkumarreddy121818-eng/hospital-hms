@@ -4,6 +4,7 @@ import com.carevista.hms.billing.dto.BillingCategoriesSummaryDto;
 import com.carevista.hms.billing.dto.BillingConsolidatedDto;
 import com.carevista.hms.billing.dto.BillPaymentRequestDto;
 import com.carevista.hms.billing.dto.BillPaymentResponseDto;
+import com.carevista.hms.billing.dto.PaymentRecordDto;
 import com.carevista.hms.billing.dto.CentralBillRequestDto;
 import com.carevista.hms.billing.dto.PatientBillingSearchResultDto;
 import com.carevista.hms.billing.entity.CentralBill;
@@ -174,5 +175,18 @@ public class BillingController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(ApiResponse.error("Failed to process payment: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/payments/history")
+    public ResponseEntity<?> getPaymentHistory(
+            @RequestParam(required = false) String moduleType,
+            @RequestParam(required = false) Long billId,
+            @RequestParam(required = false) String billNumber,
+            @RequestParam(required = false) Long patientId,
+            HttpServletRequest httpRequest) {
+        Long tenantId = getTenantId(httpRequest);
+        if (tenantId == null) return ResponseEntity.status(403).body(ApiResponse.error("Tenant ID missing."));
+        List<PaymentRecordDto> list = billingService.getPaymentHistory(tenantId, moduleType, billId, billNumber, patientId);
+        return ResponseEntity.ok(ApiResponse.success("Payment transactions fetched successfully", list));
     }
 }

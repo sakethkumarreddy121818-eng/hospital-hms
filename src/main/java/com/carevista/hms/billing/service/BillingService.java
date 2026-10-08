@@ -5,6 +5,7 @@ import com.carevista.hms.billing.dto.BillingCategoriesSummaryDto;
 import com.carevista.hms.billing.dto.BillingConsolidatedDto;
 import com.carevista.hms.billing.dto.BillPaymentRequestDto;
 import com.carevista.hms.billing.dto.BillPaymentResponseDto;
+import com.carevista.hms.billing.dto.PaymentRecordDto;
 import com.carevista.hms.billing.dto.CentralBillRequestDto;
 import com.carevista.hms.billing.dto.PatientBillingSearchResultDto;
 import com.carevista.hms.billing.entity.CentralBill;
@@ -569,6 +570,7 @@ public class BillingService {
         CentralBill savedBill = centralBillRepository.save(bill);
 
         if (paymentAmt.compareTo(BigDecimal.ZERO) > 0) {
+            String payTime = LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"));
             PaymentRecord pr = new PaymentRecord(
                     tenant,
                     "TXN-" + System.currentTimeMillis(),
@@ -579,6 +581,16 @@ public class BillingService {
                     bill.getPaymentMethod(),
                     today
             );
+            pr.setBillId(savedBill.getId());
+            pr.setBillNumber(savedBill.getBillNumber());
+            pr.setInvoiceNumber(savedBill.getInvoiceNumber());
+            pr.setUhid(patient != null ? patient.getUhid() : savedBill.getUhid());
+            pr.setOpId(savedBill.getOpId());
+            pr.setIpId(savedBill.getIpId());
+            pr.setTotalPaid(savedBill.getAmountPaid());
+            pr.setRemainingBalance(savedBill.getBalance());
+            pr.setPaymentStatus(savedBill.getPaymentStatus());
+            pr.setPaymentTime(payTime);
             pr.setNotes("Payment on Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
             paymentRecordRepository.save(pr);
         }
@@ -949,6 +961,9 @@ public class BillingService {
 
         Patient patient = null;
         String billRef = "";
+        String opId = null;
+        String ipId = null;
+        String uhid = null;
 
         switch (moduleType) {
             case "OP": {
@@ -987,8 +1002,11 @@ public class BillingService {
 
                 patient = op.getPatient();
                 billRef = op.getOpId();
+                opId = op.getOpId();
+                uhid = (patient != null) ? patient.getUhid() : null;
 
                 response.setBillNumber(op.getOpId());
+                response.setInvoiceNumber(op.getOpId());
                 response.setTotalAmount(total);
                 response.setAmountPaid(newPaid);
                 response.setBalanceAmount(newBal);
@@ -1043,8 +1061,12 @@ public class BillingService {
 
                 patient = ip.getPatient();
                 billRef = ip.getIpId();
+                ipId = ip.getIpId();
+                opId = ip.getOpId();
+                uhid = (patient != null) ? patient.getUhid() : null;
 
                 response.setBillNumber(ip.getIpId());
+                response.setInvoiceNumber(ip.getIpId());
                 response.setTotalAmount(total);
                 response.setAmountPaid(newPaid);
                 response.setBalanceAmount(newBal);
@@ -1087,8 +1109,12 @@ public class BillingService {
 
                 patient = pb.getPatient();
                 billRef = pb.getBillNumber();
+                opId = pb.getOpId();
+                ipId = pb.getIpId();
+                uhid = (patient != null) ? patient.getUhid() : pb.getUhid();
 
                 response.setBillNumber(pb.getBillNumber());
+                response.setInvoiceNumber(pb.getBillNumber());
                 response.setTotalAmount(total);
                 response.setAmountPaid(newPaid);
                 response.setBalanceAmount(newBal);
@@ -1133,8 +1159,12 @@ public class BillingService {
 
                 patient = lab.getPatient();
                 billRef = lab.getOrderNumber();
+                opId = lab.getOpId();
+                ipId = lab.getIpId();
+                uhid = (patient != null) ? patient.getUhid() : lab.getUhid();
 
                 response.setBillNumber(lab.getOrderNumber());
+                response.setInvoiceNumber(lab.getOrderNumber());
                 response.setTotalAmount(total);
                 response.setAmountPaid(newPaid);
                 response.setBalanceAmount(newBal);
@@ -1178,9 +1208,12 @@ public class BillingService {
 
                 patient = cb.getPatient();
                 billRef = cb.getInvoiceNumber() != null ? cb.getInvoiceNumber() : cb.getBillNumber();
+                opId = cb.getOpId();
+                ipId = cb.getIpId();
+                uhid = (patient != null) ? patient.getUhid() : cb.getUhid();
 
                 response.setBillNumber(cb.getBillNumber());
-                response.setInvoiceNumber(cb.getInvoiceNumber());
+                response.setInvoiceNumber(cb.getInvoiceNumber() != null ? cb.getInvoiceNumber() : cb.getBillNumber());
                 response.setTotalAmount(total);
                 response.setAmountPaid(newPaid);
                 response.setBalanceAmount(newBal);
@@ -1204,7 +1237,18 @@ public class BillingService {
                 paymentMethod,
                 today
         );
-        String notesStr = "Payment Done against " + billRef + (request.getNotes() != null && !request.getNotes().trim().isEmpty() ? " | " + request.getNotes().trim() : "");
+        pr.setBillId(billId);
+        pr.setBillNumber(response.getBillNumber());
+        pr.setInvoiceNumber(response.getInvoiceNumber());
+        pr.setUhid(uhid);
+        pr.setOpId(opId);
+        pr.setIpId(ipId);
+        pr.setTotalPaid(response.getAmountPaid());
+        pr.setRemainingBalance(response.getBalanceAmount());
+        pr.setPaymentStatus(response.getPaymentStatus());
+        pr.setPaymentTime(LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a")));
+        String notesStr = "Payment of ₹" + paymentAmount + " (" + paymentMethod + ") against " + billRef +
+                (request.getNotes() != null && !request.getNotes().trim().isEmpty() ? " | " + request.getNotes().trim() : "");
         pr.setNotes(notesStr.length() > 255 ? notesStr.substring(0, 255) : notesStr);
         paymentRecordRepository.save(pr);
 
@@ -1225,6 +1269,24 @@ public class BillingService {
 
         response.setMessage("Payment of ₹" + paymentAmount + " processed successfully. Status: " + response.getPaymentStatus());
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentRecordDto> getPaymentHistory(Long tenantId, String moduleType, Long billId, String billNumber, Long patientId) {
+        if (tenantId == null) return Collections.emptyList();
+        List<PaymentRecord> records;
+        if (billId != null && moduleType != null && !moduleType.trim().isEmpty()) {
+            records = paymentRecordRepository.findByTenantIdAndBillIdAndModuleTypeOrderByCreatedAtDesc(tenantId, billId, moduleType.trim().toUpperCase());
+        } else if (billNumber != null && !billNumber.trim().isEmpty()) {
+            records = paymentRecordRepository.findByTenantIdAndBillNumberOrderByCreatedAtDesc(tenantId, billNumber.trim());
+        } else if (patientId != null) {
+            records = paymentRecordRepository.findByTenantIdAndPatientIdOrderByCreatedAtDesc(tenantId, patientId);
+        } else if (moduleType != null && !moduleType.trim().isEmpty()) {
+            records = paymentRecordRepository.findByTenantIdAndModuleTypeOrderByCreatedAtDesc(tenantId, moduleType.trim().toUpperCase());
+        } else {
+            records = paymentRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
+        }
+        return records.stream().map(PaymentRecordDto::fromEntity).collect(Collectors.toList());
     }
 
     private String determinePaymentStatus(BigDecimal paid, BigDecimal balance) {

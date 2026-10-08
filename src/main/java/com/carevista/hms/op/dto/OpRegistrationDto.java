@@ -18,6 +18,8 @@ public class OpRegistrationDto {
     private String doctorName;
     private String department;
     private BigDecimal consultationFee;
+    private BigDecimal paidAmount;
+    private BigDecimal balanceAmount;
     private String paymentMethod;
     private String paymentStatus;
     private String status;
@@ -44,6 +46,8 @@ public class OpRegistrationDto {
         dto.setDoctorName(op.getDoctorName());
         dto.setDepartment(op.getDepartment());
         dto.setConsultationFee(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
+        dto.setPaidAmount(op.getPaidAmount());
+        dto.setBalanceAmount(op.getBalanceAmount());
         dto.setPaymentMethod(op.getPaymentMethod() != null ? op.getPaymentMethod() : "CASH");
         dto.setPaymentStatus(op.getPaymentStatus() != null ? op.getPaymentStatus() : "PAID");
         dto.setStatus(op.getStatus());
@@ -57,6 +61,12 @@ public class OpRegistrationDto {
         }
         return dto;
     }
+
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+
+    public BigDecimal getBalanceAmount() { return balanceAmount; }
+    public void setBalanceAmount(BigDecimal balanceAmount) { this.balanceAmount = balanceAmount; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
