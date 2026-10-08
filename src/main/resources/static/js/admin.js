@@ -11984,6 +11984,7 @@ function renderPharmacyModule(activeTab = 'billing') {
                 // Refresh background lists if present
                 if (typeof loadOpHistoryList === 'function' && moduleType === 'OP') loadOpHistoryList();
                 if (typeof renderMainBillingHistoryView === 'function' && moduleType === 'CENTRAL') renderMainBillingHistoryView();
+                if (typeof refreshCurrentBillingCategory === 'function') refreshCurrentBillingCategory();
               }
             });
           });
@@ -12166,19 +12167,10 @@ function renderPharmacyModule(activeTab = 'billing') {
     await loadBillingSummaryData();
     updateBillingKpiValues();
     if (billingMainTab === 'billing') {
-      if (billingCategoryTab === 'op') {
-        if (opViewMode === 'all') renderOpAllLedgerTable(false);
-        else if (activeBillingPatient) loadAndRenderPatientOpBilling(activeBillingPatient);
-      } else if (billingCategoryTab === 'ip') {
-        if (ipViewMode === 'all') renderIpAllLedgerTable(false);
-        else if (activeBillingPatient) loadAndRenderPatientIpBilling(activeBillingPatient);
-      } else if (billingCategoryTab === 'pharmacy') {
-        if (phViewMode === 'all') renderPharmacyAllLedgerTable(false);
-        else if (activeBillingPatient) loadAndRenderPatientPhBilling(activeBillingPatient);
-      } else if (billingCategoryTab === 'laboratory') {
-        if (labViewMode === 'all') renderLaboratoryAllLedgerTable(false);
-        else if (activeBillingPatient) loadAndRenderPatientLabBilling(activeBillingPatient);
-      }
+      if (billingCategoryTab === 'op') renderOpCategoryView();
+      else if (billingCategoryTab === 'ip') renderIpCategoryView();
+      else if (billingCategoryTab === 'pharmacy') renderPharmacyCategoryView();
+      else if (billingCategoryTab === 'laboratory') renderLaboratoryCategoryView();
     } else {
       if (mainBillingSubView === 'history') renderMainBillingHistoryView();
       else if (activeBillingPatient) fetchCbConsolidatedCharges(activeBillingPatient.id);
@@ -12186,87 +12178,211 @@ function renderPharmacyModule(activeTab = 'billing') {
   }
 
   // ----------------------------------------------------------
-  // 1. OP BILLING — AUTO RETRIEVAL & LEDGER
+  // 1. OP BILLING — STANDARDIZED REFERENCE PATTERN & AUTO RETRIEVAL
   // ----------------------------------------------------------
-  let opViewMode = 'auto'; // 'auto' (patient auto-retrieval) or 'all' (all ledger)
+  let cbOpBillingPagination = null;
+  let opAllHistoryRecords = [];
+
   async function renderOpCategoryView() {
     const mount = document.getElementById('billingCategoryViewMount');
     if (!mount) return;
 
-    mount.innerHTML = `
-      <div class="cv-pharmacy-card">
-        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
-          <div class="cv-pharmacy-card-title">
-            <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-            OP Billing &bull; Outpatient Charges Auto-Retrieval
+    if (activeBillingPatient) {
+      mount.innerHTML = `
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+              OP Billing &bull; Patient Settlement View
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnBackToOpHistory" style="padding:0.4rem 0.85rem; font-size:0.82rem;">
+                &larr; Back to Complete OP Billing
+              </button>
+            </div>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button type="button" class="cv-btn-secondary ${opViewMode === 'all' ? 'active' : ''}" id="btnToggleOpAllLedger" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
-              ${opViewMode === 'all' ? 'Back to Patient Search' : 'View Complete OP Ledger'}
+          <div id="opCategoryMainContent"></div>
+        </div>
+      `;
+      document.getElementById('btnBackToOpHistory')?.addEventListener('click', () => {
+        activeBillingPatient = null;
+        activeOpRecord = null;
+        renderOpCategoryView();
+      });
+      loadAndRenderPatientOpBilling(activeBillingPatient);
+      return;
+    }
+
+    if (!cbOpBillingPagination) {
+      cbOpBillingPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          const tbody = document.getElementById('opBillingTableBody');
+          if (tbody) tbody.innerHTML = renderOpHistoryTableBodyHtml(pagedItems);
+          wireOpHistoryActionButtons();
+          const pMount = document.getElementById('opHistoryPaginationMount');
+          if (pMount) {
+            pMount.innerHTML = cbOpBillingPagination.renderControlsHtml('cbOpBilling');
+            cbOpBillingPagination.bindEvents('cbOpBilling');
+          }
+        }
+      });
+    }
+
+    mount.innerHTML = `
+      <div class="cv-pharmacy-card cv-pharmacy-history-card">
+        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Outpatient Billing &amp; Consultation Charges
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Search outpatient consultations, audit doctor charges, collect outstanding balances, and reprint bills.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:320px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="opHistorySearchInput" placeholder="Search by Patient, UHID, OP ID, Doctor..." autocomplete="off">
+            </div>
+            <select id="opHistoryStatusFilter" class="cv-form-select" style="height:38px; width:125px; font-size:0.82rem;">
+              <option value="">All Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIALLY PAID">Partially Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+            <button type="button" class="cv-btn-secondary" id="btnRefreshOpHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+            <button type="button" class="cv-btn-secondary" id="btnToggleOpPatientLookup" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              Patient Settle
             </button>
           </div>
         </div>
 
-        <!-- Search Bar Area + Date Period Filter -->
-        <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
-          <div style="position:relative; flex:1; min-width:280px;">
+        <!-- Collapsible Patient Lookup Bar -->
+        <div id="opPatientLookupBar" style="display:none; padding:0.85rem 1rem; background:#f8fafc; border-bottom:1px solid var(--cv-border);">
+          <div style="position:relative; max-width:540px;">
             <svg style="position:absolute; left:12px; top:11px; width:18px; height:18px; color:var(--cv-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="opPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, IP ID, or Phone..." autocomplete="off">
+            <input type="text" id="opPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, or Phone..." autocomplete="off">
             <div id="opPatientDropdown" class="cv-patient-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--cv-border); border-radius:var(--cv-radius-md); box-shadow:var(--cv-shadow-lg); z-index:50; max-height:260px; overflow-y:auto;"></div>
-          </div>
-          <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
-            <label style="font-size:0.8rem; font-weight:700; color:var(--cv-text-muted);">Date:</label>
-            <select id="opDatePeriodFilter" class="cv-form-input" style="height:40px; width:auto; font-size:0.84rem; font-weight:600;">
-              <option value="ALL" ${cbDatePeriodFilter === 'ALL' ? 'selected' : ''}>All Time</option>
-              <option value="TODAY" ${cbDatePeriodFilter === 'TODAY' ? 'selected' : ''}>Today</option>
-              <option value="WEEK" ${cbDatePeriodFilter === 'WEEK' ? 'selected' : ''}>This Week</option>
-              <option value="MONTH" ${cbDatePeriodFilter === 'MONTH' ? 'selected' : ''}>This Month</option>
-              <option value="YEAR" ${cbDatePeriodFilter === 'YEAR' ? 'selected' : ''}>This Year</option>
-            </select>
           </div>
         </div>
 
-        <div id="opCategoryMainContent"></div>
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table" id="opBillingTable">
+            <thead>
+              <tr>
+                <th>OP Bill / Invoice</th>
+                <th>Date &amp; Time</th>
+                <th>Patient Details</th>
+                <th>Doctor / Dept</th>
+                <th>Outpatient Charges</th>
+                <th style="text-align:right;">Total (₹)</th>
+                <th style="text-align:right;">Paid (₹)</th>
+                <th style="text-align:right;">Balance (₹)</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="opBillingTableBody">
+              <tr><td colspan="10" style="text-align:center; padding:2rem;"><div class="cv-spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="opHistoryPaginationMount"></div>
       </div>
     `;
 
-    setupPatientSearchWidget('opPatientSearchInput', 'opPatientDropdown', (patient) => {
-      activeBillingPatient = patient;
-      opViewMode = 'auto';
-      activeOpRecord = null;
-      loadAndRenderPatientOpBilling(patient);
-    });
-
-    document.getElementById('opDatePeriodFilter')?.addEventListener('change', (e) => {
-      cbDatePeriodFilter = e.target.value;
-      if (activeBillingPatient) {
-        activeOpRecord = null;
-        loadAndRenderPatientOpBilling(activeBillingPatient);
-      } else if (opViewMode === 'all') {
-        renderOpAllLedgerTable();
-      }
-    });
-
-    document.getElementById('btnToggleOpAllLedger')?.addEventListener('click', () => {
-      opViewMode = (opViewMode === 'all') ? 'auto' : 'all';
-      if (opViewMode === 'all') {
-        renderOpAllLedgerTable();
-      } else {
-        if (activeBillingPatient) {
-          loadAndRenderPatientOpBilling(activeBillingPatient);
-        } else {
-          renderOpCategoryView();
+    document.getElementById('btnToggleOpPatientLookup')?.addEventListener('click', () => {
+      const bar = document.getElementById('opPatientLookupBar');
+      if (bar) {
+        bar.style.display = (bar.style.display === 'none') ? 'block' : 'none';
+        if (bar.style.display === 'block') {
+          document.getElementById('opPatientSearchInput')?.focus();
         }
       }
     });
 
-    if (opViewMode === 'all') {
-      renderOpAllLedgerTable();
-    } else if (activeBillingPatient) {
-      loadAndRenderPatientOpBilling(activeBillingPatient);
-    } else {
-      renderOpAllLedgerTable(true);
+    setupPatientSearchWidget('opPatientSearchInput', 'opPatientDropdown', (patient) => {
+      activeBillingPatient = patient;
+      activeOpRecord = null;
+      renderOpCategoryView();
+    });
+
+    function updateOpHistoryView(preservePage = false) {
+      const q = (document.getElementById('opHistorySearchInput')?.value || '').toLowerCase().trim();
+      const st = (document.getElementById('opHistoryStatusFilter')?.value || '').toUpperCase().trim();
+      let filtered = opAllHistoryRecords;
+      if (q || st) {
+        filtered = filtered.filter(o => {
+          const matchQ = !q ||
+            (o.opId && o.opId.toLowerCase().includes(q)) ||
+            (o.invoiceNumber && o.invoiceNumber.toLowerCase().includes(q)) ||
+            (o.patient?.fullName && o.patient.fullName.toLowerCase().includes(q)) ||
+            (o.patient?.uhid && o.patient.uhid.toLowerCase().includes(q)) ||
+            (o.patient?.phone && o.patient.phone.toLowerCase().includes(q)) ||
+            (o.doctorName && o.doctorName.toLowerCase().includes(q)) ||
+            (o.department && o.department.toLowerCase().includes(q));
+          const statusVal = (o.paymentStatus || 'PAID').toUpperCase();
+          const matchSt = !st || statusVal === st || (st === 'PARTIALLY PAID' && statusVal === 'PARTIALLY_PAID');
+          return matchQ && matchSt;
+        });
+      }
+      const paged = cbOpBillingPagination.setItems(filtered, preservePage);
+      const tbody = document.getElementById('opBillingTableBody');
+      if (tbody) tbody.innerHTML = renderOpHistoryTableBodyHtml(paged);
+      wireOpHistoryActionButtons();
+      const pMount = document.getElementById('opHistoryPaginationMount');
+      if (pMount) {
+        pMount.innerHTML = cbOpBillingPagination.renderControlsHtml('cbOpBilling');
+        cbOpBillingPagination.bindEvents('cbOpBilling');
+      }
     }
+
+    document.getElementById('opHistorySearchInput')?.addEventListener('input', () => updateOpHistoryView(false));
+    document.getElementById('opHistoryStatusFilter')?.addEventListener('change', () => updateOpHistoryView(false));
+
+    document.getElementById('btnRefreshOpHistory')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshOpHistory');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        const res = await Api.get('/api/billing/op/history');
+        if (res && res.success && Array.isArray(res.data)) {
+          opAllHistoryRecords = res.data;
+        }
+        await loadBillingSummaryData();
+        updateBillingKpiValues();
+        updateOpHistoryView(true);
+      } catch (e) {
+        console.error('Error refreshing OP history:', e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
+        }
+      }
+    });
+
+    try {
+      const res = await Api.get('/api/billing/op/history');
+      opAllHistoryRecords = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+    } catch (e) {
+      console.error('Failed to load OP history from MySQL:', e);
+      opAllHistoryRecords = [];
+    }
+
+    updateOpHistoryView(false);
   }
 
   async function loadAndRenderPatientOpBilling(patient) {
@@ -12294,8 +12410,9 @@ function renderPharmacyModule(activeTab = 'billing') {
     });
 
     document.getElementById('btnCatViewAllLedger')?.addEventListener('click', () => {
-      opViewMode = 'all';
-      renderOpAllLedgerTable();
+      activeBillingPatient = null;
+      activeOpRecord = null;
+      renderOpCategoryView();
     });
 
     const recordsArea = document.getElementById('opPatientRecordsArea');
@@ -12607,213 +12724,322 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  async function renderOpAllLedgerTable(isPrompt = false) {
-    const mount = document.getElementById('opCategoryMainContent');
-    if (!mount) return;
-
-    mount.innerHTML = `
-      ${isPrompt ? `
-        <div style="padding:0.75rem 1rem; background:#f8fafc; border:1px dashed var(--cv-border); border-radius:6px; margin-bottom:1rem; font-size:0.84rem; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.5rem;">
-          <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Search and select a patient above to automatically retrieve their OP billing details, or review the complete hospital OP ledger below:
-        </div>
-      ` : ''}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-        <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">All Hospital Outpatient Records</div>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="opFilterSearch" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Filter rows...">
-          <select id="opFilterStatus" class="cv-form-select" style="height:34px; font-size:0.82rem; width:130px;">
-            <option value="">All Statuses</option>
-            <option value="PAID">Paid</option>
-            <option value="UNPAID">Unpaid</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="cv-bill-table-wrapper">
-        <table class="cv-bill-table" id="opBillingTable">
-          <thead>
-            <tr>
-              <th>Bill / OP ID</th>
-              <th>Date &amp; Time</th>
-              <th>Patient Name</th>
-              <th>UHID</th>
-              <th>Doctor &amp; Dept</th>
-              <th>OP Services</th>
-              <th style="text-align:right;">Subtotal</th>
-              <th style="text-align:right;">Discount</th>
-              <th style="text-align:right;">GST</th>
-              <th style="text-align:right;">Total</th>
-              <th style="text-align:right;">Paid</th>
-              <th style="text-align:right;">Balance</th>
-              <th>Method</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="opBillingTableBody">
-            <tr><td colspan="15" style="text-align:center; padding:1.5rem;"><div class="cv-spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    try {
-      const res = await Api.get('/api/billing/op/history');
-      const ops = (res && res.success) ? res.data : [];
-      const filterInput = document.getElementById('opFilterSearch');
-      const filterStatus = document.getElementById('opFilterStatus');
-      const tableBody = document.getElementById('opBillingTableBody');
-
-      function filterOpRows() {
-        const q = filterInput?.value.toLowerCase().trim() || '';
-        const st = filterStatus?.value.toUpperCase().trim() || '';
-        const filtered = ops.filter(o => {
-          const matchQ = !q ||
-            (o.opId && o.opId.toLowerCase().includes(q)) ||
-            (o.patient?.fullName && o.patient.fullName.toLowerCase().includes(q)) ||
-            (o.patient?.uhid && o.patient.uhid.toLowerCase().includes(q)) ||
-            (o.doctorName && o.doctorName.toLowerCase().includes(q)) ||
-            (o.department && o.department.toLowerCase().includes(q));
-          const matchSt = !st || (o.paymentStatus && o.paymentStatus.toUpperCase() === st);
-          return matchQ && matchSt;
-        });
-        if (tableBody) tableBody.innerHTML = renderOpBillingRows(filtered);
-      }
-
-      filterInput?.addEventListener('input', filterOpRows);
-      filterStatus?.addEventListener('change', filterOpRows);
-      filterOpRows();
-
-    } catch (e) {
-      const tb = document.getElementById('opBillingTableBody');
-      if (tb) tb.innerHTML = '<tr><td colspan="15" style="text-align:center; color:var(--cv-danger); padding:1rem;">Failed to load OP history from MySQL.</td></tr>';
+  function renderOpHistoryTableBodyHtml(records) {
+    if (!records || records.length === 0) {
+      return `
+        <tr>
+          <td colspan="10" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
+            No outpatient billing records found.
+          </td>
+        </tr>
+      `;
     }
-  }
-
-  function renderOpBillingRows(ops) {
-    if (!ops || ops.length === 0) {
-      return '<tr><td colspan="15" style="text-align:center; padding:1.75rem; color:var(--cv-text-muted);">No OP billing records found in MySQL.</td></tr>';
-    }
-    return ops.map(o => {
+    return records.map(o => {
       const fee = o.consultationFee || 0;
       const isPaid = (o.paymentStatus || 'PAID').toUpperCase() === 'PAID';
       const paidAmt = o.paidAmount != null ? o.paidAmount : (isPaid ? fee : 0);
       const balAmt = o.balanceAmount != null ? o.balanceAmount : Math.max(0, fee - paidAmt);
+      let statusBadgeClass = 'cv-badge-unpaid';
+      if (isPaid) statusBadgeClass = 'cv-badge-paid';
+      else if (paidAmt > 0) statusBadgeClass = 'cv-badge-part';
 
       return `
         <tr>
-          <td><strong>${escapeHtml(o.opId)}</strong></td>
-          <td>${escapeHtml(o.visitDate || '')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(o.registrationTime || '')}</span></td>
-          <td><strong>${escapeHtml(o.patient?.fullName || 'Walk-in')}</strong></td>
-          <td><span style="font-family:monospace; font-size:0.8rem;">${escapeHtml(o.patient?.uhid || '—')}</span></td>
-          <td>${escapeHtml(o.doctorName || 'Consultant')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(o.department || 'General')}</span></td>
-          <td>OP Consultation</td>
-          <td style="text-align:right;">₹${formatCurrency(fee)}</td>
-          <td style="text-align:right; color:var(--cv-text-muted);">₹0.00</td>
-          <td style="text-align:right; color:var(--cv-text-muted);">₹0.00</td>
-          <td style="text-align:right; font-weight:700;">₹${formatCurrency(fee)}</td>
-          <td style="text-align:right; color:#059669; font-weight:600;">₹${formatCurrency(paidAmt)}</td>
-          <td style="text-align:right; color:${balAmt > 0 ? 'var(--cv-danger)' : '#059669'}; font-weight:700;">₹${formatCurrency(balAmt)}</td>
-          <td><span class="cv-badge-unpaid" style="background:#f1f5f9; color:#475569; padding:0.15rem 0.4rem; font-size:0.75rem;">${escapeHtml(o.paymentMethod || 'CASH')}</span></td>
           <td>
-            <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : (paidAmt > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">
-              ${escapeHtml(o.paymentStatus || 'PAID')}
-            </span>
+            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(o.opId || '—')}</strong>
+            ${o.invoiceNumber ? `<div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(o.invoiceNumber)}</div>` : ''}
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-muted);">
+            <div>${escapeHtml(o.visitDate || '')}</div>
+            <div style="font-size:0.72rem;">${escapeHtml(o.registrationTime || '')}</div>
           </td>
           <td>
-            <div style="display:flex; gap:0.3rem;">
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.selectPatientForOpCategory(${o.patient?.id})">Auto-Fill</button>
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.showGenericRecordDetailsModal('OP Consultation Bill: ' + '${escapeHtml(o.opId)}', ${JSON.stringify(o).replace(/"/g, '&quot;')})">View</button>
+            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(o.patient?.fullName || 'Walk-in')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+              UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(o.patient?.uhid || '—')}</span>
+              ${o.patient?.phone ? `&bull; Ph: ${escapeHtml(o.patient.phone)}` : ''}
             </div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div>${escapeHtml(o.doctorName || 'Consultant')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(o.department || 'General')}</div>
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-main);">
+            <div>OP Consultation</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">Consultation &amp; Assessment</div>
+          </td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">
+            ₹${formatCurrency(fee)}
+          </td>
+          <td style="text-align:right; font-weight:600; color:var(--cv-success);">
+            ₹${formatCurrency(paidAmt)}
+          </td>
+          <td style="text-align:right; font-weight:700; color:${balAmt > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">
+            ₹${formatCurrency(balAmt)}
+          </td>
+          <td style="text-align:center;">
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">
+              ${escapeHtml(o.paymentStatus || (balAmt <= 0 ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID')))}
+            </span>
+          </td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="cv-btn-secondary btn-op-invoice" data-op-id="${o.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              Invoice
+            </button>
+            <button type="button" class="cv-btn-secondary btn-op-payments" data-op-id="${o.id}" data-op-no="${escapeHtml(o.opId || '')}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
+              Payments
+            </button>
+            <button type="button" class="cv-btn-secondary btn-op-print" data-op-id="${o.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; margin-left:0.3rem;">
+              Print Bill
+            </button>
           </td>
         </tr>
       `;
     }).join('');
   }
 
+  function wireOpHistoryActionButtons() {
+    document.querySelectorAll('.btn-op-invoice').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-op-id'));
+        const record = opAllHistoryRecords.find(x => x.id === id);
+        if (record) {
+          showGenericRecordDetailsModal('OP Consultation Bill: ' + (record.opId || id), record);
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-op-payments').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-op-id');
+        const no = e.currentTarget.getAttribute('data-op-no');
+        showBillPaymentsModal('OP', id, no);
+      });
+    });
+
+    document.querySelectorAll('.btn-op-print').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-op-id'));
+        const record = opAllHistoryRecords.find(x => x.id === id);
+        if (record) {
+          printDedicatedDocument(buildOpBillPrintHtml(record.patient, record));
+        }
+      });
+    });
+  }
+
   // ----------------------------------------------------------
-  // 2. IP BILLING — AUTO RETRIEVAL & LEDGER
+  // 2. IP BILLING — STANDARDIZED REFERENCE PATTERN & AUTO RETRIEVAL
   // ----------------------------------------------------------
-  let ipViewMode = 'auto';
+  let cbIpBillingPagination = null;
+  let ipAllHistoryRecords = [];
+
   async function renderIpCategoryView() {
     const mount = document.getElementById('billingCategoryViewMount');
     if (!mount) return;
 
-    mount.innerHTML = `
-      <div class="cv-pharmacy-card">
-        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
-          <div class="cv-pharmacy-card-title">
-            <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-            IP Billing &bull; Inpatient, Room &amp; Bed Charges Auto-Retrieval
+    if (activeBillingPatient) {
+      mount.innerHTML = `
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+              IP Billing &bull; Patient Settlement View
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnBackToIpHistory" style="padding:0.4rem 0.85rem; font-size:0.82rem;">
+                &larr; Back to Complete IP Billing
+              </button>
+            </div>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button type="button" class="cv-btn-secondary ${ipViewMode === 'all' ? 'active' : ''}" id="btnToggleIpAllLedger" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
-              ${ipViewMode === 'all' ? 'Back to Patient Search' : 'View Complete IP Ledger'}
+          <div id="ipCategoryMainContent"></div>
+        </div>
+      `;
+      document.getElementById('btnBackToIpHistory')?.addEventListener('click', () => {
+        activeBillingPatient = null;
+        activeIpRecord = null;
+        renderIpCategoryView();
+      });
+      loadAndRenderPatientIpBilling(activeBillingPatient);
+      return;
+    }
+
+    if (!cbIpBillingPagination) {
+      cbIpBillingPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          const tbody = document.getElementById('ipBillingTableBody');
+          if (tbody) tbody.innerHTML = renderIpHistoryTableBodyHtml(pagedItems);
+          wireIpHistoryActionButtons();
+          const pMount = document.getElementById('ipHistoryPaginationMount');
+          if (pMount) {
+            pMount.innerHTML = cbIpBillingPagination.renderControlsHtml('cbIpBilling');
+            cbIpBillingPagination.bindEvents('cbIpBilling');
+          }
+        }
+      });
+    }
+
+    mount.innerHTML = `
+      <div class="cv-pharmacy-card cv-pharmacy-history-card">
+        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+              </svg>
+              Inpatient Billing &amp; Room Charges
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Search inpatient admissions, track room &amp; bed tariffs, collect deposits, and manage discharge bills.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:320px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="ipHistorySearchInput" placeholder="Search by Patient, UHID, IP ID, Doctor, Room, Bed..." autocomplete="off">
+            </div>
+            <select id="ipHistoryStatusFilter" class="cv-form-select" style="height:38px; width:125px; font-size:0.82rem;">
+              <option value="">All Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIALLY PAID">Partially Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+            <button type="button" class="cv-btn-secondary" id="btnRefreshIpHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+            <button type="button" class="cv-btn-secondary" id="btnToggleIpPatientLookup" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              Patient Settle
             </button>
           </div>
         </div>
 
-        <!-- Search Bar Area + Date Period Filter -->
-        <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
-          <div style="position:relative; flex:1; min-width:280px;">
+        <!-- Collapsible Patient Lookup Bar -->
+        <div id="ipPatientLookupBar" style="display:none; padding:0.85rem 1rem; background:#f8fafc; border-bottom:1px solid var(--cv-border);">
+          <div style="position:relative; max-width:540px;">
             <svg style="position:absolute; left:12px; top:11px; width:18px; height:18px; color:var(--cv-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="ipPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, IP ID, or Phone..." autocomplete="off">
+            <input type="text" id="ipPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, IP ID, or Phone..." autocomplete="off">
             <div id="ipPatientDropdown" class="cv-patient-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--cv-border); border-radius:var(--cv-radius-md); box-shadow:var(--cv-shadow-lg); z-index:50; max-height:260px; overflow-y:auto;"></div>
-          </div>
-          <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
-            <label style="font-size:0.8rem; font-weight:700; color:var(--cv-text-muted);">Date:</label>
-            <select id="ipDatePeriodFilter" class="cv-form-input" style="height:40px; width:auto; font-size:0.84rem; font-weight:600;">
-              <option value="ALL" ${cbDatePeriodFilter === 'ALL' ? 'selected' : ''}>All Time</option>
-              <option value="TODAY" ${cbDatePeriodFilter === 'TODAY' ? 'selected' : ''}>Today</option>
-              <option value="WEEK" ${cbDatePeriodFilter === 'WEEK' ? 'selected' : ''}>This Week</option>
-              <option value="MONTH" ${cbDatePeriodFilter === 'MONTH' ? 'selected' : ''}>This Month</option>
-              <option value="YEAR" ${cbDatePeriodFilter === 'YEAR' ? 'selected' : ''}>This Year</option>
-            </select>
           </div>
         </div>
 
-        <div id="ipCategoryMainContent"></div>
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table" id="ipBillingTable">
+            <thead>
+              <tr>
+                <th>IP Bill / Invoice</th>
+                <th>Date &amp; Time</th>
+                <th>Patient Details</th>
+                <th>Doctor / Dept</th>
+                <th>Room &amp; Bed</th>
+                <th>IP Charges</th>
+                <th style="text-align:right;">Total (₹)</th>
+                <th style="text-align:right;">Paid (₹)</th>
+                <th style="text-align:right;">Balance (₹)</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ipBillingTableBody">
+              <tr><td colspan="11" style="text-align:center; padding:2rem;"><div class="cv-spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="ipHistoryPaginationMount"></div>
       </div>
     `;
 
-    setupPatientSearchWidget('ipPatientSearchInput', 'ipPatientDropdown', (patient) => {
-      activeBillingPatient = patient;
-      ipViewMode = 'auto';
-      activeIpRecord = null;
-      loadAndRenderPatientIpBilling(patient);
-    });
-
-    document.getElementById('ipDatePeriodFilter')?.addEventListener('change', (e) => {
-      cbDatePeriodFilter = e.target.value;
-      if (activeBillingPatient) {
-        activeIpRecord = null;
-        loadAndRenderPatientIpBilling(activeBillingPatient);
-      } else if (ipViewMode === 'all') {
-        renderIpAllLedgerTable();
-      }
-    });
-
-    document.getElementById('btnToggleIpAllLedger')?.addEventListener('click', () => {
-      ipViewMode = (ipViewMode === 'all') ? 'auto' : 'all';
-      if (ipViewMode === 'all') {
-        renderIpAllLedgerTable();
-      } else {
-        if (activeBillingPatient) {
-          loadAndRenderPatientIpBilling(activeBillingPatient);
-        } else {
-          renderIpCategoryView();
+    document.getElementById('btnToggleIpPatientLookup')?.addEventListener('click', () => {
+      const bar = document.getElementById('ipPatientLookupBar');
+      if (bar) {
+        bar.style.display = (bar.style.display === 'none') ? 'block' : 'none';
+        if (bar.style.display === 'block') {
+          document.getElementById('ipPatientSearchInput')?.focus();
         }
       }
     });
 
-    if (ipViewMode === 'all') {
-      renderIpAllLedgerTable();
-    } else if (activeBillingPatient) {
-      loadAndRenderPatientIpBilling(activeBillingPatient);
-    } else {
-      renderIpAllLedgerTable(true);
+    setupPatientSearchWidget('ipPatientSearchInput', 'ipPatientDropdown', (patient) => {
+      activeBillingPatient = patient;
+      activeIpRecord = null;
+      renderIpCategoryView();
+    });
+
+    function updateIpHistoryView(preservePage = false) {
+      const q = (document.getElementById('ipHistorySearchInput')?.value || '').toLowerCase().trim();
+      const st = (document.getElementById('ipHistoryStatusFilter')?.value || '').toUpperCase().trim();
+      let filtered = ipAllHistoryRecords;
+      if (q || st) {
+        filtered = filtered.filter(ip => {
+          const matchQ = !q ||
+            (ip.ipId && ip.ipId.toLowerCase().includes(q)) ||
+            (ip.invoiceNumber && ip.invoiceNumber.toLowerCase().includes(q)) ||
+            (ip.patient?.fullName && ip.patient.fullName.toLowerCase().includes(q)) ||
+            (ip.patient?.uhid && ip.patient.uhid.toLowerCase().includes(q)) ||
+            (ip.patient?.phone && ip.patient.phone.toLowerCase().includes(q)) ||
+            (ip.doctorName && ip.doctorName.toLowerCase().includes(q)) ||
+            (ip.department && ip.department.toLowerCase().includes(q)) ||
+            (ip.roomNumber && String(ip.roomNumber).toLowerCase().includes(q)) ||
+            (ip.room?.roomNumber && String(ip.room.roomNumber).toLowerCase().includes(q)) ||
+            (ip.bedNumber && String(ip.bedNumber).toLowerCase().includes(q)) ||
+            (ip.bed?.bedNumber && String(ip.bed.bedNumber).toLowerCase().includes(q));
+          const statusVal = (ip.paymentStatus || 'PAID').toUpperCase();
+          const matchSt = !st || statusVal === st || (st === 'PARTIALLY PAID' && statusVal === 'PARTIALLY_PAID');
+          return matchQ && matchSt;
+        });
+      }
+      const paged = cbIpBillingPagination.setItems(filtered, preservePage);
+      const tbody = document.getElementById('ipBillingTableBody');
+      if (tbody) tbody.innerHTML = renderIpHistoryTableBodyHtml(paged);
+      wireIpHistoryActionButtons();
+      const pMount = document.getElementById('ipHistoryPaginationMount');
+      if (pMount) {
+        pMount.innerHTML = cbIpBillingPagination.renderControlsHtml('cbIpBilling');
+        cbIpBillingPagination.bindEvents('cbIpBilling');
+      }
     }
+
+    document.getElementById('ipHistorySearchInput')?.addEventListener('input', () => updateIpHistoryView(false));
+    document.getElementById('ipHistoryStatusFilter')?.addEventListener('change', () => updateIpHistoryView(false));
+
+    document.getElementById('btnRefreshIpHistory')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshIpHistory');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        const res = await Api.get('/api/billing/ip/history');
+        if (res && res.success && Array.isArray(res.data)) {
+          ipAllHistoryRecords = res.data;
+        }
+        await loadBillingSummaryData();
+        updateBillingKpiValues();
+        updateIpHistoryView(true);
+      } catch (e) {
+        console.error('Error refreshing IP history:', e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
+        }
+      }
+    });
+
+    try {
+      const res = await Api.get('/api/billing/ip/history');
+      ipAllHistoryRecords = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+    } catch (e) {
+      console.error('Failed to load IP history from MySQL:', e);
+      ipAllHistoryRecords = [];
+    }
+
+    updateIpHistoryView(false);
   }
 
   async function loadAndRenderPatientIpBilling(patient) {
@@ -12841,8 +13067,9 @@ function renderPharmacyModule(activeTab = 'billing') {
     });
 
     document.getElementById('btnCatViewAllLedger')?.addEventListener('click', () => {
-      ipViewMode = 'all';
-      renderIpAllLedgerTable();
+      activeBillingPatient = null;
+      activeIpRecord = null;
+      renderIpCategoryView();
     });
 
     const recordsArea = document.getElementById('ipPatientRecordsArea');
@@ -13174,219 +13401,333 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  async function renderIpAllLedgerTable(isPrompt = false) {
-    const mount = document.getElementById('ipCategoryMainContent');
-    if (!mount) return;
-
-    mount.innerHTML = `
-      ${isPrompt ? `
-        <div style="padding:0.75rem 1rem; background:#f8fafc; border:1px dashed var(--cv-border); border-radius:6px; margin-bottom:1rem; font-size:0.84rem; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.5rem;">
-          <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Search and select a patient above to automatically retrieve their IP billing details, or review the complete hospital IP ledger below:
-        </div>
-      ` : ''}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-        <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">All Hospital Inpatient Records</div>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="ipFilterSearch" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Filter rows...">
-          <select id="ipFilterStatus" class="cv-form-select" style="height:34px; font-size:0.82rem; width:130px;">
-            <option value="">All Statuses</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="UNPAID">Unpaid</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="cv-bill-table-wrapper">
-        <table class="cv-bill-table" id="ipBillingTable">
-          <thead>
-            <tr>
-              <th>Bill / IP ID</th>
-              <th>Admission Date</th>
-              <th>Patient Name</th>
-              <th>UHID &amp; OP ID</th>
-              <th>Doctor &amp; Dept</th>
-              <th>Room &amp; Bed</th>
-              <th style="text-align:right;">Room Chg</th>
-              <th style="text-align:right;">Bed Chg</th>
-              <th style="text-align:right;">IP Services</th>
-              <th style="text-align:right;">Total Chg</th>
-              <th style="text-align:right;">Paid / Dep</th>
-              <th style="text-align:right;">Balance</th>
-              <th>Method</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="ipBillingTableBody">
-            <tr><td colspan="15" style="text-align:center; padding:1.5rem;"><div class="cv-spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    try {
-      const res = await Api.get('/api/billing/ip/history');
-      const ips = (res && res.success) ? res.data : [];
-      const filterInput = document.getElementById('ipFilterSearch');
-      const filterStatus = document.getElementById('ipFilterStatus');
-      const tableBody = document.getElementById('ipBillingTableBody');
-
-      function filterIpRows() {
-        const q = filterInput?.value.toLowerCase().trim() || '';
-        const st = filterStatus?.value.toUpperCase().trim() || '';
-        const filtered = ips.filter(ip => {
-          const matchQ = !q ||
-            (ip.ipId && ip.ipId.toLowerCase().includes(q)) ||
-            (ip.patient?.fullName && ip.patient.fullName.toLowerCase().includes(q)) ||
-            (ip.patient?.uhid && ip.patient.uhid.toLowerCase().includes(q)) ||
-            (ip.doctorName && ip.doctorName.toLowerCase().includes(q)) ||
-            (ip.roomNumber && ip.roomNumber.toLowerCase().includes(q)) ||
-            (ip.bedNumber && ip.bedNumber.toLowerCase().includes(q));
-          const matchSt = !st || (ip.paymentStatus && ip.paymentStatus.toUpperCase() === st);
-          return matchQ && matchSt;
-        });
-        if (tableBody) tableBody.innerHTML = renderIpBillingRows(filtered);
-      }
-
-      filterInput?.addEventListener('input', filterIpRows);
-      filterStatus?.addEventListener('change', filterIpRows);
-      filterIpRows();
-
-    } catch (e) {
-      const tb = document.getElementById('ipBillingTableBody');
-      if (tb) tb.innerHTML = '<tr><td colspan="15" style="text-align:center; color:var(--cv-danger); padding:1rem;">Failed to load IP history from MySQL.</td></tr>';
+  function renderIpHistoryTableBodyHtml(records) {
+    if (!records || records.length === 0) {
+      return `
+        <tr>
+          <td colspan="11" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
+            No inpatient billing records found.
+          </td>
+        </tr>
+      `;
     }
-  }
-
-  function renderIpBillingRows(ips) {
-    if (!ips || ips.length === 0) {
-      return '<tr><td colspan="15" style="text-align:center; padding:1.75rem; color:var(--cv-text-muted);">No IP billing records found in MySQL.</td></tr>';
-    }
-    return ips.map(ip => {
+    return records.map(ip => {
       const roomChg = ip.roomPrice || 0;
       const bedChg = ip.bedPrice || 0;
       const baseChg = roomChg + bedChg;
       const totalChg = (ip.totalCharges && ip.totalCharges > 0) ? ip.totalCharges : baseChg;
-      const ipServices = Math.max(0, totalChg - baseChg);
       const isPaid = (ip.paymentStatus || 'PAID').toUpperCase() === 'PAID';
       const paidAmt = isPaid ? totalChg : (ip.paidAmount != null ? ip.paidAmount : (ip.depositAmount || 0));
       const balAmt = ip.balanceAmount != null ? ip.balanceAmount : Math.max(0, totalChg - paidAmt);
+      let statusBadgeClass = 'cv-badge-unpaid';
+      if (isPaid) statusBadgeClass = 'cv-badge-paid';
+      else if (paidAmt > 0) statusBadgeClass = 'cv-badge-part';
+
+      const roomDisplay = ip.room?.roomNumber || ip.roomNumber || '—';
+      const wardDisplay = ip.room?.roomType || ip.wardName || 'Ward';
+      const bedDisplay = ip.bed?.bedNumber || ip.bedNumber || '—';
 
       return `
         <tr>
-          <td><strong>${escapeHtml(ip.ipId)}</strong></td>
-          <td>${escapeHtml(ip.admissionDate || '')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(ip.admissionTime || '')}</span></td>
-          <td><strong>${escapeHtml(ip.patient?.fullName || 'Patient')}</strong></td>
-          <td><span style="font-family:monospace; font-size:0.8rem;">${escapeHtml(ip.patient?.uhid || '—')}</span><br><span style="font-size:0.72rem; color:var(--cv-text-muted);">OP: ${escapeHtml(ip.opId || '—')}</span></td>
-          <td>${escapeHtml(ip.doctorName || 'Attending')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(ip.department || 'General')}</span></td>
-          <td>${escapeHtml(ip.roomNumber ? 'Room ' + ip.roomNumber : ip.wardName || 'General Ward')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">Bed: ${escapeHtml(ip.bedNumber || '—')}</span></td>
-          <td style="text-align:right;">₹${formatCurrency(roomChg)}</td>
-          <td style="text-align:right;">₹${formatCurrency(bedChg)}</td>
-          <td style="text-align:right;">₹${formatCurrency(ipServices)}</td>
-          <td style="text-align:right; font-weight:700;">₹${formatCurrency(totalChg)}</td>
-          <td style="text-align:right; color:#059669; font-weight:600;">₹${formatCurrency(paidAmt)}</td>
-          <td style="text-align:right; color:${balAmt > 0 ? 'var(--cv-danger)' : '#059669'}; font-weight:700;">₹${formatCurrency(balAmt)}</td>
-          <td><span class="cv-badge-unpaid" style="background:#f1f5f9; color:#475569; padding:0.15rem 0.4rem; font-size:0.75rem;">${escapeHtml(ip.paymentMethod || 'CASH')}</span></td>
           <td>
-            <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : (paidAmt > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">
-              ${escapeHtml(ip.paymentStatus || 'PAID')}
-            </span>
+            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(ip.ipId || '—')}</strong>
+            ${ip.invoiceNumber ? `<div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(ip.invoiceNumber)}</div>` : ''}
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-muted);">
+            <div>${escapeHtml(ip.admissionDate || '')}</div>
+            <div style="font-size:0.72rem;">${escapeHtml(ip.admissionTime || '')}</div>
           </td>
           <td>
-            <div style="display:flex; gap:0.3rem;">
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.selectPatientForIpCategory(${ip.patient?.id})">Auto-Fill</button>
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.showGenericRecordDetailsModal('IP Admission Bill: ' + '${escapeHtml(ip.ipId)}', ${JSON.stringify(ip).replace(/"/g, '&quot;')})">View</button>
+            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(ip.patient?.fullName || 'Patient')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+              UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(ip.patient?.uhid || '—')}</span>
+              ${ip.opId ? `&bull; OP: ${escapeHtml(ip.opId)}` : ''}
             </div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div>${escapeHtml(ip.doctorName || 'Attending')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(ip.department || 'Inpatient')}</div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div><strong>Room ${escapeHtml(roomDisplay)}</strong> <span style="font-size:0.72rem; color:var(--cv-text-muted);">(${escapeHtml(wardDisplay)})</span></div>
+            <div style="font-size:0.75rem; color:var(--cv-primary); font-weight:600;">Bed ${escapeHtml(bedDisplay)}</div>
+          </td>
+          <td style="font-size:0.78rem;">
+            <div>Room: ₹${formatCurrency(roomChg)}</div>
+            <div style="color:var(--cv-text-muted);">Bed: ₹${formatCurrency(bedChg)}</div>
+          </td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">
+            ₹${formatCurrency(totalChg)}
+          </td>
+          <td style="text-align:right; font-weight:600; color:var(--cv-success);">
+            ₹${formatCurrency(paidAmt)}
+          </td>
+          <td style="text-align:right; font-weight:700; color:${balAmt > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">
+            ₹${formatCurrency(balAmt)}
+          </td>
+          <td style="text-align:center;">
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">
+              ${escapeHtml(ip.paymentStatus || (balAmt <= 0 ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID')))}
+            </span>
+          </td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="cv-btn-secondary btn-ip-invoice" data-ip-id="${ip.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              Invoice
+            </button>
+            <button type="button" class="cv-btn-secondary btn-ip-payments" data-ip-id="${ip.id}" data-ip-no="${escapeHtml(ip.ipId || '')}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
+              Payments
+            </button>
+            <button type="button" class="cv-btn-secondary btn-ip-print" data-ip-id="${ip.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; margin-left:0.3rem;">
+              Print Bill
+            </button>
           </td>
         </tr>
       `;
     }).join('');
   }
 
+  function wireIpHistoryActionButtons() {
+    document.querySelectorAll('.btn-ip-invoice').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-ip-id'));
+        const record = ipAllHistoryRecords.find(x => x.id === id);
+        if (record) {
+          if (typeof showIpDetailsModal === 'function') {
+            showIpDetailsModal(record.id);
+          } else {
+            showGenericRecordDetailsModal('IP Admission Bill: ' + (record.ipId || id), record);
+          }
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-ip-payments').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-ip-id');
+        const no = e.currentTarget.getAttribute('data-ip-no');
+        showBillPaymentsModal('IP', id, no);
+      });
+    });
+
+    document.querySelectorAll('.btn-ip-print').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-ip-id'));
+        const record = ipAllHistoryRecords.find(x => x.id === id);
+        if (record) {
+          printDedicatedDocument(buildIpBillPrintHtml(record.patient, record));
+        }
+      });
+    });
+  }
+
   // ----------------------------------------------------------
-  // 3. PHARMACY BILLING — AUTO RETRIEVAL & LEDGER
+  // 3. PHARMACY BILLING — STANDARDIZED REFERENCE PATTERN & AUTO RETRIEVAL
   // ----------------------------------------------------------
-  let phViewMode = 'auto';
+  let cbPhBillingPagination = null;
+  let phAllBillingRecords = [];
+
   async function renderPharmacyCategoryView() {
     const mount = document.getElementById('billingCategoryViewMount');
     if (!mount) return;
 
-    mount.innerHTML = `
-      <div class="cv-pharmacy-card">
-        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
-          <div class="cv-pharmacy-card-title">
-            <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-            Pharmacy Billing &bull; Dispensed Medicines &amp; Taxes Auto-Retrieval
+    if (activeBillingPatient) {
+      mount.innerHTML = `
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              Pharmacy Billing &bull; Patient Settlement View
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnBackToPhHistory" style="padding:0.4rem 0.85rem; font-size:0.82rem;">
+                &larr; Back to Complete Pharmacy Billing
+              </button>
+            </div>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button type="button" class="cv-btn-secondary ${phViewMode === 'all' ? 'active' : ''}" id="btnTogglePhAllLedger" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
-              ${phViewMode === 'all' ? 'Back to Patient Search' : 'View Complete Pharmacy Ledger'}
+          <div id="phCategoryMainContent"></div>
+        </div>
+      `;
+      document.getElementById('btnBackToPhHistory')?.addEventListener('click', () => {
+        activeBillingPatient = null;
+        activePhRecord = null;
+        renderPharmacyCategoryView();
+      });
+      loadAndRenderPatientPhBilling(activeBillingPatient);
+      return;
+    }
+
+    if (!cbPhBillingPagination) {
+      cbPhBillingPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          const tbody = document.getElementById('phBillingTableBody');
+          if (tbody) tbody.innerHTML = renderPharmacyBillingTableBodyHtml(pagedItems);
+          wirePharmacyBillingActionButtons();
+          const pMount = document.getElementById('phBillingPaginationMount');
+          if (pMount) {
+            pMount.innerHTML = cbPhBillingPagination.renderControlsHtml('cbPhBilling');
+            cbPhBillingPagination.bindEvents('cbPhBilling');
+          }
+        }
+      });
+    }
+
+    mount.innerHTML = `
+      <div class="cv-pharmacy-card cv-pharmacy-history-card">
+        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              Pharmacy Billing &amp; Dispensary Sales
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Search pharmacy bills, inspect dispensed medication batches, collect balances, and print invoices.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:320px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="phBillingSearchInput" placeholder="Search by Patient, UHID, OP/IP ID, Bill No..." autocomplete="off">
+            </div>
+            <select id="phBillingStatusFilter" class="cv-form-select" style="height:38px; width:125px; font-size:0.82rem;">
+              <option value="">All Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIALLY PAID">Partially Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+            <button type="button" class="cv-btn-secondary" id="btnRefreshPhBilling" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+            <button type="button" class="cv-btn-secondary" id="btnTogglePhPatientLookup" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              Patient Settle
             </button>
           </div>
         </div>
 
-        <!-- Search Bar Area + Date Period Filter -->
-        <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
-          <div style="position:relative; flex:1; min-width:280px;">
+        <!-- Collapsible Patient Lookup Bar -->
+        <div id="phPatientLookupBar" style="display:none; padding:0.85rem 1rem; background:#f8fafc; border-bottom:1px solid var(--cv-border);">
+          <div style="position:relative; max-width:540px;">
             <svg style="position:absolute; left:12px; top:11px; width:18px; height:18px; color:var(--cv-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input type="text" id="phPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, IP ID, or Phone..." autocomplete="off">
             <div id="phPatientDropdown" class="cv-patient-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--cv-border); border-radius:var(--cv-radius-md); box-shadow:var(--cv-shadow-lg); z-index:50; max-height:260px; overflow-y:auto;"></div>
           </div>
-          <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
-            <label style="font-size:0.8rem; font-weight:700; color:var(--cv-text-muted);">Date:</label>
-            <select id="phDatePeriodFilter" class="cv-form-input" style="height:40px; width:auto; font-size:0.84rem; font-weight:600;">
-              <option value="ALL" ${cbDatePeriodFilter === 'ALL' ? 'selected' : ''}>All Time</option>
-              <option value="TODAY" ${cbDatePeriodFilter === 'TODAY' ? 'selected' : ''}>Today</option>
-              <option value="WEEK" ${cbDatePeriodFilter === 'WEEK' ? 'selected' : ''}>This Week</option>
-              <option value="MONTH" ${cbDatePeriodFilter === 'MONTH' ? 'selected' : ''}>This Month</option>
-              <option value="YEAR" ${cbDatePeriodFilter === 'YEAR' ? 'selected' : ''}>This Year</option>
-            </select>
-          </div>
         </div>
 
-        <div id="phCategoryMainContent"></div>
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table" id="phBillingTable">
+            <thead>
+              <tr>
+                <th>Bill Number</th>
+                <th>Date &amp; Time</th>
+                <th>Patient Details</th>
+                <th>Doctor / Dept</th>
+                <th>Medicines</th>
+                <th style="text-align:right;">Total (₹)</th>
+                <th style="text-align:right;">Paid (₹)</th>
+                <th style="text-align:right;">Balance (₹)</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="phBillingTableBody">
+              <tr><td colspan="10" style="text-align:center; padding:2rem;"><div class="cv-spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="phBillingPaginationMount"></div>
       </div>
     `;
 
-    setupPatientSearchWidget('phPatientSearchInput', 'phPatientDropdown', (patient) => {
-      activeBillingPatient = patient;
-      phViewMode = 'auto';
-      activePhRecord = null;
-      loadAndRenderPatientPhBilling(patient);
-    });
-
-    document.getElementById('phDatePeriodFilter')?.addEventListener('change', (e) => {
-      cbDatePeriodFilter = e.target.value;
-      if (activeBillingPatient) {
-        activePhRecord = null;
-        loadAndRenderPatientPhBilling(activeBillingPatient);
-      } else if (phViewMode === 'all') {
-        renderPharmacyAllLedgerTable();
-      }
-    });
-
-    document.getElementById('btnTogglePhAllLedger')?.addEventListener('click', () => {
-      phViewMode = (phViewMode === 'all') ? 'auto' : 'all';
-      if (phViewMode === 'all') {
-        renderPharmacyAllLedgerTable();
-      } else {
-        if (activeBillingPatient) {
-          loadAndRenderPatientPhBilling(activeBillingPatient);
-        } else {
-          renderPharmacyCategoryView();
+    document.getElementById('btnTogglePhPatientLookup')?.addEventListener('click', () => {
+      const bar = document.getElementById('phPatientLookupBar');
+      if (bar) {
+        bar.style.display = (bar.style.display === 'none') ? 'block' : 'none';
+        if (bar.style.display === 'block') {
+          document.getElementById('phPatientSearchInput')?.focus();
         }
       }
     });
 
-    if (phViewMode === 'all') {
-      renderPharmacyAllLedgerTable();
-    } else if (activeBillingPatient) {
-      loadAndRenderPatientPhBilling(activeBillingPatient);
-    } else {
-      renderPharmacyAllLedgerTable(true);
+    setupPatientSearchWidget('phPatientSearchInput', 'phPatientDropdown', (patient) => {
+      activeBillingPatient = patient;
+      activePhRecord = null;
+      renderPharmacyCategoryView();
+    });
+
+    function updatePhBillingView(preservePage = false) {
+      const q = (document.getElementById('phBillingSearchInput')?.value || '').toLowerCase().trim();
+      const st = (document.getElementById('phBillingStatusFilter')?.value || '').toUpperCase().trim();
+      let filtered = phAllBillingRecords;
+      if (q || st) {
+        filtered = filtered.filter(b => {
+          const matchQ = !q ||
+            (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
+            (b.invoiceNumber && b.invoiceNumber.toLowerCase().includes(q)) ||
+            (b.patientName && b.patientName.toLowerCase().includes(q)) ||
+            (b.patient?.fullName && b.patient.fullName.toLowerCase().includes(q)) ||
+            (b.uhid && b.uhid.toLowerCase().includes(q)) ||
+            (b.opId && b.opId.toLowerCase().includes(q)) ||
+            (b.ipId && b.ipId.toLowerCase().includes(q)) ||
+            (b.doctorName && b.doctorName.toLowerCase().includes(q));
+          const statusVal = (b.paymentStatus || 'PAID').toUpperCase();
+          const matchSt = !st || statusVal === st || (st === 'PARTIALLY PAID' && statusVal === 'PARTIALLY_PAID');
+          return matchQ && matchSt;
+        });
+      }
+      const paged = cbPhBillingPagination.setItems(filtered, preservePage);
+      const tbody = document.getElementById('phBillingTableBody');
+      if (tbody) tbody.innerHTML = renderPharmacyBillingTableBodyHtml(paged);
+      wirePharmacyBillingActionButtons();
+      const pMount = document.getElementById('phBillingPaginationMount');
+      if (pMount) {
+        pMount.innerHTML = cbPhBillingPagination.renderControlsHtml('cbPhBilling');
+        cbPhBillingPagination.bindEvents('cbPhBilling');
+      }
     }
+
+    document.getElementById('phBillingSearchInput')?.addEventListener('input', () => updatePhBillingView(false));
+    document.getElementById('phBillingStatusFilter')?.addEventListener('change', () => updatePhBillingView(false));
+
+    document.getElementById('btnRefreshPhBilling')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshPhBilling');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        const res = await Api.get('/api/billing/pharmacy/history');
+        if (res && res.success && Array.isArray(res.data)) {
+          phAllBillingRecords = res.data;
+        }
+        await loadBillingSummaryData();
+        updateBillingKpiValues();
+        updatePhBillingView(true);
+      } catch (e) {
+        console.error('Error refreshing Pharmacy billing history:', e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
+        }
+      }
+    });
+
+    try {
+      const res = await Api.get('/api/billing/pharmacy/history');
+      phAllBillingRecords = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+    } catch (e) {
+      console.error('Failed to load Pharmacy history from MySQL:', e);
+      phAllBillingRecords = [];
+    }
+
+    updatePhBillingView(false);
   }
 
   async function loadAndRenderPatientPhBilling(patient) {
@@ -13414,8 +13755,9 @@ function renderPharmacyModule(activeTab = 'billing') {
     });
 
     document.getElementById('btnCatViewAllLedger')?.addEventListener('click', () => {
-      phViewMode = 'all';
-      renderPharmacyAllLedgerTable();
+      activeBillingPatient = null;
+      activePhRecord = null;
+      renderPharmacyCategoryView();
     });
 
     const recordsArea = document.getElementById('phPatientRecordsArea');
@@ -13739,214 +14081,336 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  async function renderPharmacyAllLedgerTable(isPrompt = false) {
-    const mount = document.getElementById('phCategoryMainContent');
-    if (!mount) return;
-
-    mount.innerHTML = `
-      ${isPrompt ? `
-        <div style="padding:0.75rem 1rem; background:#f8fafc; border:1px dashed var(--cv-border); border-radius:6px; margin-bottom:1rem; font-size:0.84rem; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.5rem;">
-          <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Search and select a patient above to automatically retrieve their Pharmacy sales records, or review the complete hospital Pharmacy ledger below:
-        </div>
-      ` : ''}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-        <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">All Hospital Pharmacy Bills</div>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="phFilterSearch" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Filter rows...">
-          <select id="phFilterStatus" class="cv-form-select" style="height:34px; font-size:0.82rem; width:130px;">
-            <option value="">All Statuses</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="UNPAID">Unpaid</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="cv-bill-table-wrapper">
-        <table class="cv-bill-table" id="phBillingTable">
-          <thead>
-            <tr>
-              <th>Bill Number</th>
-              <th>Date &amp; Time</th>
-              <th>Patient Name</th>
-              <th>UHID</th>
-              <th>OP / IP ID</th>
-              <th>Medicines Dispensed</th>
-              <th style="text-align:right;">Subtotal</th>
-              <th style="text-align:right;">Discount</th>
-              <th style="text-align:right;">GST</th>
-              <th style="text-align:right;">Total</th>
-              <th style="text-align:right;">Paid</th>
-              <th style="text-align:right;">Balance</th>
-              <th>Method</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="phBillingTableBody">
-            <tr><td colspan="15" style="text-align:center; padding:1.5rem;"><div class="cv-spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    try {
-      const res = await Api.get('/api/billing/pharmacy/history');
-      const bills = (res && res.success) ? res.data : [];
-      const filterInput = document.getElementById('phFilterSearch');
-      const filterStatus = document.getElementById('phFilterStatus');
-      const tableBody = document.getElementById('phBillingTableBody');
-
-      function filterPhRows() {
-        const q = filterInput?.value.toLowerCase().trim() || '';
-        const st = filterStatus?.value.toUpperCase().trim() || '';
-        const filtered = bills.filter(b => {
-          const matchQ = !q ||
-            (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
-            (b.patientName && b.patientName.toLowerCase().includes(q)) ||
-            (b.uhid && b.uhid.toLowerCase().includes(q)) ||
-            (b.opId && b.opId.toLowerCase().includes(q)) ||
-            (b.ipId && b.ipId.toLowerCase().includes(q));
-          const matchSt = !st || (b.paymentStatus && b.paymentStatus.toUpperCase() === st);
-          return matchQ && matchSt;
-        });
-        if (tableBody) tableBody.innerHTML = renderPharmacyBillingRows(filtered);
-      }
-
-      filterInput?.addEventListener('input', filterPhRows);
-      filterStatus?.addEventListener('change', filterPhRows);
-      filterPhRows();
-
-    } catch (e) {
-      const tb = document.getElementById('phBillingTableBody');
-      if (tb) tb.innerHTML = '<tr><td colspan="15" style="text-align:center; color:var(--cv-danger); padding:1rem;">Failed to load Pharmacy history from MySQL.</td></tr>';
+  function renderPharmacyBillingTableBodyHtml(records) {
+    if (!records || records.length === 0) {
+      return `
+        <tr>
+          <td colspan="10" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
+            No pharmacy billing records found.
+          </td>
+        </tr>
+      `;
     }
-  }
-
-  function renderPharmacyBillingRows(bills) {
-    if (!bills || bills.length === 0) {
-      return '<tr><td colspan="15" style="text-align:center; padding:1.75rem; color:var(--cv-text-muted);">No Pharmacy bills found in MySQL.</td></tr>';
-    }
-    return bills.map(b => {
+    return records.map(b => {
       const isPaid = (b.paymentStatus || 'PAID').toUpperCase() === 'PAID';
+      const totalAmt = b.totalAmount != null ? b.totalAmount : 0;
+      const paidAmt = b.paidAmount != null ? b.paidAmount : (isPaid ? totalAmt : 0);
+      const balAmt = b.balanceAmount != null ? b.balanceAmount : Math.max(0, totalAmt - paidAmt);
+      let statusBadgeClass = 'cv-badge-unpaid';
+      if (isPaid || balAmt <= 0) statusBadgeClass = 'cv-badge-paid';
+      else if (paidAmt > 0) statusBadgeClass = 'cv-badge-part';
+
       const medSummary = b.items && b.items.length > 0
-        ? b.items.length + ' items (' + b.items.map(it => it.medicineName || '').filter(s => s).slice(0, 2).join(', ') + (b.items.length > 2 ? '...' : '') + ')'
+        ? b.items.length + ' item' + (b.items.length > 1 ? 's' : '') + ' (' + b.items.map(it => it.medicineName || '').filter(Boolean).slice(0, 2).join(', ') + (b.items.length > 2 ? '...' : '') + ')'
         : 'Medicines Dispensed';
+
+      const patientName = b.patientName || b.patient?.fullName || 'Walk-in';
+      const uhid = b.uhid || b.patient?.uhid || '—';
+      const phone = b.patient?.phone || '';
+      const doctor = b.doctorName || b.prescribedBy || 'Consultant';
+      const dept = b.department || 'Pharmacy';
 
       return `
         <tr>
-          <td><strong>${escapeHtml(b.billNumber)}</strong></td>
-          <td>${escapeHtml(b.billDate || '')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(b.billTime || '')}</span></td>
-          <td><strong>${escapeHtml(b.patientName || b.patient?.fullName || 'Walk-in')}</strong></td>
-          <td><span style="font-family:monospace; font-size:0.8rem;">${escapeHtml(b.uhid || '—')}</span></td>
-          <td>${escapeHtml(b.opId || b.ipId || '—')}</td>
-          <td>${escapeHtml(medSummary)}</td>
-          <td style="text-align:right;">₹${formatCurrency(b.subtotal)}</td>
-          <td style="text-align:right; color:var(--cv-danger);">- ₹${formatCurrency(b.discountAmount)}</td>
-          <td style="text-align:right; color:#0369a1;">+ ₹${formatCurrency(b.gstAmount)}</td>
-          <td style="text-align:right; font-weight:700;">₹${formatCurrency(b.totalAmount)}</td>
-          <td style="text-align:right; color:#059669; font-weight:600;">₹${formatCurrency(b.paidAmount)}</td>
-          <td style="text-align:right; color:${(b.balanceAmount || 0) > 0 ? 'var(--cv-danger)' : '#059669'}; font-weight:700;">₹${formatCurrency(b.balanceAmount)}</td>
-          <td><span class="cv-badge-unpaid" style="background:#f1f5f9; color:#475569; padding:0.15rem 0.4rem; font-size:0.75rem;">${escapeHtml(b.paymentMethod || 'CASH')}</span></td>
           <td>
-            <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : ((b.paidAmount || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">
-              ${escapeHtml(b.paymentStatus || 'PAID')}
-            </span>
+            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber || '—')}</strong>
+            ${b.invoiceNumber ? `<div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(b.invoiceNumber)}</div>` : ''}
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-muted);">
+            <div>${escapeHtml(b.billDate || '')}</div>
+            <div style="font-size:0.72rem;">${escapeHtml(b.billTime || '')}</div>
           </td>
           <td>
-            <div style="display:flex; gap:0.3rem;">
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.selectPatientForPhCategory(${b.patient?.id})">Auto-Fill</button>
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.showPharmacyInvoiceModal(${b.id})">Invoice</button>
+            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(patientName)}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+              UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(uhid)}</span>
+              ${b.opId || b.ipId ? `&bull; ${escapeHtml(b.opId || b.ipId)}` : ''}
+              ${phone ? `&bull; Ph: ${escapeHtml(phone)}` : ''}
             </div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div>${escapeHtml(doctor)}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(dept)}</div>
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-main);">
+            <div>${escapeHtml(medSummary)}</div>
+            ${b.items && b.items.length > 0 ? `<div style="font-size:0.72rem; color:var(--cv-text-muted);">${b.items.length} prescribed batch${b.items.length > 1 ? 'es' : ''}</div>` : ''}
+          </td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">
+            ₹${formatCurrency(totalAmt)}
+          </td>
+          <td style="text-align:right; font-weight:600; color:var(--cv-success);">
+            ₹${formatCurrency(paidAmt)}
+          </td>
+          <td style="text-align:right; font-weight:700; color:${balAmt > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">
+            ₹${formatCurrency(balAmt)}
+          </td>
+          <td style="text-align:center;">
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">
+              ${escapeHtml(b.paymentStatus || (balAmt <= 0 ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID')))}
+            </span>
+          </td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="cv-btn-secondary btn-ph-invoice" data-ph-id="${b.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              Invoice
+            </button>
+            <button type="button" class="cv-btn-secondary btn-ph-payments" data-ph-id="${b.id}" data-ph-no="${escapeHtml(b.billNumber || b.invoiceNumber || '')}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
+              Payments
+            </button>
+            <button type="button" class="cv-btn-secondary btn-ph-print" data-ph-id="${b.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; margin-left:0.3rem;">
+              Print Bill
+            </button>
           </td>
         </tr>
       `;
     }).join('');
   }
 
+  function wirePharmacyBillingActionButtons() {
+    document.querySelectorAll('.btn-ph-invoice').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-ph-id'));
+        if (typeof showPharmacyInvoiceModal === 'function') {
+          showPharmacyInvoiceModal(id);
+        } else {
+          const record = phAllBillingRecords.find(x => x.id === id);
+          if (record) showGenericRecordDetailsModal('Pharmacy Bill: ' + (record.billNumber || id), record);
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-ph-payments').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-ph-id');
+        const no = e.currentTarget.getAttribute('data-ph-no');
+        showBillPaymentsModal('PHARMACY', id, no);
+      });
+    });
+
+    document.querySelectorAll('.btn-ph-print').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-ph-id'));
+        const record = phAllBillingRecords.find(x => x.id === id);
+        if (record) {
+          if (typeof buildPharmacyBillPrintHtml === 'function') {
+            printDedicatedDocument(buildPharmacyBillPrintHtml(record.patient, record));
+          } else {
+            printDedicatedDocument(buildGenericBillingPrintHtml(record, 'Pharmacy Billing Receipt'));
+          }
+        }
+      });
+    });
+  }
+
   // ----------------------------------------------------------
-  // 4. LABORATORY BILLING — AUTO RETRIEVAL & LEDGER
+  // 4. LABORATORY BILLING — STANDARDIZED REFERENCE PATTERN & AUTO RETRIEVAL
   // ----------------------------------------------------------
-  let labViewMode = 'auto';
+  let cbLabBillingPagination = null;
+  let labAllBillingRecords = [];
+
   async function renderLaboratoryCategoryView() {
     const mount = document.getElementById('billingCategoryViewMount');
     if (!mount) return;
 
-    mount.innerHTML = `
-      <div class="cv-pharmacy-card">
-        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
-          <div class="cv-pharmacy-card-title">
-            <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-            Laboratory Billing &bull; Diagnostic Orders &amp; Tests Auto-Retrieval
+    if (activeBillingPatient) {
+      mount.innerHTML = `
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+              Laboratory Billing &bull; Patient Settlement View
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnBackToLabHistory" style="padding:0.4rem 0.85rem; font-size:0.82rem;">
+                &larr; Back to Complete Laboratory Billing
+              </button>
+            </div>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button type="button" class="cv-btn-secondary ${labViewMode === 'all' ? 'active' : ''}" id="btnToggleLabAllLedger" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
-              ${labViewMode === 'all' ? 'Back to Patient Search' : 'View Complete Lab Ledger'}
+          <div id="labCategoryMainContent"></div>
+        </div>
+      `;
+      document.getElementById('btnBackToLabHistory')?.addEventListener('click', () => {
+        activeBillingPatient = null;
+        activeLabRecord = null;
+        renderLaboratoryCategoryView();
+      });
+      loadAndRenderPatientLabBilling(activeBillingPatient);
+      return;
+    }
+
+    if (!cbLabBillingPagination) {
+      cbLabBillingPagination = createHistoryPaginationController({
+        defaultPageSize: 10,
+        onPageChange: (pagedItems) => {
+          const tbody = document.getElementById('labBillingTableBody');
+          if (tbody) tbody.innerHTML = renderLaboratoryBillingTableBodyHtml(pagedItems);
+          wireLaboratoryBillingActionButtons();
+          const pMount = document.getElementById('labBillingPaginationMount');
+          if (pMount) {
+            pMount.innerHTML = cbLabBillingPagination.renderControlsHtml('cbLabBilling');
+            cbLabBillingPagination.bindEvents('cbLabBilling');
+          }
+        }
+      });
+    }
+
+    mount.innerHTML = `
+      <div class="cv-pharmacy-card cv-pharmacy-history-card">
+        <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+              </svg>
+              Laboratory Billing &amp; Diagnostic Ledger
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Search diagnostic orders, audit investigations, collect test payments, and print invoices.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:320px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="labBillingSearchInput" placeholder="Search by Patient, UHID, Order ID, Test..." autocomplete="off">
+            </div>
+            <select id="labBillingStatusFilter" class="cv-form-select" style="height:38px; width:125px; font-size:0.82rem;">
+              <option value="">All Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIALLY PAID">Partially Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+            <button type="button" class="cv-btn-secondary" id="btnRefreshLabBilling" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+            <button type="button" class="cv-btn-secondary" id="btnToggleLabPatientLookup" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              Patient Settle
             </button>
           </div>
         </div>
 
-        <!-- Search Bar Area + Date Period Filter -->
-        <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
-          <div style="position:relative; flex:1; min-width:280px;">
+        <!-- Collapsible Patient Lookup Bar -->
+        <div id="labPatientLookupBar" style="display:none; padding:0.85rem 1rem; background:#f8fafc; border-bottom:1px solid var(--cv-border);">
+          <div style="position:relative; max-width:540px;">
             <svg style="position:absolute; left:12px; top:11px; width:18px; height:18px; color:var(--cv-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="labPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, IP ID, Phone, or Lab Order ID..." autocomplete="off">
+            <input type="text" id="labPatientSearchInput" class="cv-form-input" style="padding-left:2.5rem; height:40px; font-size:0.88rem;" placeholder="Search patient by Name, UHID, OP ID, IP ID, or Phone..." autocomplete="off">
             <div id="labPatientDropdown" class="cv-patient-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--cv-border); border-radius:var(--cv-radius-md); box-shadow:var(--cv-shadow-lg); z-index:50; max-height:260px; overflow-y:auto;"></div>
-          </div>
-          <div style="display:flex; align-items:center; gap:0.4rem; white-space:nowrap;">
-            <label style="font-size:0.8rem; font-weight:700; color:var(--cv-text-muted);">Date:</label>
-            <select id="labDatePeriodFilter" class="cv-form-input" style="height:40px; width:auto; font-size:0.84rem; font-weight:600;">
-              <option value="ALL" ${cbDatePeriodFilter === 'ALL' ? 'selected' : ''}>All Time</option>
-              <option value="TODAY" ${cbDatePeriodFilter === 'TODAY' ? 'selected' : ''}>Today</option>
-              <option value="WEEK" ${cbDatePeriodFilter === 'WEEK' ? 'selected' : ''}>This Week</option>
-              <option value="MONTH" ${cbDatePeriodFilter === 'MONTH' ? 'selected' : ''}>This Month</option>
-              <option value="YEAR" ${cbDatePeriodFilter === 'YEAR' ? 'selected' : ''}>This Year</option>
-            </select>
           </div>
         </div>
 
-        <div id="labCategoryMainContent"></div>
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table" id="labBillingTable">
+            <thead>
+              <tr>
+                <th>Lab Order ID</th>
+                <th>Date &amp; Time</th>
+                <th>Patient Details</th>
+                <th>Doctor / Dept</th>
+                <th>Tests &amp; Category</th>
+                <th style="text-align:right;">Total (₹)</th>
+                <th style="text-align:right;">Paid (₹)</th>
+                <th style="text-align:right;">Balance (₹)</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="labBillingTableBody">
+              <tr><td colspan="10" style="text-align:center; padding:2rem;"><div class="cv-spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="labBillingPaginationMount"></div>
       </div>
     `;
 
-    setupPatientSearchWidget('labPatientSearchInput', 'labPatientDropdown', (patient) => {
-      activeBillingPatient = patient;
-      labViewMode = 'auto';
-      activeLabRecord = null;
-      loadAndRenderPatientLabBilling(patient);
-    });
-
-    document.getElementById('labDatePeriodFilter')?.addEventListener('change', (e) => {
-      cbDatePeriodFilter = e.target.value;
-      if (activeBillingPatient) {
-        activeLabRecord = null;
-        loadAndRenderPatientLabBilling(activeBillingPatient);
-      } else if (labViewMode === 'all') {
-        renderLaboratoryAllLedgerTable();
-      }
-    });
-
-    document.getElementById('btnToggleLabAllLedger')?.addEventListener('click', () => {
-      labViewMode = (labViewMode === 'all') ? 'auto' : 'all';
-      if (labViewMode === 'all') {
-        renderLaboratoryAllLedgerTable();
-      } else {
-        if (activeBillingPatient) {
-          loadAndRenderPatientLabBilling(activeBillingPatient);
-        } else {
-          renderLaboratoryCategoryView();
+    document.getElementById('btnToggleLabPatientLookup')?.addEventListener('click', () => {
+      const bar = document.getElementById('labPatientLookupBar');
+      if (bar) {
+        bar.style.display = (bar.style.display === 'none') ? 'block' : 'none';
+        if (bar.style.display === 'block') {
+          document.getElementById('labPatientSearchInput')?.focus();
         }
       }
     });
 
-    if (labViewMode === 'all') {
-      renderLaboratoryAllLedgerTable();
-    } else if (activeBillingPatient) {
-      loadAndRenderPatientLabBilling(activeBillingPatient);
-    } else {
-      renderLaboratoryAllLedgerTable(true);
+    setupPatientSearchWidget('labPatientSearchInput', 'labPatientDropdown', (patient) => {
+      activeBillingPatient = patient;
+      activeLabRecord = null;
+      renderLaboratoryCategoryView();
+    });
+
+    function updateLabBillingView(preservePage = false) {
+      const q = (document.getElementById('labBillingSearchInput')?.value || '').toLowerCase().trim();
+      const st = (document.getElementById('labBillingStatusFilter')?.value || '').toUpperCase().trim();
+      let filtered = labAllBillingRecords;
+      if (q || st) {
+        filtered = filtered.filter(l => {
+          const matchQ = !q ||
+            (l.orderNumber && l.orderNumber.toLowerCase().includes(q)) ||
+            (l.invoiceNumber && l.invoiceNumber.toLowerCase().includes(q)) ||
+            (l.patientName && l.patientName.toLowerCase().includes(q)) ||
+            (l.patient?.fullName && l.patient.fullName.toLowerCase().includes(q)) ||
+            (l.uhid && l.uhid.toLowerCase().includes(q)) ||
+            (l.testName && l.testName.toLowerCase().includes(q)) ||
+            (l.opId && l.opId.toLowerCase().includes(q)) ||
+            (l.ipId && l.ipId.toLowerCase().includes(q)) ||
+            (l.doctorName && l.doctorName.toLowerCase().includes(q));
+          const statusVal = (l.paymentStatus || 'PAID').toUpperCase();
+          const matchSt = !st || statusVal === st || (st === 'PARTIALLY PAID' && statusVal === 'PARTIALLY_PAID');
+          return matchQ && matchSt;
+        });
+      }
+      const paged = cbLabBillingPagination.setItems(filtered, preservePage);
+      const tbody = document.getElementById('labBillingTableBody');
+      if (tbody) tbody.innerHTML = renderLaboratoryBillingTableBodyHtml(paged);
+      wireLaboratoryBillingActionButtons();
+      const pMount = document.getElementById('labBillingPaginationMount');
+      if (pMount) {
+        pMount.innerHTML = cbLabBillingPagination.renderControlsHtml('cbLabBilling');
+        cbLabBillingPagination.bindEvents('cbLabBilling');
+      }
     }
+
+    document.getElementById('labBillingSearchInput')?.addEventListener('input', () => updateLabBillingView(false));
+    document.getElementById('labBillingStatusFilter')?.addEventListener('change', () => updateLabBillingView(false));
+
+    document.getElementById('btnRefreshLabBilling')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnRefreshLabBilling');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
+      }
+      try {
+        const res = await Api.get('/api/billing/laboratory/history');
+        if (res && res.success && Array.isArray(res.data)) {
+          labAllBillingRecords = res.data;
+        }
+        await loadBillingSummaryData();
+        updateBillingKpiValues();
+        updateLabBillingView(true);
+      } catch (e) {
+        console.error('Error refreshing Laboratory billing history:', e);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
+        }
+      }
+    });
+
+    try {
+      const res = await Api.get('/api/billing/laboratory/history');
+      labAllBillingRecords = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+    } catch (e) {
+      console.error('Failed to load Laboratory history from MySQL:', e);
+      labAllBillingRecords = [];
+    }
+
+    updateLabBillingView(false);
   }
 
   async function loadAndRenderPatientLabBilling(patient) {
@@ -13974,8 +14438,9 @@ function renderPharmacyModule(activeTab = 'billing') {
     });
 
     document.getElementById('btnCatViewAllLedger')?.addEventListener('click', () => {
-      labViewMode = 'all';
-      renderLaboratoryAllLedgerTable();
+      activeBillingPatient = null;
+      activeLabRecord = null;
+      renderLaboratoryCategoryView();
     });
 
     const recordsArea = document.getElementById('labPatientRecordsArea');
@@ -14023,8 +14488,9 @@ function renderPharmacyModule(activeTab = 'billing') {
             renderLaboratoryCategoryView();
           });
           document.getElementById('btnCatViewAllLedger')?.addEventListener('click', () => {
-            labViewMode = 'all';
-            renderLaboratoryAllLedgerTable();
+            activeBillingPatient = null;
+            activeLabRecord = null;
+            renderLaboratoryCategoryView();
           });
         }
       }
@@ -14289,132 +14755,123 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  async function renderLaboratoryAllLedgerTable(isPrompt = false) {
-    const mount = document.getElementById('labCategoryMainContent');
-    if (!mount) return;
-
-    mount.innerHTML = `
-      ${isPrompt ? `
-        <div style="padding:0.75rem 1rem; background:#f8fafc; border:1px dashed var(--cv-border); border-radius:6px; margin-bottom:1rem; font-size:0.84rem; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.5rem;">
-          <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Search and select a patient above to automatically retrieve their Laboratory billing details, or review the complete hospital Laboratory ledger below:
-        </div>
-      ` : ''}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-        <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">All Hospital Diagnostic Orders</div>
-        <div style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="labFilterSearch" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Filter rows...">
-          <select id="labFilterStatus" class="cv-form-select" style="height:34px; font-size:0.82rem; width:130px;">
-            <option value="">All Statuses</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIALLY_PAID">Partially Paid</option>
-            <option value="UNPAID">Unpaid</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="cv-bill-table-wrapper">
-        <table class="cv-bill-table" id="labBillingTable">
-          <thead>
-            <tr>
-              <th>Lab Order ID</th>
-              <th>Date</th>
-              <th>Patient Name</th>
-              <th>UHID</th>
-              <th>OP / IP ID</th>
-              <th>Tests &amp; Category</th>
-              <th style="text-align:right;">Test Price</th>
-              <th style="text-align:right;">Discount</th>
-              <th style="text-align:right;">GST</th>
-              <th style="text-align:right;">Total</th>
-              <th style="text-align:right;">Paid</th>
-              <th style="text-align:right;">Balance</th>
-              <th>Method</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="labBillingTableBody">
-            <tr><td colspan="15" style="text-align:center; padding:1.5rem;"><div class="cv-spinner"></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    try {
-      const res = await Api.get('/api/billing/laboratory/history');
-      const orders = (res && res.success) ? res.data : [];
-      const filterInput = document.getElementById('labFilterSearch');
-      const filterStatus = document.getElementById('labFilterStatus');
-      const tableBody = document.getElementById('labBillingTableBody');
-
-      function filterLabRows() {
-        const q = filterInput?.value.toLowerCase().trim() || '';
-        const st = filterStatus?.value.toUpperCase().trim() || '';
-        const filtered = orders.filter(l => {
-          const matchQ = !q ||
-            (l.orderNumber && l.orderNumber.toLowerCase().includes(q)) ||
-            (l.patientName && l.patientName.toLowerCase().includes(q)) ||
-            (l.uhid && l.uhid.toLowerCase().includes(q)) ||
-            (l.testName && l.testName.toLowerCase().includes(q)) ||
-            (l.opId && l.opId.toLowerCase().includes(q)) ||
-            (l.ipId && l.ipId.toLowerCase().includes(q));
-          const matchSt = !st || (l.paymentStatus && l.paymentStatus.toUpperCase() === st);
-          return matchQ && matchSt;
-        });
-        if (tableBody) tableBody.innerHTML = renderLaboratoryBillingRows(filtered);
-      }
-
-      filterInput?.addEventListener('input', filterLabRows);
-      filterStatus?.addEventListener('change', filterLabRows);
-      filterLabRows();
-
-    } catch (e) {
-      const tb = document.getElementById('labBillingTableBody');
-      if (tb) tb.innerHTML = '<tr><td colspan="15" style="text-align:center; color:var(--cv-danger); padding:1rem;">Failed to load Laboratory history from MySQL.</td></tr>';
+  function renderLaboratoryBillingTableBodyHtml(records) {
+    if (!records || records.length === 0) {
+      return `
+        <tr>
+          <td colspan="10" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
+            No laboratory billing records found.
+          </td>
+        </tr>
+      `;
     }
-  }
-
-  function renderLaboratoryBillingRows(orders) {
-    if (!orders || orders.length === 0) {
-      return '<tr><td colspan="15" style="text-align:center; padding:1.75rem; color:var(--cv-text-muted);">No Laboratory bills found in MySQL.</td></tr>';
-    }
-    return orders.map(l => {
+    return records.map(l => {
       const isPaid = (l.paymentStatus || 'PAID').toUpperCase() === 'PAID';
       const subtotal = l.subtotal || l.testPrice || 0;
       const total = l.totalAmount || subtotal;
-      const paid = l.paidAmount || (isPaid ? total : 0);
+      const paid = l.paidAmount != null ? l.paidAmount : (isPaid ? total : 0);
       const bal = l.balanceAmount !== undefined ? l.balanceAmount : Math.max(0, total - paid);
+      let statusBadgeClass = 'cv-badge-unpaid';
+      if (isPaid || bal <= 0) statusBadgeClass = 'cv-badge-paid';
+      else if (paid > 0) statusBadgeClass = 'cv-badge-part';
+
+      const patientName = l.patientName || l.patient?.fullName || 'Walk-in';
+      const uhid = l.uhid || l.patient?.uhid || '—';
+      const phone = l.patient?.phone || '';
+      const doctor = l.doctorName || 'Consultant';
+      const dept = l.department || 'Diagnostics';
 
       return `
         <tr>
-          <td><strong>${escapeHtml(l.orderNumber)}</strong></td>
-          <td>${escapeHtml(l.orderDate || '')}</td>
-          <td><strong>${escapeHtml(l.patientName || l.patient?.fullName || 'Walk-in')}</strong></td>
-          <td><span style="font-family:monospace; font-size:0.8rem;">${escapeHtml(l.uhid || '—')}</span></td>
-          <td>${escapeHtml(l.opId || l.ipId || '—')}</td>
-          <td>${escapeHtml(l.testName || 'Diagnostics')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(l.category || 'General')}</span></td>
-          <td style="text-align:right;">₹${formatCurrency(subtotal)}</td>
-          <td style="text-align:right; color:var(--cv-danger);">- ₹${formatCurrency(l.discountAmount || 0)}</td>
-          <td style="text-align:right; color:#0369a1;">+ ₹${formatCurrency(l.gstAmount || 0)}</td>
-          <td style="text-align:right; font-weight:700;">₹${formatCurrency(total)}</td>
-          <td style="text-align:right; color:#059669; font-weight:600;">₹${formatCurrency(paid)}</td>
-          <td style="text-align:right; color:${bal > 0 ? 'var(--cv-danger)' : '#059669'}; font-weight:700;">₹${formatCurrency(bal)}</td>
-          <td><span class="cv-badge-unpaid" style="background:#f1f5f9; color:#475569; padding:0.15rem 0.4rem; font-size:0.75rem;">${escapeHtml(l.paymentMethod || 'CASH')}</span></td>
           <td>
-            <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : (paid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">
-              ${escapeHtml(l.paymentStatus || 'PAID')}
-            </span>
+            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(l.orderNumber || '—')}</strong>
+            ${l.invoiceNumber ? `<div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(l.invoiceNumber)}</div>` : ''}
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-muted);">
+            <div>${escapeHtml(l.orderDate || '')}</div>
+            <div style="font-size:0.72rem;">${escapeHtml(l.orderTime || '')}</div>
           </td>
           <td>
-            <div style="display:flex; gap:0.3rem;">
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.selectPatientForLabCategory(${l.patient?.id})">Auto-Fill</button>
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.showLabOrderDetailsModal(${l.id})">Details</button>
+            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(patientName)}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+              UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(uhid)}</span>
+              ${l.opId || l.ipId ? `&bull; ${escapeHtml(l.opId || l.ipId)}` : ''}
+              ${phone ? `&bull; Ph: ${escapeHtml(phone)}` : ''}
             </div>
+          </td>
+          <td style="font-size:0.8rem;">
+            <div>${escapeHtml(doctor)}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(dept)}</div>
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-main);">
+            <div>${escapeHtml(l.testName || 'Diagnostic Tests')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(l.category || 'General')}</div>
+          </td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">
+            ₹${formatCurrency(total)}
+          </td>
+          <td style="text-align:right; font-weight:600; color:var(--cv-success);">
+            ₹${formatCurrency(paid)}
+          </td>
+          <td style="text-align:right; font-weight:700; color:${bal > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">
+            ₹${formatCurrency(bal)}
+          </td>
+          <td style="text-align:center;">
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">
+              ${escapeHtml(l.paymentStatus || (bal <= 0 ? 'PAID' : (paid > 0 ? 'PARTIALLY PAID' : 'UNPAID')))}
+            </span>
+          </td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="cv-btn-secondary btn-lab-invoice" data-lab-id="${l.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              Invoice
+            </button>
+            <button type="button" class="cv-btn-secondary btn-lab-payments" data-lab-id="${l.id}" data-lab-no="${escapeHtml(l.orderNumber || l.invoiceNumber || '')}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
+              Payments
+            </button>
+            <button type="button" class="cv-btn-secondary btn-lab-print" data-lab-id="${l.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; margin-left:0.3rem;">
+              Print Bill
+            </button>
           </td>
         </tr>
       `;
     }).join('');
+  }
+
+  function wireLaboratoryBillingActionButtons() {
+    document.querySelectorAll('.btn-lab-invoice').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-lab-id'));
+        if (typeof showLabOrderDetailsModal === 'function') {
+          showLabOrderDetailsModal(id);
+        } else {
+          const record = labAllBillingRecords.find(x => x.id === id);
+          if (record) showGenericRecordDetailsModal('Lab Order: ' + (record.orderNumber || id), record);
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-lab-payments').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-lab-id');
+        const no = e.currentTarget.getAttribute('data-lab-no');
+        showBillPaymentsModal('LABORATORY', id, no);
+      });
+    });
+
+    document.querySelectorAll('.btn-lab-print').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.getAttribute('data-lab-id'));
+        const record = labAllBillingRecords.find(x => x.id === id);
+        if (record) {
+          if (typeof buildLabBillPrintHtml === 'function') {
+            printDedicatedDocument(buildLabBillPrintHtml(record.patient, record));
+          } else {
+            printDedicatedDocument(buildGenericBillingPrintHtml(record, 'Laboratory Billing Receipt'));
+          }
+        }
+      });
+    });
   }
 
   // Helper bindings for auto-fill buttons from ledger rows
@@ -15262,45 +15719,53 @@ function renderPharmacyModule(activeTab = 'billing') {
       cbHistoryAllBills = (res && res.success && Array.isArray(res.data)) ? res.data : [];
 
       mount.innerHTML = `
-        <div class="cv-pharmacy-card" style="box-shadow:var(--cv-shadow-sm);">
+        <div class="cv-pharmacy-card cv-pharmacy-history-card">
           <div class="cv-pharmacy-card-header" style="flex-wrap:wrap; gap:0.75rem;">
-            <div class="cv-pharmacy-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              Central Billing History &amp; Issued Invoices
+            <div>
+              <div class="cv-pharmacy-card-title">
+                <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Central Billing History &amp; Issued Invoices
+              </div>
+              <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+                Browse consolidated multi-department hospital bills, audit invoices, record installments, and print receipts.
+              </p>
             </div>
             <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-              <input type="text" id="cbHistoryFilterInput" class="cv-form-input" style="height:34px; font-size:0.82rem; width:220px;" placeholder="Search bill, invoice, patient, UHID...">
-              <select id="cbHistoryStatusFilter" class="cv-form-select" style="height:34px; font-size:0.82rem; width:125px;">
+              <div class="cv-search-icon-input" style="width:320px;">
+                <i class="fas fa-search">
+                  <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </i>
+                <input type="text" id="cbHistoryFilterInput" placeholder="Search bill, invoice, patient, UHID..." autocomplete="off">
+              </div>
+              <select id="cbHistoryStatusFilter" class="cv-form-select" style="height:38px; width:125px; font-size:0.82rem;">
                 <option value="">All Statuses</option>
                 <option value="PAID">Paid</option>
                 <option value="PARTIALLY PAID">Partially Paid</option>
                 <option value="UNPAID">Unpaid</option>
               </select>
-              <button type="button" class="cv-btn-secondary" id="btnRefreshCbHistory" style="height:34px; padding:0 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+              <button type="button" class="cv-btn-secondary" id="btnRefreshCbHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
                 <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 Refresh
               </button>
             </div>
           </div>
 
-          <!-- Compact Fixed/Controlled Layout for Table -->
-          <div class="cv-bill-table-wrapper" style="max-height: 480px; overflow-y: auto; overflow-x: auto; margin-top:0; border:1px solid var(--cv-border); border-radius:6px 6px 0 0;">
-            <table class="cv-bill-table" id="cbHistoryTable" style="margin-bottom:0;">
-              <thead style="position:sticky; top:0; z-index:10; background:#f8fafc;">
+          <div class="cv-bill-table-wrapper" style="margin-top:0;">
+            <table class="cv-bill-table" id="cbHistoryTable">
+              <thead>
                 <tr>
                   <th style="white-space:nowrap;">Central Bill No</th>
                   <th style="white-space:nowrap;">Invoice Number</th>
                   <th style="white-space:nowrap;">Date &amp; Time</th>
-                  <th>Patient Name</th>
-                  <th>UHID</th>
+                  <th>Patient Details</th>
                   <th>OP / IP ID</th>
-                  <th style="text-align:right; white-space:nowrap;">Subtotal</th>
-                  <th style="text-align:right; white-space:nowrap;">Discount</th>
-                  <th style="text-align:right; white-space:nowrap;">GST</th>
-                  <th style="text-align:right; white-space:nowrap;">Final Total</th>
-                  <th style="text-align:right; white-space:nowrap;">Paid</th>
-                  <th style="text-align:right; white-space:nowrap;">Balance</th>
-                  <th>Status</th>
+                  <th style="text-align:right; white-space:nowrap;">Subtotal (₹)</th>
+                  <th style="text-align:right; white-space:nowrap;">Discount (₹)</th>
+                  <th style="text-align:right; white-space:nowrap;">GST (₹)</th>
+                  <th style="text-align:right; white-space:nowrap;">Final Total (₹)</th>
+                  <th style="text-align:right; white-space:nowrap;">Paid (₹)</th>
+                  <th style="text-align:right; white-space:nowrap;">Balance (₹)</th>
+                  <th style="text-align:center;">Payment Status</th>
                   <th style="text-align:center;">Actions</th>
                 </tr>
               </thead>
@@ -15376,36 +15841,49 @@ function renderPharmacyModule(activeTab = 'billing') {
 
   function renderCbHistoryRows(bills) {
     if (!bills || bills.length === 0) {
-      return '<tr><td colspan="14" style="text-align:center; padding:1.75rem; color:var(--cv-text-muted);">No Central Bills issued yet.</td></tr>';
+      return '<tr><td colspan="13" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No Central Bills issued yet.</td></tr>';
     }
     return bills.map(b => {
       const isPaid = (b.paymentStatus || 'PAID').toUpperCase() === 'PAID';
-      const bal = b.balance || 0;
+      const bal = b.balance != null ? b.balance : 0;
+      const statusBadgeClass = isPaid || bal <= 0 ? 'cv-badge-paid' : ((b.amountPaid || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
 
       return `
         <tr>
-          <td><strong>${escapeHtml(b.billNumber)}</strong></td>
-          <td><span style="font-family:monospace; font-weight:700; color:var(--cv-primary);">${escapeHtml(b.invoiceNumber || '—')}</span></td>
-          <td>${escapeHtml(b.billDate || '')}<br><span style="font-size:0.75rem; color:var(--cv-text-muted);">${escapeHtml(b.billTime || '')}</span></td>
-          <td><strong>${escapeHtml(b.patientName || b.patient?.fullName || 'Walk-in')}</strong></td>
-          <td><span style="font-family:monospace; font-size:0.8rem;">${escapeHtml(b.uhid || '—')}</span></td>
-          <td>${escapeHtml(b.opId || b.ipId || '—')}</td>
+          <td>
+            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber || '—')}</strong>
+          </td>
+          <td>
+            <span style="font-family:monospace; font-weight:700; color:#0284c7;">${escapeHtml(b.invoiceNumber || '—')}</span>
+          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-muted);">
+            <div>${escapeHtml(b.billDate || '')}</div>
+            <div style="font-size:0.72rem;">${escapeHtml(b.billTime || '')}</div>
+          </td>
+          <td>
+            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(b.patientName || b.patient?.fullName || 'Walk-in')}</div>
+            <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+              UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(b.uhid || b.patient?.uhid || '—')}</span>
+              ${b.phone || b.patient?.phone ? `&bull; Ph: ${escapeHtml(b.phone || b.patient?.phone)}` : ''}
+            </div>
+          </td>
+          <td style="font-size:0.8rem; font-family:monospace;">${escapeHtml(b.opId || b.ipId || '—')}</td>
           <td style="text-align:right;">₹${formatCurrency(b.subtotal)}</td>
           <td style="text-align:right; color:var(--cv-danger);">- ₹${formatCurrency(b.discountAmount)}</td>
           <td style="text-align:right; color:#0369a1;">+ ₹${formatCurrency(b.gstAmount)}</td>
-          <td style="text-align:right; font-weight:700;">₹${formatCurrency(b.finalTotal)}</td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(b.finalTotal)}</td>
           <td style="text-align:right; color:#059669; font-weight:600;">₹${formatCurrency(b.amountPaid)}</td>
-          <td style="text-align:right; color:${bal > 0 ? 'var(--cv-danger)' : '#059669'}; font-weight:700;">₹${formatCurrency(bal)}</td>
-          <td>
-            <span class="cv-payment-balance-badge ${isPaid ? 'cv-badge-paid' : ((b.amountPaid || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">
-              ${escapeHtml(b.paymentStatus || 'PAID')}
+          <td style="text-align:right; color:${bal > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'}; font-weight:700;">₹${formatCurrency(bal)}</td>
+          <td style="text-align:center;">
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">
+              ${escapeHtml(b.paymentStatus || (bal <= 0 ? 'PAID' : ((b.amountPaid || 0) > 0 ? 'PARTIALLY PAID' : 'UNPAID')))}
             </span>
           </td>
-          <td>
-            <div style="display:flex; gap:0.35rem;">
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="AdminModule.showCentralInvoiceModal(${b.id})">Invoice</button>
+          <td style="text-align:center; white-space:nowrap;">
+            <div style="display:inline-flex; gap:0.3rem;">
+              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem;" onclick="AdminModule.showCentralInvoiceModal(${b.id})">Invoice</button>
               <button class="cv-btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="window.open('/api/billing/central/' + ${b.id} + '/pdf', '_blank')">PDF</button>
-              <button class="cv-btn-secondary" style="padding:0.25rem 0.45rem; font-size:0.75rem;" onclick="AdminModule.showBillPaymentsModal('CENTRAL', ${b.id}, '${escapeHtml(b.invoiceNumber || b.billNumber || '')}')">Payments</button>
+              <button class="cv-btn-secondary" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:#0284c7;" onclick="AdminModule.showBillPaymentsModal('CENTRAL', ${b.id}, '${escapeHtml(b.invoiceNumber || b.billNumber || '')}')">Payments</button>
             </div>
           </td>
         </tr>
