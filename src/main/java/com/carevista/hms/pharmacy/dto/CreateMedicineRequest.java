@@ -11,7 +11,6 @@ public class CreateMedicineRequest {
     @NotBlank(message = "Medicine name is required.")
     private String name;
 
-    @NotBlank(message = "Medicine ID / Code is required.")
     private String medicineCode;
 
     private String genericName;
@@ -26,12 +25,10 @@ public class CreateMedicineRequest {
 
     private String supplier;
 
-    @NotBlank(message = "Batch number is required.")
     private String batchNumber;
 
     private LocalDate purchaseDate = LocalDate.now();
 
-    @NotNull(message = "Expiry date is required.")
     private LocalDate expiryDate;
 
     private BigDecimal costPrice = BigDecimal.ZERO;
@@ -40,17 +37,27 @@ public class CreateMedicineRequest {
     @Min(value = 0, message = "Selling price cannot be negative.")
     private BigDecimal unitPrice;
 
-    @NotNull(message = "Opening stock quantity is required.")
-    @Min(value = 0, message = "Stock quantity cannot be negative.")
     private Integer stockQuantity = 0;
 
     private Integer reorderLevel = 10;
+
+    private Integer minStockThreshold = 10;
 
     private BigDecimal gstPercentage = new BigDecimal("5.00");
 
     private String notes;
 
     private String rackLocation;
+
+    private String placement;
+
+    private String soldAs = "tablet"; // tablet, capsule, other
+
+    private Integer unitsPerStrip = 10;
+
+    private Boolean prescriptionRequired = false;
+
+    private String hsnCode = "3004";
 
     public CreateMedicineRequest() {}
 
@@ -93,11 +100,14 @@ public class CreateMedicineRequest {
     public BigDecimal getCostPrice() { return costPrice; }
     public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
 
-    public Integer getStockQuantity() { return stockQuantity; }
+    public Integer getStockQuantity() { return stockQuantity != null ? stockQuantity : 0; }
     public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
 
-    public Integer getReorderLevel() { return reorderLevel; }
-    public void setReorderLevel(Integer reorderLevel) { this.reorderLevel = reorderLevel; }
+    public Integer getReorderLevel() { return reorderLevel != null ? reorderLevel : (minStockThreshold != null ? minStockThreshold : 10); }
+    public void setReorderLevel(Integer reorderLevel) { this.reorderLevel = reorderLevel; this.minStockThreshold = reorderLevel; }
+
+    public Integer getMinStockThreshold() { return minStockThreshold != null ? minStockThreshold : reorderLevel; }
+    public void setMinStockThreshold(Integer minStockThreshold) { this.minStockThreshold = minStockThreshold; this.reorderLevel = minStockThreshold; }
 
     public BigDecimal getGstPercentage() { return gstPercentage; }
     public void setGstPercentage(BigDecimal gstPercentage) { this.gstPercentage = gstPercentage; }
@@ -105,7 +115,21 @@ public class CreateMedicineRequest {
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
 
-    public String getRackLocation() { return rackLocation; }
-    public void setRackLocation(String rackLocation) { this.rackLocation = rackLocation; }
-}
+    public String getRackLocation() { return rackLocation != null ? rackLocation : placement; }
+    public void setRackLocation(String rackLocation) { this.rackLocation = rackLocation; this.placement = rackLocation; }
 
+    public String getPlacement() { return placement != null ? placement : rackLocation; }
+    public void setPlacement(String placement) { this.placement = placement; this.rackLocation = placement; }
+
+    public String getSoldAs() { return soldAs; }
+    public void setSoldAs(String soldAs) { this.soldAs = soldAs; }
+
+    public Integer getUnitsPerStrip() { return unitsPerStrip != null ? unitsPerStrip : 10; }
+    public void setUnitsPerStrip(Integer unitsPerStrip) { this.unitsPerStrip = unitsPerStrip; }
+
+    public Boolean getPrescriptionRequired() { return prescriptionRequired != null && prescriptionRequired; }
+    public void setPrescriptionRequired(Boolean prescriptionRequired) { this.prescriptionRequired = prescriptionRequired; }
+
+    public String getHsnCode() { return hsnCode; }
+    public void setHsnCode(String hsnCode) { this.hsnCode = hsnCode; }
+}

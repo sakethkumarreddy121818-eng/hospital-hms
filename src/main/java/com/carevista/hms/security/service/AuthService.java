@@ -30,11 +30,13 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final TokenService tokenService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, AuditService auditService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, AuditService auditService, TokenService tokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.tokenService = tokenService;
     }
 
     @Transactional
@@ -110,18 +112,53 @@ public class AuthService {
                 user.getTenant() != null ? user.getTenant().getId() : null,
                 "LOGIN_SUCCESS", "User successfully authenticated as " + user.getRole(), clientIp, "SUCCESS");
 
-        return UserDto.fromEntity(user);
+        UserDto dto = UserDto.fromEntity(user);
+        String token = tokenService.generateToken(
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name(),
+                user.getTenant() != null ? user.getTenant().getId() : null
+        );
+        dto.setToken(token);
+        return dto;
     }
 
     public UserDto getCurrentUser(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("USER_ID") == null) {
+        Long userId = null;
+        if (session != null && session.getAttribute("USER_ID") != null) {
+            userId = (Long) session.getAttribute("USER_ID");
+        } else if (request.getAttribute("USER_ID") != null) {
+            userId = (Long) request.getAttribute("USER_ID");
+        }
+
+        if (userId == null) {
+            // Check authorization token from header
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.trim().startsWith("Bearer ")) {
+                TokenService.TokenData tokenData = tokenService.validateToken(authHeader.trim().substring(7).trim());
+                if (tokenData != null && tokenData.isValid()) {
+                    userId = tokenData.getUserId();
+                }
+            }
+        }
+
+        if (userId == null) {
             return null;
         }
 
-        Long userId = (Long) session.getAttribute("USER_ID");
         return userRepository.findById(userId)
-                .map(UserDto::fromEntity)
+                .map(u -> {
+                    UserDto d = UserDto.fromEntity(u);
+                    String tok = tokenService.generateToken(
+                            u.getId(),
+                            u.getEmail(),
+                            u.getRole().name(),
+                            u.getTenant() != null ? u.getTenant().getId() : null
+                    );
+                    d.setToken(tok);
+                    return d;
+                })
                 .orElse(null);
     }
 

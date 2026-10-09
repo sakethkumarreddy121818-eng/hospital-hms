@@ -18,6 +18,7 @@ public class UserDto {
     private String department;
     private String permissions;
     private LocalDateTime lastLoginAt;
+    private String token;
 
     public UserDto() {}
 
@@ -72,4 +73,7 @@ public class UserDto {
 
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
 }

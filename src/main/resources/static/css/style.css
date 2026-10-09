@@ -2904,6 +2904,180 @@ body.cv-dashboard-active #app {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+/* Pharmacy Enhanced Styles: Batch Trains, Rx Indicators, Unit Toggles, Drilldowns */
+.cv-kpi-clickable {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.cv-kpi-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -2px rgba(15, 23, 42, 0.08), 0 3px 6px -1px rgba(15, 23, 42, 0.05);
+  border-color: var(--cv-primary);
+}
+.cv-kpi-clickable::after {
+  content: 'Click to view →';
+  position: absolute;
+  bottom: 0.35rem;
+  right: 0.65rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--cv-text-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.cv-kpi-clickable:hover::after {
+  opacity: 0.9;
+}
+
+.cv-batch-train-wrapper {
+  margin: 0.6rem 0;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.cv-batch-train {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  scrollbar-width: thin;
+}
+.cv-batch-card {
+  min-width: 170px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+}
+.cv-batch-card:hover:not(.disabled) {
+  border-color: var(--cv-primary);
+  background: #f0f7ff;
+  transform: translateY(-1px);
+}
+.cv-batch-card.selected {
+  border-color: var(--cv-primary);
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+.cv-batch-card.disabled {
+  opacity: 0.55;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+.cv-batch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: 700;
+  color: #0f172a;
+}
+.cv-batch-card-meta {
+  font-size: 0.72rem;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+}
+.cv-batch-badge-feifo {
+  background: #e0f2fe;
+  color: #0284c7;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.cv-rx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.cv-rx-dot.otc {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+.cv-rx-dot.rx {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+  animation: cvPulseDot 1.8s infinite;
+}
+@keyframes cvPulseDot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.cv-unit-pills {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid #e2e8f0;
+}
+.cv-unit-pill-btn {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #475569;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cv-unit-pill-btn.active {
+  background: #ffffff;
+  color: var(--cv-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cv-placement-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.cv-doctor-lock-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.2rem 0.5rem;
+  background: #f8fafc;
+  border-radius: 5px;
+  border: 1px solid #e2e8f0;
+}
+.cv-doctor-lock-switch input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--cv-primary);
+}
+
 /* Printable Bill Paper */
 .cv-invoice-paper {
   background: #ffffff;

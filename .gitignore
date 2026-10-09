@@ -46,5 +46,6 @@ scratch/
 .env.*
 *.local
 cookies.txt
+*.zip
 
 

@@ -12,15 +12,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.carevista.hms.security.entity.User;
+import com.carevista.hms.security.repository.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 @RestController
 @RequestMapping("/api/admin/money")
 @PreAuthorize("hasRole('ADMIN')")
 public class MoneyManagementController {
 
     private final MoneyManagementService moneyManagementService;
+    private final UserRepository userRepository;
 
-    public MoneyManagementController(MoneyManagementService moneyManagementService) {
+    public MoneyManagementController(MoneyManagementService moneyManagementService, UserRepository userRepository) {
         this.moneyManagementService = moneyManagementService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping("/dashboard")
@@ -80,6 +87,20 @@ public class MoneyManagementController {
         if (session != null && session.getAttribute("TENANT_ID") != null) {
             return (Long) session.getAttribute("TENANT_ID");
         }
+        if (request.getAttribute("TENANT_ID") != null) {
+            return (Long) request.getAttribute("TENANT_ID");
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getName() != null && !"anonymousUser".equals(auth.getName())) {
+            User user = userRepository.findByEmail(auth.getName().trim().toLowerCase()).orElse(null);
+            if (user != null && user.getTenant() != null) {
+                Long tid = user.getTenant().getId();
+                if (session != null) {
+                    session.setAttribute("TENANT_ID", tid);
+                }
+                return tid;
+            }
+        }
         return null;
     }
 
@@ -88,6 +109,20 @@ public class MoneyManagementController {
         if (session != null && session.getAttribute("USER_ID") != null) {
             return (Long) session.getAttribute("USER_ID");
         }
+        if (request.getAttribute("USER_ID") != null) {
+            return (Long) request.getAttribute("USER_ID");
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getName() != null && !"anonymousUser".equals(auth.getName())) {
+            User user = userRepository.findByEmail(auth.getName().trim().toLowerCase()).orElse(null);
+            if (user != null) {
+                Long uid = user.getId();
+                if (session != null) {
+                    session.setAttribute("USER_ID", uid);
+                }
+                return uid;
+            }
+        }
         return null;
     }
 
@@ -95,6 +130,13 @@ public class MoneyManagementController {
         HttpSession session = request.getSession(false);
         if (session != null && session.getAttribute("USER_EMAIL") != null) {
             return (String) session.getAttribute("USER_EMAIL");
+        }
+        if (request.getAttribute("USER_EMAIL") != null) {
+            return (String) request.getAttribute("USER_EMAIL");
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getName() != null && !"anonymousUser".equals(auth.getName())) {
+            return auth.getName();
         }
         return "admin@system.local";
     }

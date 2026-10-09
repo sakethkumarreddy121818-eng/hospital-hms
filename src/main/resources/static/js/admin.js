@@ -6051,25 +6051,38 @@ const Admin = (function () {
   }
 
   // ====================================================================
-  // PHARMACY & MEDICINE BILLING MODULE
+  // PHARMACY MANAGEMENT SUITE (CareVista HMS Native Module)
+  // Re-engineered from Pharmacy Reference & Native to CareVista Architecture
   // ====================================================================
-  let pharActiveTab = 'billing'; // 'billing', 'history', 'inventory'
+  let pharActiveTab = 'dashboard'; // 'dashboard', 'billing', 'inventory', 'procurement', 'suppliers', 'history'
   let pharSelectedPatient = null;
   let pharMedicinesCatalog = [];
   let pharBillItems = [];
   let pharPatientSearchDebounce = null;
   let pharAllSalesHistory = [];
   let pharActiveSavedBill = null;
+  let pharSelectedMedicineForPOS = null;
+  let pharSelectedBatchForPOS = null;
+  let pharSelectedUnitForPOS = 'basic'; // 'basic' | 'strip'
+  let pharLockedDoctor = null; // Stored { name, department } when lock doctor is active
+  let pharPreselectedRestockMedId = null;
 
   async function cvFetch(url, options = {}) {
     if (options.method === 'POST') {
       const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : {};
       return await Api.post(url, body);
     }
+    if (options.method === 'PUT') {
+      const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : {};
+      return await Api.put(url, body);
+    }
+    if (options.method === 'DELETE') {
+      return await Api.delete(url);
+    }
     return await Api.get(url);
   }
 
-function renderPharmacyModule(activeTab = 'billing') {
+  function renderPharmacyModule(activeTab = 'dashboard') {
     const mainContent = document.getElementById('dashboardMain');
     if (!mainContent) return;
 
@@ -6085,32 +6098,44 @@ function renderPharmacyModule(activeTab = 'billing') {
             <div>
               <h1 class="cv-page-title" style="display:flex; align-items:center; gap:0.6rem;">
                 <svg style="width:26px; height:26px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
-                Pharmacy Management &amp; Billing
+                Pharmacy Management Suite
               </h1>
-              <p class="cv-page-subtitle">Hospital: ${escapeHtml(currentUser?.hospitalName || 'City Care Super Speciality Hospital')}</p>
+              <p class="cv-page-subtitle">Hospital: ${escapeHtml(currentUser?.hospitalName || 'CareVista Multispeciality Hospital')} &bull; Licensed Drug Dispensary</p>
             </div>
           </div>
 
-          <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <div class="cv-pharmacy-nav-tabs">
-              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'billing' ? 'active' : ''}" id="tabBtnPharBilling">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                Sales &amp; Billing
+              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'dashboard' ? 'active' : ''}" id="tabBtnPharDashboard">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                Dashboard
               </button>
-              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'history' ? 'active' : ''}" id="tabBtnPharHistory">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                Sales History
+              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'billing' ? 'active' : ''}" id="tabBtnPharBilling">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                Sales POS
               </button>
               <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'inventory' ? 'active' : ''}" id="tabBtnPharInventory">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                Medicine Master &amp; Stock
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                Medicines &amp; Placement
+              </button>
+              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'procurement' ? 'active' : ''}" id="tabBtnPharProcurement">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Procurement &amp; Ledger
+              </button>
+              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'suppliers' ? 'active' : ''}" id="tabBtnPharSuppliers">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                Suppliers
+              </button>
+              <button type="button" class="cv-pharmacy-tab-btn ${pharActiveTab === 'history' ? 'active' : ''}" id="tabBtnPharHistory">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Sales History
               </button>
             </div>
 
             <button type="button" class="cv-btn-secondary" id="btnPharBackDashboard" style="padding:0.5rem 0.9rem; font-size:0.85rem;">
-              Back to Dashboard
+              Back to HMS
             </button>
           </div>
         </div>
@@ -6128,9 +6153,12 @@ function renderPharmacyModule(activeTab = 'billing') {
       navigateTo('dashboard', 'main', () => renderDashboardLayout(false));
     });
 
+    document.getElementById('tabBtnPharDashboard')?.addEventListener('click', () => switchPharTab('dashboard', true));
     document.getElementById('tabBtnPharBilling')?.addEventListener('click', () => switchPharTab('billing', true));
-    document.getElementById('tabBtnPharHistory')?.addEventListener('click', () => switchPharTab('history', true));
     document.getElementById('tabBtnPharInventory')?.addEventListener('click', () => switchPharTab('inventory', true));
+    document.getElementById('tabBtnPharProcurement')?.addEventListener('click', () => switchPharTab('procurement', true));
+    document.getElementById('tabBtnPharSuppliers')?.addEventListener('click', () => switchPharTab('suppliers', true));
+    document.getElementById('tabBtnPharHistory')?.addEventListener('click', () => switchPharTab('history', true));
 
     switchPharTab(pharActiveTab, false);
   }
@@ -6143,15 +6171,25 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
     pharActiveTab = tab;
     document.querySelectorAll('.cv-pharmacy-tab-btn').forEach(b => b.classList.remove('active'));
-    if (tab === 'billing') {
+
+    if (tab === 'dashboard') {
+      document.getElementById('tabBtnPharDashboard')?.classList.add('active');
+      renderPharmacyDashboardTab();
+    } else if (tab === 'billing') {
       document.getElementById('tabBtnPharBilling')?.classList.add('active');
       renderPharmacyBillingTab();
-    } else if (tab === 'history') {
-      document.getElementById('tabBtnPharHistory')?.classList.add('active');
-      renderPharmacyHistoryTab();
     } else if (tab === 'inventory') {
       document.getElementById('tabBtnPharInventory')?.classList.add('active');
       renderPharmacyInventoryTab();
+    } else if (tab === 'procurement') {
+      document.getElementById('tabBtnPharProcurement')?.classList.add('active');
+      renderPharmacyProcurementTab();
+    } else if (tab === 'suppliers') {
+      document.getElementById('tabBtnPharSuppliers')?.classList.add('active');
+      renderPharmacySuppliersTab();
+    } else if (tab === 'history') {
+      document.getElementById('tabBtnPharHistory')?.classList.add('active');
+      renderPharmacyHistoryTab();
     }
   }
 
@@ -6163,9 +6201,493 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
+  // ====================================================================
+  // TAB 1: PHARMACY DASHBOARD & ALERTS
+  // ====================================================================
+  async function renderPharmacyDashboardTab() {
+    const container = document.getElementById('pharTabContent');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+        <div class="cv-loading-spinner"></div>
+      </div>
+    `;
+
+    let summary = {
+      totalMedicines: 0,
+      availableStock: 0,
+      lowStockCount: 0,
+      outOfStockBatchesCount: 0,
+      expiringSoonBatchesCount: 0,
+      expiredBatchesCount: 0,
+      totalBatchesCount: 0,
+      todayBillsCount: 0,
+      todayRevenue: 0
+    };
+    let recentBills = [];
+
+    try {
+      const [sumRes, histRes] = await Promise.all([
+        cvFetch('/api/pharmacy/summary'),
+        cvFetch('/api/pharmacy/bills/history')
+      ]);
+      if (sumRes && sumRes.success && sumRes.data) summary = sumRes.data;
+      if (histRes && histRes.success && Array.isArray(histRes.data)) {
+        recentBills = histRes.data.slice(0, 5);
+      }
+    } catch (err) {
+      console.error('Failed to load pharmacy dashboard summary:', err);
+    }
+
+    const outOfStockCount = (summary.outOfStockCount !== undefined && summary.outOfStockCount !== null) ? summary.outOfStockCount : ((summary.outOfStockBatchesCount !== undefined && summary.outOfStockBatchesCount !== null) ? summary.outOfStockBatchesCount : 0);
+    const lowStockCount = (summary.lowStockCount !== undefined && summary.lowStockCount !== null) ? summary.lowStockCount : 0;
+    const expiringSoonCount = (summary.expiringSoonCount !== undefined && summary.expiringSoonCount !== null) ? summary.expiringSoonCount : ((summary.expiringSoonBatchesCount !== undefined && summary.expiringSoonBatchesCount !== null) ? summary.expiringSoonBatchesCount : 0);
+    const expiredCount = (summary.expiredCount !== undefined && summary.expiredCount !== null) ? summary.expiredCount : ((summary.expiredBatchesCount !== undefined && summary.expiredBatchesCount !== null) ? summary.expiredBatchesCount : 0);
+    const availableStock = (summary.availableStock !== undefined && summary.availableStock !== null) ? summary.availableStock : 0;
+    const totalBatches = (summary.totalBatchesCount !== undefined && summary.totalBatchesCount !== null) ? summary.totalBatchesCount : 0;
+    const totalMeds = (summary.totalMedicines !== undefined && summary.totalMedicines !== null) ? summary.totalMedicines : 0;
+    const todayRevenue = (summary.todayRevenue !== undefined && summary.todayRevenue !== null) ? summary.todayRevenue : 0;
+    const todayBills = (summary.todayBillsCount !== undefined && summary.todayBillsCount !== null) ? summary.todayBillsCount : 0;
+
+    container.innerHTML = `
+      <div class="cv-pharmacy-flow">
+        
+        <!-- Quick Action Banner -->
+        <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius:12px; padding:1.25rem 1.75rem; color:#ffffff; display:flex; justify-content:space-between; align-items:center; box-shadow:0 8px 20px rgba(15,23,42,0.12); flex-wrap:wrap; gap:1rem;">
+          <div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+              <span style="background:rgba(37,99,235,0.25); color:#60a5fa; font-size:0.7rem; font-weight:800; padding:0.15rem 0.5rem; border-radius:12px; text-transform:uppercase; letter-spacing:0.05em; border:1px solid rgba(96,165,250,0.3);">Real-time FEIFO Engine</span>
+              <span style="color:#94a3b8; font-size:0.75rem;">Batch-level Inventory Active</span>
+            </div>
+            <h2 style="margin:0; font-size:1.35rem; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">Dispensary Operations Control</h2>
+            <p style="margin:0.25rem 0 0 0; font-size:0.82rem; color:#cbd5e1;">Monitor out-of-stock lots, expiry windows, physical shelf racks, and POS customer checkouts.</p>
+          </div>
+          <div style="display:flex; gap:0.6rem; align-items:center;">
+            <button type="button" id="btnDashQuickPOS" class="cv-btn-primary" style="padding:0.6rem 1.25rem; font-size:0.86rem; font-weight:700; display:inline-flex; align-items:center; gap:0.45rem; background:linear-gradient(135deg, #2563eb, #1d4ed8); border:none; box-shadow:0 4px 12px rgba(37,99,235,0.35);">
+              <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+              Open Sales POS
+            </button>
+            <button type="button" id="btnDashQuickProcure" class="cv-btn-secondary" style="padding:0.6rem 1.1rem; font-size:0.86rem; font-weight:600; background:rgba(255,255,255,0.1); color:#ffffff; border-color:rgba(255,255,255,0.2);">
+              + Stock Procurement
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Metrics Grid (Interactive Alerts) -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:0.85rem;">
+          
+          <!-- Out of stock alert -->
+          <div class="cv-metric-card cv-kpi-clickable" id="kpiOutOfStock" data-cat="out-of-stock" style="border-left:4px solid var(--cv-danger);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="cv-metric-label">Out of Stock Batches</div>
+              <span style="color:var(--cv-danger); font-size:1.1rem;">⚠️</span>
+            </div>
+            <div class="cv-metric-value" style="color:var(--cv-danger);">${outOfStockCount}</div>
+            <span class="cv-metric-badge" style="background:#fee2e2; color:#b91c1c;">
+              ${outOfStockCount > 0 ? 'Urgent Depletion' : 'Zero Depleted'}
+            </span>
+          </div>
+
+          <!-- Low stock alert -->
+          <div class="cv-metric-card cv-kpi-clickable" id="kpiLowStock" data-cat="low-stock" style="border-left:4px solid #f59e0b;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="cv-metric-label">Low Stock Medicines</div>
+              <span style="color:#f59e0b; font-size:1.1rem;">📉</span>
+            </div>
+            <div class="cv-metric-value" style="color:#d97706;">${lowStockCount}</div>
+            <span class="cv-metric-badge" style="background:#fef3c7; color:#92400e;">
+              ${lowStockCount > 0 ? 'Below Min Threshold' : 'Stock Optimal'}
+            </span>
+          </div>
+
+          <!-- Expiring soon alert -->
+          <div class="cv-metric-card cv-kpi-clickable" id="kpiExpiringSoon" data-cat="expiring-soon" style="border-left:4px solid #f97316;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="cv-metric-label">Expiring Soon (&lt;90d)</div>
+              <span style="color:#f97316; font-size:1.1rem;">⏳</span>
+            </div>
+            <div class="cv-metric-value" style="color:#ea580c;">${expiringSoonCount}</div>
+            <span class="cv-metric-badge" style="background:#ffedd5; color:#c2410c;">
+              ${expiringSoonCount > 0 ? 'Review & Dispense' : 'All Batches Fresh'}
+            </span>
+          </div>
+
+          <!-- Expired batches alert -->
+          <div class="cv-metric-card cv-kpi-clickable" id="kpiExpired" data-cat="expired" style="border-left:4px solid #dc2626;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div class="cv-metric-label">Expired Batches</div>
+              <span style="color:#dc2626; font-size:1.1rem;">🚫</span>
+            </div>
+            <div class="cv-metric-value" style="color:#dc2626;">${expiredCount}</div>
+            <span class="cv-metric-badge" style="background:#fee2e2; color:#991b1b;">
+              ${expiredCount > 0 ? 'Locked (Purge Needed)' : 'Zero Expired'}
+            </span>
+          </div>
+
+          <!-- Available stock -->
+          <div class="cv-metric-card" style="border-left:4px solid var(--cv-success);">
+            <div class="cv-metric-label">Available Units</div>
+            <div class="cv-metric-value" style="color:#16a34a;">${availableStock}</div>
+            <span class="cv-metric-badge" style="background:#dcfce7; color:#15803d;">Across ${totalBatches} Batches</span>
+          </div>
+
+          <!-- Total medicines -->
+          <div class="cv-metric-card" style="border-left:4px solid var(--cv-primary);">
+            <div class="cv-metric-label">Medicine Master Items</div>
+            <div class="cv-metric-value" style="color:var(--cv-primary);">${totalMeds}</div>
+            <span class="cv-metric-badge" style="background:#e0f2fe; color:#0369a1;">Verified Hospital Catalog</span>
+          </div>
+
+          <!-- Today bills & revenue -->
+          <div class="cv-metric-card" style="border-left:4px solid #0d9488;">
+            <div class="cv-metric-label">Today's Sales &amp; Revenue</div>
+            <div class="cv-metric-value" style="color:#0f766e;">&#8377;${formatCurrency(todayRevenue)}</div>
+            <span class="cv-metric-badge" style="background:#ccfbf1; color:#115e59;">${todayBills} Dispensary Bills</span>
+          </div>
+        </div>
+
+        <!-- Recent Transactions Card -->
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:19px; height:19px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Recent Pharmacy Sales Transactions
+            </div>
+            <button type="button" class="cv-btn-secondary" id="btnDashViewAllHistory" style="padding:0.35rem 0.75rem; font-size:0.78rem;">
+              View All History &rarr;
+            </button>
+          </div>
+
+          <div class="cv-bill-table-wrapper" style="margin-top:0;">
+            <table class="cv-bill-table">
+              <thead>
+                <tr>
+                  <th>Bill #</th>
+                  <th>Date &amp; Time</th>
+                  <th>Patient Details</th>
+                  <th>Doctor</th>
+                  <th>Medicines</th>
+                  <th style="text-align:right;">Amount (₹)</th>
+                  <th style="text-align:center;">Status</th>
+                  <th style="text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentBills.length === 0 ? `
+                  <tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No transactions recorded yet today.</td></tr>
+                ` : recentBills.map(b => `
+                  <tr>
+                    <td><strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber)}</strong></td>
+                    <td style="font-size:0.8rem; color:var(--cv-text-muted);">${escapeHtml(b.billDate || '')} ${escapeHtml(b.billTime || '')}</td>
+                    <td>
+                      <div style="font-weight:700;">${escapeHtml(b.patientName)}</div>
+                      <div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">UHID: ${escapeHtml(b.uhid || 'N/A')}</div>
+                    </td>
+                    <td style="font-size:0.82rem;">${escapeHtml(b.doctorName || 'Dr. On Duty')}</td>
+                    <td style="font-size:0.82rem;">${b.items ? b.items.length : 0} item(s)</td>
+                    <td style="text-align:right; font-weight:700;">₹${formatCurrency(b.finalTotal || b.totalAmount)}</td>
+                    <td style="text-align:center;">
+                      <span class="cv-payment-balance-badge ${b.paymentStatus === 'PAID' ? 'cv-badge-paid' : (b.paymentStatus === 'PARTIALLY PAID' ? 'cv-badge-partial' : 'cv-badge-unpaid')}">
+                        ${escapeHtml(b.paymentStatus)}
+                      </span>
+                    </td>
+                    <td style="text-align:center;">
+                      <button type="button" class="cv-btn-secondary btn-dash-invoice" data-bill-id="${b.id}" style="padding:0.25rem 0.55rem; font-size:0.75rem;">
+                        Invoice
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    // Bind dashboard events
+    document.getElementById('btnDashQuickPOS')?.addEventListener('click', () => switchPharTab('billing', true));
+    document.getElementById('btnDashQuickProcure')?.addEventListener('click', () => switchPharTab('procurement', true));
+    document.getElementById('btnDashViewAllHistory')?.addEventListener('click', () => switchPharTab('history', true));
+
+    document.querySelectorAll('.btn-dash-invoice').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-bill-id');
+        try {
+          const res = await cvFetch(`/api/pharmacy/bills/${id}`);
+          if (res && res.success && res.data) showPharmacyInvoiceModal(res.data);
+        } catch (err) {
+          alert('Failed to load invoice: ' + err.message);
+        }
+      });
+    });
+
+    // Wire Clickable KPI Drill-Down Alerts
+    document.querySelectorAll('.cv-kpi-clickable').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const category = e.currentTarget.getAttribute('data-cat');
+        if (category) showDrillDownModal(category);
+      });
+    });
+  }
+
   // ------------------------------------------------------------------
-  // TAB 1: MEDICINE SALES & BILLING
+  // DRILL-DOWN MODAL FOR DASHBOARD ALERTS (Preserving Reference Workflows)
   // ------------------------------------------------------------------
+  async function showDrillDownModal(category) {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    let categoryTitle = 'Alert Details';
+    let categoryBadge = 'Audit';
+    let badgeColor = '#0284c7';
+    let badgeBg = '#e0f2fe';
+
+    if (category === 'out-of-stock') {
+      categoryTitle = 'Out of Stock Batches (Stock = 0)';
+      categoryBadge = 'Zero Inventory';
+      badgeColor = '#b91c1c';
+      badgeBg = '#fee2e2';
+    } else if (category === 'low-stock') {
+      categoryTitle = 'Low Stock Medicines (Below Reorder Threshold)';
+      categoryBadge = 'Reorder Needed';
+      badgeColor = '#b45309';
+      badgeBg = '#fef3c7';
+    } else if (category === 'expiring-soon') {
+      categoryTitle = 'Expiring Soon Batches (Within 90 Days)';
+      categoryBadge = 'Near Expiry Window';
+      badgeColor = '#c2410c';
+      badgeBg = '#ffedd5';
+    } else if (category === 'expired') {
+      categoryTitle = 'Expired Medicine Batches (Past Expiry Date)';
+      categoryBadge = 'Locked / Non-dispensable';
+      badgeColor = '#991b1b';
+      badgeBg = '#fee2e2';
+    }
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="drillDownBackdrop" style="padding:1rem;">
+        <div style="background:#ffffff; width:920px; max-width:95vw; border-radius:12px; box-shadow:0 20px 45px rgba(15,23,42,0.25); display:flex; flex-direction:column; max-height:88vh; overflow:hidden; border:1px solid #e2e8f0;">
+          
+          <!-- Modal Header -->
+          <div style="padding:0.9rem 1.25rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <h3 style="margin:0; font-size:1.05rem; font-weight:800; color:#0f172a;">${categoryTitle}</h3>
+                <span style="background:${badgeBg}; color:${badgeColor}; font-size:0.72rem; font-weight:800; padding:0.15rem 0.5rem; border-radius:12px;">${categoryBadge}</span>
+              </div>
+              <p style="margin:0.2rem 0 0 0; font-size:0.74rem; color:var(--cv-text-muted);">
+                Take immediate operational action: purge expired/empty lots or restock medicine batches.
+              </p>
+            </div>
+            <button type="button" id="btnCloseDrillDown" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+
+          <!-- Search Filter Toolbar -->
+          <div style="padding:0.75rem 1.25rem; background:#ffffff; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+            <div class="cv-search-icon-input" style="width:320px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="drillDownSearchInput" placeholder="Filter medicines, batch, shelf placement..." autocomplete="off">
+            </div>
+            <div id="drillDownItemCount" style="font-size:0.8rem; font-weight:700; color:var(--cv-text-muted);">
+              Loading records...
+            </div>
+          </div>
+
+          <!-- Items Table Container -->
+          <div style="flex:1; overflow-y:auto; padding:0 1.25rem 1rem 1.25rem;">
+            <table class="cv-bill-table" style="margin-top:0.75rem;">
+              <thead>
+                <tr>
+                  <th>Medicine</th>
+                  <th>Batch #</th>
+                  <th>Shelf / Placement</th>
+                  <th>Expiry Date</th>
+                  <th style="text-align:center;">Current Stock</th>
+                  <th style="text-align:right;">MRP (₹)</th>
+                  <th style="text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="drillDownTableBody">
+                <tr><td colspan="7" style="text-align:center; padding:2rem;"><div class="cv-loading-spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Modal Footer -->
+          <div style="padding:0.75rem 1.25rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+            <button type="button" class="cv-btn-secondary" id="btnCloseDrillDownFooter" style="padding:0.4rem 1.1rem; font-size:0.84rem;">Close</button>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => {
+      modalHost.innerHTML = '';
+      document.removeEventListener('keydown', onEscKey);
+    };
+    const onEscKey = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onEscKey);
+
+    document.getElementById('btnCloseDrillDown')?.addEventListener('click', closeModal);
+    document.getElementById('btnCloseDrillDownFooter')?.addEventListener('click', closeModal);
+    document.getElementById('drillDownBackdrop')?.addEventListener('click', (e) => {
+      if (e.target.id === 'drillDownBackdrop') closeModal();
+    });
+
+    // Fetch items
+    let allDrillItems = [];
+    try {
+      const res = await cvFetch(`/api/pharmacy/dashboard/details/${category}`);
+      if (res && res.success && Array.isArray(res.data)) {
+        allDrillItems = res.data;
+      }
+    } catch (err) {
+      console.error('Failed to load drill down details:', err);
+    }
+
+    function renderDrillDownList(items) {
+      const tbody = document.getElementById('drillDownTableBody');
+      const countEl = document.getElementById('drillDownItemCount');
+      if (countEl) countEl.textContent = `${items.length} item(s) found`;
+
+      if (!items || items.length === 0) {
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
+                No records currently found for this alert category.
+              </td>
+            </tr>
+          `;
+        }
+        return;
+      }
+
+      if (tbody) {
+        tbody.innerHTML = items.map(it => {
+          const daysToExpiry = it.expiryDate ? Math.ceil((new Date(it.expiryDate) - new Date()) / 86400000) : 0;
+          const isExpired = (it.alertCategory === 'expired') || (daysToExpiry <= 0);
+          const isNearExpiry = (it.alertCategory === 'expiring-soon') || (daysToExpiry > 0 && daysToExpiry <= 90);
+
+          let expiryBadge = `<span style="color:#64748b;">${escapeHtml(it.expiryDate || 'N/A')}</span>`;
+          if (isExpired) {
+            expiryBadge = `<span style="color:var(--cv-danger); font-weight:800;">${escapeHtml(it.expiryDate)} (Expired)</span>`;
+          } else if (isNearExpiry) {
+            expiryBadge = `<span style="color:#c2410c; font-weight:700;">${escapeHtml(it.expiryDate)} (${daysToExpiry}d left)</span>`;
+          }
+
+          const rackLoc = it.placement || it.rackLocation;
+          const placementBadge = rackLoc
+            ? `<span class="cv-placement-tag"><svg style="width:11px; height:11px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>${escapeHtml(rackLoc)}</span>`
+            : `<span style="color:#94a3b8; font-size:0.75rem;">Unassigned</span>`;
+
+          const qty = it.currentQuantity !== undefined ? it.currentQuantity : (it.stockQuantity || 0);
+          const price = it.unitPrice || it.mrp || 0;
+
+          return `
+            <tr>
+              <td>
+                <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(it.name)}</div>
+                <div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(it.medicineCode)} &bull; ${escapeHtml(it.genericName || '')}</div>
+              </td>
+              <td><span style="font-family:monospace; font-size:0.8rem; background:#f1f5f9; padding:0.15rem 0.45rem; border-radius:4px;">${escapeHtml(it.batchNumber || 'All Batches')}</span></td>
+              <td>${placementBadge}</td>
+              <td style="font-size:0.82rem;">${expiryBadge}</td>
+              <td style="text-align:center; font-weight:800; font-size:0.95rem; color:${qty <= 0 ? 'var(--cv-danger)' : (qty <= 15 ? '#d97706' : '#16a34a')};">
+                ${qty}
+              </td>
+              <td style="text-align:right; font-weight:700;">₹${formatCurrency(price)}</td>
+              <td style="text-align:center; white-space:nowrap;">
+                ${it.batchId ? `
+                  ${(isExpired || qty <= 0) ? `
+                    <button type="button" class="cv-btn-secondary btn-drill-purge-batch" data-batch-id="${it.batchId}" data-batch-no="${escapeHtml(it.batchNumber)}" style="padding:0.25rem 0.6rem; font-size:0.75rem; color:var(--cv-danger); border-color:#fca5a5;">
+                      Purge Batch
+                    </button>
+                  ` : ''}
+                ` : ''}
+                <button type="button" class="cv-btn-secondary btn-drill-restock" data-med-id="${it.medicineId}" style="padding:0.25rem 0.6rem; font-size:0.75rem; color:var(--cv-primary); margin-left:0.25rem;">
+                  Restock
+                </button>
+                <button type="button" class="cv-btn-secondary btn-drill-batches" data-med-id="${it.medicineId}" style="padding:0.25rem 0.6rem; font-size:0.75rem; margin-left:0.25rem;">
+                  Batches
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Wire Actions
+        tbody.querySelectorAll('.btn-drill-purge-batch').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const bId = e.currentTarget.getAttribute('data-batch-id');
+            const bNo = e.currentTarget.getAttribute('data-batch-no');
+            if (!confirm(`Are you sure you want to purge/delete batch ${bNo}? This will remove it from active dispensary records.`)) return;
+
+            try {
+              const res = await cvFetch(`/api/pharmacy/batches/${bId}?context=PurgeAlert`, { method: 'DELETE' });
+              if (res && res.success) {
+                showToast(`Batch ${bNo} purged successfully.`, 'success');
+                allDrillItems = allDrillItems.filter(i => String(i.batchId) !== String(bId));
+                renderDrillDownList(allDrillItems);
+                renderPharmacyDashboardTab();
+              } else {
+                alert(res?.message || 'Failed to purge batch.');
+              }
+            } catch (err) {
+              alert('Error purging batch: ' + err.message);
+            }
+          });
+        });
+
+        tbody.querySelectorAll('.btn-drill-restock').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const medId = e.currentTarget.getAttribute('data-med-id');
+            pharPreselectedRestockMedId = medId;
+            closeModal();
+            switchPharTab('procurement', true);
+          });
+        });
+
+        tbody.querySelectorAll('.btn-drill-batches').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const medId = e.currentTarget.getAttribute('data-med-id');
+            closeModal();
+            showBatchManagementModal(medId);
+          });
+        });
+      }
+    }
+
+    renderDrillDownList(allDrillItems);
+
+    document.getElementById('drillDownSearchInput')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) {
+        renderDrillDownList(allDrillItems);
+        return;
+      }
+      const filtered = allDrillItems.filter(it =>
+        (it.name && it.name.toLowerCase().includes(q)) ||
+        (it.medicineCode && it.medicineCode.toLowerCase().includes(q)) ||
+        (it.genericName && it.genericName.toLowerCase().includes(q)) ||
+        (it.batchNumber && it.batchNumber.toLowerCase().includes(q)) ||
+        (it.rackLocation && it.rackLocation.toLowerCase().includes(q))
+      );
+      renderDrillDownList(filtered);
+    });
+  }
+
+
+
+  // ====================================================================
+  // TAB 2: SALES & POS DISPENSING ENGINE
+  // ====================================================================
   async function renderPharmacyBillingTab() {
     const container = document.getElementById('pharTabContent');
     if (!container) return;
@@ -6176,32 +6698,46 @@ function renderPharmacyModule(activeTab = 'billing') {
       </div>
     `;
 
-    // Load available medicines from backend
+    let doctors = [];
     try {
-      const res = await cvFetch('/api/pharmacy/medicines');
-      if (res && res.success && Array.isArray(res.data)) {
-        pharMedicinesCatalog = res.data;
+      const [medRes, docRes] = await Promise.all([
+        cvFetch('/api/pharmacy/medicines'),
+        cvFetch('/api/pharmacy/sales/doctors')
+      ]);
+      if (medRes && medRes.success && Array.isArray(medRes.data)) {
+        pharMedicinesCatalog = medRes.data;
       } else {
         pharMedicinesCatalog = [];
       }
+      if (docRes && docRes.success && Array.isArray(docRes.data)) {
+        doctors = docRes.data;
+      }
     } catch (err) {
-      console.error('Failed to load pharmacy medicines:', err);
-      pharMedicinesCatalog = [];
+      console.error('Failed to load pharmacy medicines/doctors:', err);
     }
 
     container.innerHTML = `
-      
       <div class="cv-pharmacy-flow">
-        <!-- 1. Patient Details & Search Card -->
+        
+        <!-- 1. Patient Details & Doctor Card -->
         <div class="cv-pharmacy-card">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              1. Patient Details &amp; Search
+              1. Patient Identification &amp; Prescriber
             </div>
-            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Real MySQL Records</span>
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <button type="button" class="cv-btn-secondary" id="btnPharViewPatientHistory" style="padding:0.25rem 0.65rem; font-size:0.75rem; color:#0284c7; display:inline-flex; align-items:center; gap:0.3rem;">
+                <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Purchase History (Last 5)
+              </button>
+              <label class="cv-doctor-lock-switch" title="Keep the selected prescribing doctor active across bill resets">
+                <input type="checkbox" id="pharLockDoctorCheckbox" ${pharLockedDoctor ? 'checked' : ''}>
+                <span>Lock Doctor</span>
+              </label>
+            </div>
           </div>
 
           <div class="cv-patient-search-row">
@@ -6215,99 +6751,151 @@ function renderPharmacyModule(activeTab = 'billing') {
               <div id="pharPatientDropdown" class="cv-patient-dropdown" style="display:none;"></div>
             </div>
 
-            <div id="pharPatientAutofillContainer" class="cv-patient-autofill-wrapper">
-              ${renderPatientAutofillHtml(pharSelectedPatient)}
+            <!-- Doctor Selector -->
+            <div style="min-width:260px;">
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; text-transform:uppercase;">
+                PRESCRIBING DOCTOR
+              </label>
+              <select id="pharDoctorSelect" class="cv-form-select" style="height:38px; font-size:0.86rem; width:100%;">
+                <option value="">-- Select Consultant / Prescribing Doctor --</option>
+                ${doctors.map(d => `
+                  <option value="${escapeHtml(d.name)}" data-dept="${escapeHtml(d.department || '')}" ${pharLockedDoctor?.name === d.name ? 'selected' : ''}>
+                    ${escapeHtml(d.name)} (${escapeHtml(d.department || 'General')})
+                  </option>
+                `).join('')}
+              </select>
             </div>
+          </div>
+
+          <div id="pharPatientAutofillContainer" class="cv-patient-autofill-wrapper" style="margin-top:0.75rem;">
+            ${renderPatientAutofillHtml(pharSelectedPatient)}
           </div>
         </div>
 
-        <!-- 2. Medicine Selection & Dispensing Card -->
+        <!-- 2. Medicine Selection & FEIFO Batch Workspace -->
         <div class="cv-pharmacy-card">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              2. Medicine Selection &amp; Dispensing
+              2. Medicine Selection &amp; FEIFO Batch Dispensing
             </div>
             <div id="pharStockStatusPill">
               <span class="cv-stock-info-pill cv-stock-in">Select a medicine to view stock</span>
             </div>
           </div>
 
-          <!-- Medicine Search (Name, Medicine ID, Batch Number) -->
-          <div style="margin-bottom:0.75rem; position:relative;">
-            <label for="pharMedicineSearchInput" style="font-size:0.75rem; font-weight:700; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem; letter-spacing:0.02em;">
-              <svg style="width:14px; height:14px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              MEDICINE SEARCH
-            </label>
-            <div style="position:relative; width:100%;">
-              <input type="text" id="pharMedicineSearchInput" class="cv-form-input" placeholder="Search medicine / medicine ID / batch number" autocomplete="off" style="height:38px; font-size:0.86rem; width:100%;">
+          <!-- Dual-input Medicine Search -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; margin-bottom:0.75rem;">
+            <div style="position:relative;">
+              <label for="pharMedicineSearchInput" style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
+                <svg style="width:13px; height:13px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                SEARCH BY NAME / CODE / GENERIC / BATCH
+              </label>
+              <input type="text" id="pharMedicineSearchInput" class="cv-form-input" placeholder="Type medicine name, code, generic, or batch..." autocomplete="off" style="height:38px; font-size:0.86rem; width:100%;">
               <div id="pharMedicineDropdown" class="cv-patient-dropdown" style="display:none; max-height:280px; overflow-y:auto; width:100%; z-index:100; position:absolute; top:calc(100% + 4px); left:0; right:0; box-shadow:var(--cv-shadow-lg); background:var(--cv-surface); border:1px solid var(--cv-border); border-radius:var(--cv-radius-md);"></div>
             </div>
-          </div>
 
-          <div class="cv-medicine-add-grid">
             <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">
-                MEDICINE MASTER <span style="color:var(--cv-danger);">*</span>
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem;">
+                OR CHOOSE FROM MASTER CATALOG
               </label>
               <select id="pharMedicineSelect" class="cv-form-select" style="height:38px; font-size:0.86rem; width:100%;">
-                <option value="">-- Search &amp; Select Medicine --</option>
+                <option value="">-- Choose Medicine --</option>
                 ${pharMedicinesCatalog.map(m => `
-                  <option value="${m.id}" data-code="${escapeHtml(m.medicineCode)}" data-name="${escapeHtml(m.name)}" data-batch="${escapeHtml(m.batchNumber)}" data-price="${m.unitPrice}" data-stock="${m.stockQuantity}" data-exp="${escapeHtml(m.expiryDate || '')}">
-                    ${escapeHtml(m.name)} (${escapeHtml(m.medicineCode)}) | Batch: ${escapeHtml(m.batchNumber)} | Stock: ${m.stockQuantity} | ₹${m.unitPrice}
+                  <option value="${m.id}">
+                    ${escapeHtml(m.name)} (${escapeHtml(m.medicineCode)}) | Stock: ${m.stockQuantity} | ₹${formatCurrency(m.unitPrice)}
                   </option>
                 `).join('')}
               </select>
             </div>
-
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">BATCH NO</label>
-              <input type="text" id="pharMedicineBatch" class="cv-form-input" style="height:38px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Batch">
-            </div>
-
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">EXPIRY</label>
-              <input type="text" id="pharMedicineExpiry" class="cv-form-input" style="height:38px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="YYYY-MM-DD">
-            </div>
-
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">
-                QTY <span style="color:var(--cv-danger);">*</span>
-              </label>
-              <input type="number" id="pharMedicineQty" class="cv-form-input" min="1" value="1" style="height:38px; font-weight:700; text-align:center;">
-            </div>
-
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">UNIT PRICE (₹)</label>
-              <input type="number" id="pharMedicineUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; text-align:right;">
-            </div>
-
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">AMOUNT (₹)</label>
-              <input type="text" id="pharMedicineAmount" class="cv-form-input" style="height:38px; font-weight:700; text-align:right; background:#f8fafc;" readonly value="0.00">
-            </div>
-
-            <div>
-              <button type="button" class="cv-btn-primary" id="btnPharAddMedicine" style="height:38px; padding:0 1.2rem; font-size:0.85rem; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:0.4rem;">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                + Add to Bill
-              </button>
-            </div>
           </div>
 
-          <div id="pharStockErrorHint" style="display:none; color:var(--cv-danger); font-size:0.78rem; font-weight:600; margin-top:0.4rem;"></div>
+          <!-- Dynamic Medicine Workspace (Shown when medicine is selected) -->
+          <div id="pharMedicineWorkspace" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.9rem 1.1rem; margin-bottom:0.75rem; display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+              <div>
+                <div style="display:flex; align-items:center; gap:0.55rem;">
+                  <span id="pharRxDot" class="cv-rx-dot otc"></span>
+                  <h3 id="pharWorkMedName" style="margin:0; font-size:1.05rem; font-weight:800; color:#0f172a;">Medicine Name</h3>
+                  <span id="pharWorkMedCode" style="font-family:monospace; font-size:0.8rem; background:#e0f2fe; color:#0369a1; padding:0.1rem 0.45rem; border-radius:4px; font-weight:700;">MED-0000</span>
+                  <span id="pharWorkRxBadge" style="font-size:0.7rem; font-weight:800; padding:0.12rem 0.5rem; border-radius:12px; background:#dcfce7; color:#15803d;">OTC</span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.2rem; display:flex; gap:0.75rem; align-items:center;">
+                  <span id="pharWorkGeneric">Generic</span>
+                  <span id="pharWorkMfg">Manufacturer</span>
+                  <span id="pharWorkPlacement"></span>
+                </div>
+              </div>
+
+              <!-- Unit Toggle (Basic vs Strip) -->
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; text-transform:uppercase;">Packaging Unit</label>
+                <div class="cv-unit-pills">
+                  <button type="button" class="cv-unit-pill-btn active" id="btnUnitBasic">Basic Unit</button>
+                  <button type="button" class="cv-unit-pill-btn" id="btnUnitStrip">Strip / Box</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Horizontal FEIFO Batch Train -->
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                <label style="font-size:0.7rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.02em;">
+                  AVAILABLE BATCHES (SORTED FEIFO &bull; EARLIEST EXPIRY FIRST)
+                </label>
+                <span id="pharBatchCountText" style="font-size:0.72rem; color:var(--cv-text-muted);">Loading batches...</span>
+              </div>
+              <div class="cv-batch-train-wrapper">
+                <div class="cv-batch-train" id="pharBatchTrainMount">
+                  <!-- Injected via loadMedicineBatchesForPOS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Dispense Add Row -->
+            <div style="display:grid; grid-template-columns: 140px 140px 140px 1fr; gap:0.75rem; align-items:flex-end; margin-top:0.75rem; padding-top:0.6rem; border-top:1px dashed #cbd5e1;">
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">QUANTITY</label>
+                <div style="display:flex; align-items:center;">
+                  <button type="button" id="btnPharQtyMinus" style="height:36px; width:32px; border:1px solid #cbd5e1; background:#ffffff; border-radius:6px 0 0 6px; font-weight:800; cursor:pointer;">-</button>
+                  <input type="number" id="pharMedicineQty" min="1" value="1" style="height:36px; width:65px; border-top:1px solid #cbd5e1; border-bottom:1px solid #cbd5e1; border-left:none; border-right:none; text-align:center; font-weight:800;">
+                  <button type="button" id="btnPharQtyPlus" style="height:36px; width:32px; border:1px solid #cbd5e1; background:#ffffff; border-radius:0 6px 6px 0; font-weight:800; cursor:pointer;">+</button>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">UNIT RATE (₹)</label>
+                <input type="number" id="pharMedicineUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:36px; font-weight:700; text-align:right;">
+              </div>
+
+              <div>
+                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">AMOUNT (₹)</label>
+                <input type="text" id="pharMedicineAmount" class="cv-form-input" readonly value="0.00" style="height:36px; font-weight:800; text-align:right; background:#f1f5f9;">
+              </div>
+
+              <div style="display:flex; justify-content:flex-end;">
+                <button type="button" class="cv-btn-primary" id="btnPharAddMedicine" style="height:36px; padding:0 1.5rem; font-size:0.86rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+                  <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                  + Add to Bill
+                </button>
+              </div>
+            </div>
+
+            <div id="pharStockErrorHint" style="display:none; color:var(--cv-danger); font-size:0.78rem; font-weight:600; margin-top:0.4rem;"></div>
+          </div>
+
         </div>
 
-        <!-- 3. Selected Medicines / Bill Table Card (Full Width) -->
+        <!-- 3. Selected Medicines / Cart Table Card -->
         <div class="cv-pharmacy-card">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              3. Selected Medicines / Bill Table
+              3. Selected Medicines &amp; Cart Table
               <span id="pharItemCountBadge" style="font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:0.12rem 0.5rem; border-radius:12px; margin-left:0.5rem; font-weight:700;">
                 ${pharBillItems.length} items
               </span>
@@ -6323,14 +6911,15 @@ function renderPharmacyModule(activeTab = 'billing') {
             <table class="cv-bill-table" id="pharBillTable">
               <thead>
                 <tr>
-                  <th style="width:45px; text-align:center;">#</th>
-                  <th>Medicine</th>
-                  <th style="width:130px;">Batch</th>
-                  <th style="width:115px;">Expiry</th>
-                  <th style="width:95px; text-align:center;">Qty</th>
-                  <th style="width:125px; text-align:right;">Unit Price (₹)</th>
-                  <th style="width:125px; text-align:right;">Amount (₹)</th>
-                  <th style="width:70px; text-align:center;">Action</th>
+                  <th style="width:40px; text-align:center;">#</th>
+                  <th>Medicine Name</th>
+                  <th style="width:130px;">Batch #</th>
+                  <th style="width:105px;">Expiry</th>
+                  <th style="width:90px; text-align:center;">Unit</th>
+                  <th style="width:85px; text-align:center;">Qty</th>
+                  <th style="width:115px; text-align:right;">Rate (₹)</th>
+                  <th style="width:115px; text-align:right;">Amount (₹)</th>
+                  <th style="width:60px; text-align:center;">Action</th>
                 </tr>
               </thead>
               <tbody id="pharBillTableBody">
@@ -6340,21 +6929,21 @@ function renderPharmacyModule(activeTab = 'billing') {
           </div>
         </div>
 
-        <!-- 4. Billing & Payment Summary Card (Positioned Directly Below Bill Table) -->
+        <!-- 4. Billing & Payment Summary Card -->
         <div class="cv-pharmacy-card cv-pharmacy-summary-card">
           <div class="cv-pharmacy-card-header" style="margin-bottom:0.5rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.35rem;">
             <div class="cv-pharmacy-card-title" style="font-size:0.88rem;">
               <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              4. Billing &amp; Payment Summary
+              4. Invoicing, Taxes &amp; Settlement
             </div>
-            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Tax Invoice &amp; Settlement</span>
+            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Dispensary Bill Settlement</span>
           </div>
           
           <div class="cv-pharmacy-summary-grid">
             
-            <!-- Left Column: Bill & Tax Calculation -->
+            <!-- Left Column: Calculation -->
             <div class="cv-summary-calc-col">
               <div class="cv-calc-row">
                 <span class="cv-calc-label">Subtotal</span>
@@ -6371,6 +6960,9 @@ function renderPharmacyModule(activeTab = 'billing') {
                 </div>
                 <span id="pharDiscountAmount" style="font-weight:700; color:var(--cv-danger); font-size:0.86rem;">- ₹0.00</span>
               </div>
+              <div id="pharDiscountWarningHint" style="display:none; color:#d97706; font-size:0.7rem; font-weight:700; text-align:right;">
+                ⚠️ Discount exceeds standard 15% threshold
+              </div>
               
               <div class="cv-calc-row">
                 <span class="cv-calc-label">Net Taxable Amount</span>
@@ -6378,7 +6970,7 @@ function renderPharmacyModule(activeTab = 'billing') {
               </div>
               
               <div class="cv-calc-row">
-                <span class="cv-calc-label">GSTIN / GST Number</span>
+                <span class="cv-calc-label">GSTIN</span>
                 <input type="text" id="pharGstNumber" class="cv-form-input" style="height:26px; width:155px; font-size:0.74rem; font-family:monospace; text-transform:uppercase; text-align:right;" placeholder="22AAAAA0000A1Z5" value="22AAAAA0000A1Z5">
               </div>
 
@@ -6441,12 +7033,12 @@ function renderPharmacyModule(activeTab = 'billing') {
               </div>
 
               <div class="cv-calc-row">
-                <span class="cv-calc-label">Dispensing Notes</span>
+                <span class="cv-calc-label">Prescription / Notes</span>
                 <input type="text" id="pharNotes" class="cv-form-input" style="height:26px; width:180px; font-size:0.78rem; padding:0.1rem 0.4rem;" placeholder="Prescription ref / notes...">
               </div>
 
               <!-- Action Buttons -->
-              <div style="display:flex; gap:0.5rem; align-items:center;">
+              <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.4rem;">
                 <button type="button" class="cv-btn-secondary" id="btnPharResetBill" style="flex:1; height:32px; font-weight:600; font-size:0.82rem; padding:0 0.5rem;">
                   Reset
                 </button>
@@ -6459,11 +7051,10 @@ function renderPharmacyModule(activeTab = 'billing') {
             </div>
           </div>
         </div>
+
       </div>
+    `;
 
-`;
-
-    // Setup interactive events
     setupPharmacyBillingEvents();
     recalculatePharmacyBill();
   }
@@ -6500,10 +7091,6 @@ function renderPharmacyModule(activeTab = 'billing') {
             <span style="font-family:monospace;">${escapeHtml(patient.opId || 'N/A')}</span>
           </div>
           <div class="cv-autofill-item">
-            <label>IP ID</label>
-            <span style="font-family:monospace;">${escapeHtml(patient.ipId || 'N/A')}</span>
-          </div>
-          <div class="cv-autofill-item">
             <label>Phone Number</label>
             <span>${escapeHtml(patient.phone || 'N/A')}</span>
           </div>
@@ -6531,8 +7118,8 @@ function renderPharmacyModule(activeTab = 'billing') {
     if (!pharBillItems || pharBillItems.length === 0) {
       return `
         <tr>
-          <td colspan="8" style="text-align:center; padding:1.25rem; color:var(--cv-text-muted); font-size:0.85rem;">
-            No medicines added to bill yet. Select a medicine from above and click <strong>+ Add to Bill</strong>.
+          <td colspan="9" style="text-align:center; padding:1.25rem; color:var(--cv-text-muted); font-size:0.85rem;">
+            No medicines added to bill yet. Select a medicine and batch above and click <strong>+ Add to Bill</strong>.
           </td>
         </tr>
       `;
@@ -6540,13 +7127,18 @@ function renderPharmacyModule(activeTab = 'billing') {
 
     return pharBillItems.map((item, idx) => `
       <tr data-index="${idx}">
-        <td style="color:var(--cv-text-muted); font-weight:600;">${idx + 1}</td>
+        <td style="color:var(--cv-text-muted); font-weight:600; text-align:center;">${idx + 1}</td>
         <td>
           <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(item.medicineName)}</div>
-          <div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(item.medicineCode)}</div>
+          <div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">
+            ${escapeHtml(item.medicineCode)} ${item.hasPrescription ? '<span style="color:var(--cv-danger); font-weight:800;">[Rx Required]</span>' : ''}
+          </div>
         </td>
         <td><span style="font-family:monospace; font-size:0.8rem; background:#f1f5f9; padding:0.15rem 0.4rem; border-radius:4px;">${escapeHtml(item.batchNumber)}</span></td>
         <td style="font-size:0.78rem; color:var(--cv-text-muted);">${escapeHtml(item.expiryDate || 'N/A')}</td>
+        <td style="text-align:center; font-size:0.75rem; text-transform:uppercase; font-weight:700; color:#0369a1;">
+          ${escapeHtml(item.unit || 'BASIC')}
+        </td>
         <td style="text-align:center;">
           <input type="number" class="cv-bill-input-qty phar-item-qty" data-index="${idx}" min="1" max="${item.maxStock}" value="${item.quantity}">
         </td>
@@ -6595,7 +7187,6 @@ function renderPharmacyModule(activeTab = 'billing') {
                     <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; gap:0.5rem; margin-top:0.15rem;">
                       <span>UHID: <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(p.uhid)}</strong></span>
                       ${p.opId ? `<span>OP: <strong style="font-family:monospace;">${escapeHtml(p.opId)}</strong></span>` : ''}
-                      ${p.ipId ? `<span>IP: <strong style="font-family:monospace;">${escapeHtml(p.ipId)}</strong></span>` : ''}
                       <span>Phone: ${escapeHtml(p.phone || 'N/A')}</span>
                     </div>
                   </div>
@@ -6626,7 +7217,6 @@ function renderPharmacyModule(activeTab = 'billing') {
         }, 250);
       });
 
-      // Close dropdown when clicking outside
       document.addEventListener('click', (e) => {
         if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
           dropdown.style.display = 'none';
@@ -6634,10 +7224,39 @@ function renderPharmacyModule(activeTab = 'billing') {
       });
     }
 
-    // Clear patient button
     document.getElementById('btnPharClearPatient')?.addEventListener('click', clearPharmacyPatient);
 
-    // Medicine Search autocomplete (Name, Medicine ID, Batch Number)
+    // Patient History Button
+    document.getElementById('btnPharViewPatientHistory')?.addEventListener('click', async () => {
+      let q = '';
+      if (pharSelectedPatient) {
+        q = pharSelectedPatient.uhid || pharSelectedPatient.phone || '';
+      } else {
+        q = document.getElementById('pharWalkinPhone')?.value?.trim() || '';
+      }
+      if (!q) {
+        alert('Please select a patient first, or enter a phone number to view purchase history.');
+        return;
+      }
+      showPatientHistoryModal(q);
+    });
+
+    // Doctor lock toggle
+    const lockDoctorCheckbox = document.getElementById('pharLockDoctorCheckbox');
+    lockDoctorCheckbox?.addEventListener('change', (e) => {
+      const docSelect = document.getElementById('pharDoctorSelect');
+      if (e.target.checked && docSelect && docSelect.value) {
+        pharLockedDoctor = {
+          name: docSelect.value,
+          department: docSelect.selectedOptions[0]?.getAttribute('data-dept') || 'General'
+        };
+        showToast(`Doctor ${pharLockedDoctor.name} locked for subsequent bills.`, 'info');
+      } else {
+        pharLockedDoctor = null;
+      }
+    });
+
+    // Medicine search bar autocomplete
     const medSearchInput = document.getElementById('pharMedicineSearchInput');
     const medDropdown = document.getElementById('pharMedicineDropdown');
     const medSelect = document.getElementById('pharMedicineSelect');
@@ -6657,33 +7276,20 @@ function renderPharmacyModule(activeTab = 'billing') {
         medSearchDebounce = setTimeout(async () => {
           try {
             const res = await cvFetch(`/api/pharmacy/medicines?q=${encodeURIComponent(q)}`);
-            let items = [];
-            if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-              items = res.data;
-            } else if (pharMedicinesCatalog && pharMedicinesCatalog.length > 0) {
-              const lowerQ = q.toLowerCase();
-              items = pharMedicinesCatalog.filter(m =>
-                (m.name && m.name.toLowerCase().includes(lowerQ)) ||
-                (m.medicineCode && m.medicineCode.toLowerCase().includes(lowerQ)) ||
-                (m.batchNumber && m.batchNumber.toLowerCase().includes(lowerQ)) ||
-                (m.genericName && m.genericName.toLowerCase().includes(lowerQ))
-              );
-            }
-
+            let items = (res && res.success && Array.isArray(res.data)) ? res.data : [];
             if (items.length > 0) {
-              const sorted = sortByStartsWith(items, q, 'name');
-              medDropdown.innerHTML = sorted.map(m => `
-                <div class="cv-patient-dropdown-item cv-med-result-item" data-id="${m.id}" data-name="${escapeHtml(m.name)}" data-batch="${escapeHtml(m.batchNumber || '')}">
+              medDropdown.innerHTML = items.map(m => `
+                <div class="cv-patient-dropdown-item cv-med-result-item" data-id="${m.id}">
                   <div style="flex:1;">
                     <div style="font-weight:700; color:var(--cv-text-main); font-size:0.88rem;">
                       ${escapeHtml(m.name)}
                       <span style="font-size:0.75rem; color:var(--cv-primary); font-family:monospace; margin-left:0.35rem;">(${escapeHtml(m.medicineCode || '')})</span>
+                      ${m.rackLocation ? `<span class="cv-placement-tag" style="margin-left:0.4rem;">📍 ${escapeHtml(m.rackLocation)}</span>` : ''}
                     </div>
                     <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; gap:0.65rem; margin-top:0.2rem; flex-wrap:wrap;">
-                      <span>Batch: <strong style="font-family:monospace; color:var(--cv-text-primary);">${escapeHtml(m.batchNumber || 'N/A')}</strong></span>
-                      <span>Stock: <strong style="color:${m.stockQuantity <= 0 ? 'var(--cv-danger)' : (m.stockQuantity <= 15 ? 'var(--cv-warning)' : 'var(--cv-success)')};">${m.stockQuantity}</strong></span>
-                      <span>Price: <strong>₹${formatCurrency(m.unitPrice)}</strong></span>
-                      <span>Expiry: ${escapeHtml(m.expiryDate || 'N/A')}</span>
+                      <span>Stock: <strong style="color:${m.stockQuantity <= 0 ? 'var(--cv-danger)' : (m.stockQuantity <= 15 ? '#d97706' : '#16a34a')};">${m.stockQuantity}</strong></span>
+                      <span>MRP: <strong>₹${formatCurrency(m.unitPrice)}</strong></span>
+                      ${m.prescriptionRequired ? '<span style="color:var(--cv-danger); font-weight:800;">[Rx Required]</span>' : '<span style="color:#16a34a;">[OTC]</span>'}
                     </div>
                   </div>
                   <div>
@@ -6695,19 +7301,13 @@ function renderPharmacyModule(activeTab = 'billing') {
 
               medDropdown.querySelectorAll('.cv-med-result-item').forEach(el => {
                 el.addEventListener('click', () => {
-                  const medId = el.getAttribute('data-id');
-                  const medName = el.getAttribute('data-name');
-                  const medBatch = el.getAttribute('data-batch');
-                  if (medSelect) {
-                    medSelect.value = medId;
-                    medSelect.dispatchEvent(new Event('change'));
-                  }
-                  medSearchInput.value = `${medName} (Batch: ${medBatch})`;
+                  const mId = el.getAttribute('data-id');
+                  selectMedicineForPOS(mId);
                   medDropdown.style.display = 'none';
                 });
               });
             } else {
-              medDropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:var(--cv-text-muted); font-size:0.85rem; text-align:center;">No medicines found matching "<strong>${escapeHtml(q)}</strong>".</div>`;
+              medDropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:var(--cv-text-muted); font-size:0.85rem; text-align:center;">No medicines found.</div>`;
               medDropdown.style.display = 'block';
             }
           } catch (err) {
@@ -6723,91 +7323,76 @@ function renderPharmacyModule(activeTab = 'billing') {
       });
     }
 
-    // 2. Medicine selection change
-    const batchInput = document.getElementById('pharMedicineBatch');
-    const expInput = document.getElementById('pharMedicineExpiry');
-    const qtyInput = document.getElementById('pharMedicineQty');
-    const priceInput = document.getElementById('pharMedicineUnitPrice');
-    const amtInput = document.getElementById('pharMedicineAmount');
-    const stockPill = document.getElementById('pharStockStatusPill');
-    const stockHint = document.getElementById('pharStockErrorHint');
-
-    function updateMedicineInputAmount() {
-      const q = parseInt(qtyInput?.value) || 0;
-      const p = parseFloat(priceInput?.value) || 0;
-      if (amtInput) amtInput.value = (q * p).toFixed(2);
-
-      // Validate stock
-      const opt = medSelect?.selectedOptions?.[0];
-      if (opt && opt.value) {
-        const stock = parseInt(opt.getAttribute('data-stock')) || 0;
-        if (q > stock) {
-          if (stockHint) {
-            stockHint.textContent = `Only ${stock} units are available in stock.`;
-            stockHint.style.display = 'block';
-          }
-        } else {
-          if (stockHint) stockHint.style.display = 'none';
-        }
-      }
-    }
-
     if (medSelect) {
       medSelect.addEventListener('change', () => {
-        const opt = medSelect.selectedOptions[0];
-        if (opt && opt.value) {
-          const batch = opt.getAttribute('data-batch') || '';
-          const exp = opt.getAttribute('data-exp') || '';
-          const price = parseFloat(opt.getAttribute('data-price')) || 0;
-          const stock = parseInt(opt.getAttribute('data-stock')) || 0;
-
-          if (batchInput) batchInput.value = batch;
-          if (expInput) expInput.value = exp;
-          if (priceInput) priceInput.value = price.toFixed(2);
-          if (qtyInput) qtyInput.value = 1;
-
-          if (stockPill) {
-            if (stock <= 0) {
-              stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-out">OUT OF STOCK (0 units)</span>`;
-            } else if (stock <= 15) {
-              stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-low">LOW STOCK (${stock} units available)</span>`;
-            } else {
-              stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-in">${stock} units available in stock</span>`;
-            }
-          }
-          updateMedicineInputAmount();
+        if (medSelect.value) {
+          selectMedicineForPOS(medSelect.value);
         } else {
-          if (batchInput) batchInput.value = '';
-          if (expInput) expInput.value = '';
-          if (priceInput) priceInput.value = '0.00';
-          if (amtInput) amtInput.value = '0.00';
-          if (stockPill) stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-in">Select a medicine to view stock</span>`;
-          if (stockHint) stockHint.style.display = 'none';
+          document.getElementById('pharMedicineWorkspace').style.display = 'none';
         }
       });
     }
 
-    qtyInput?.addEventListener('input', updateMedicineInputAmount);
-    priceInput?.addEventListener('input', updateMedicineInputAmount);
+    // Unit toggle buttons
+    const btnUnitBasic = document.getElementById('btnUnitBasic');
+    const btnUnitStrip = document.getElementById('btnUnitStrip');
+    btnUnitBasic?.addEventListener('click', () => {
+      pharSelectedUnitForPOS = 'basic';
+      btnUnitBasic.classList.add('active');
+      btnUnitStrip.classList.remove('active');
+      updatePOSRateAndAmount();
+    });
+    btnUnitStrip?.addEventListener('click', () => {
+      pharSelectedUnitForPOS = 'strip';
+      btnUnitStrip.classList.add('active');
+      btnUnitBasic.classList.remove('active');
+      updatePOSRateAndAmount();
+    });
 
-    // 3. Add to Bill button
+    // Quantity stepper
+    document.getElementById('btnPharQtyMinus')?.addEventListener('click', () => {
+      const qInput = document.getElementById('pharMedicineQty');
+      if (qInput) {
+        let val = parseInt(qInput.value) || 1;
+        if (val > 1) {
+          qInput.value = val - 1;
+          updatePOSRateAndAmount();
+        }
+      }
+    });
+    document.getElementById('btnPharQtyPlus')?.addEventListener('click', () => {
+      const qInput = document.getElementById('pharMedicineQty');
+      if (qInput) {
+        let val = parseInt(qInput.value) || 1;
+        qInput.value = val + 1;
+        updatePOSRateAndAmount();
+      }
+    });
+    document.getElementById('pharMedicineQty')?.addEventListener('input', updatePOSRateAndAmount);
+    document.getElementById('pharMedicineUnitPrice')?.addEventListener('input', updatePOSRateAndAmount);
+
+    // Add to bill button
     document.getElementById('btnPharAddMedicine')?.addEventListener('click', addMedicineToBill);
 
-    // 4. Clear all items
+    // Clear all items
     document.getElementById('btnPharClearAllItems')?.addEventListener('click', () => {
       pharBillItems = [];
       refreshBillTable();
     });
 
-    // 5. Table Inline edits (Quantity, Rate, Remove)
     wireBillTableInputs();
 
-    // 6. Summary Card dynamic calculation inputs
-    document.getElementById('pharDiscountPct')?.addEventListener('input', recalculatePharmacyBill);
+    // Summary calculations
+    const discInput = document.getElementById('pharDiscountPct');
+    discInput?.addEventListener('input', () => {
+      const p = parseFloat(discInput.value) || 0;
+      const warnHint = document.getElementById('pharDiscountWarningHint');
+      if (warnHint) warnHint.style.display = (p > 15) ? 'block' : 'none';
+      recalculatePharmacyBill();
+    });
     document.getElementById('pharGstPct')?.addEventListener('input', recalculatePharmacyBill);
     document.getElementById('pharPaidAmount')?.addEventListener('input', recalculatePharmacyBill);
 
-    // Pay Full shortcut button
     document.getElementById('btnPharPayFull')?.addEventListener('click', () => {
       const finalTotalStr = document.getElementById('pharFinalTotal')?.textContent.replace(/[^0-9.]/g, '') || '0';
       const paidInput = document.getElementById('pharPaidAmount');
@@ -6817,7 +7402,6 @@ function renderPharmacyModule(activeTab = 'billing') {
       }
     });
 
-    // 7. Reset bill button
     document.getElementById('btnPharResetBill')?.addEventListener('click', () => {
       if (confirm('Are you sure you want to reset this bill? All selected medicines will be cleared.')) {
         pharBillItems = [];
@@ -6827,244 +7411,280 @@ function renderPharmacyModule(activeTab = 'billing') {
       }
     });
 
-    // 8. Generate & Save Bill
-    document.getElementById('btnPharGenerateBill')?.addEventListener('click', generatePharmacyBill);
+    document.getElementById('btnPharGenerateBill')?.addEventListener('click', () => checkoutPharmacyBill(false));
+    document.getElementById('btnPharDirectPaid')?.addEventListener('click', () => checkoutPharmacyBill(true));
+  }
 
-    // 9. Direct PAID Button Handler (Single-Click Real MySQL Payment Collection)
-    document.getElementById('btnPharDirectPaid')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      if (btn.disabled || btn.dataset.processing === 'true') return;
+  async function selectMedicineForPOS(medicineId) {
+    try {
+      const res = await cvFetch(`/api/pharmacy/medicines/${medicineId}`);
+      if (!res || !res.success || !res.data) return;
 
-      const amtVal = document.getElementById('pharPaidAmount')?.value;
-      if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
-        showToast('Please enter an amount to pay.', 'danger');
+      const med = res.data;
+      pharSelectedMedicineForPOS = med;
+
+      const workspace = document.getElementById('pharMedicineWorkspace');
+      if (!workspace) return;
+      workspace.style.display = 'block';
+
+      document.getElementById('pharWorkMedName').textContent = med.name;
+      document.getElementById('pharWorkMedCode').textContent = med.medicineCode;
+      document.getElementById('pharWorkGeneric').textContent = `Generic: ${med.genericName || 'N/A'}`;
+      document.getElementById('pharWorkMfg').textContent = `Mfg: ${med.manufacturer || 'Standard'}`;
+
+      const placementEl = document.getElementById('pharWorkPlacement');
+      if (placementEl) {
+        if (med.rackLocation) {
+          placementEl.innerHTML = `<span class="cv-placement-tag">📍 Shelf: ${escapeHtml(med.rackLocation)}</span>`;
+        } else {
+          placementEl.innerHTML = '<span style="color:#94a3b8;">Shelf: Unassigned</span>';
+        }
+      }
+
+      // Rx vs OTC dot
+      const rxDot = document.getElementById('pharRxDot');
+      const rxBadge = document.getElementById('pharWorkRxBadge');
+      if (med.prescriptionRequired) {
+        if (rxDot) { rxDot.className = 'cv-rx-dot rx'; }
+        if (rxBadge) {
+          rxBadge.style.background = '#fee2e2';
+          rxBadge.style.color = '#dc2626';
+          rxBadge.textContent = 'Rx Required (Prescription Needed)';
+        }
+      } else {
+        if (rxDot) { rxDot.className = 'cv-rx-dot otc'; }
+        if (rxBadge) {
+          rxBadge.style.background = '#dcfce7';
+          rxBadge.style.color = '#15803d';
+          rxBadge.textContent = 'OTC (Over The Counter)';
+        }
+      }
+
+      // Packaging unit pill label
+      const btnUnitStrip = document.getElementById('btnUnitStrip');
+      const unitsPerStrip = med.unitsPerStrip || 10;
+      if (btnUnitStrip) {
+        btnUnitStrip.textContent = `Strip / Box (x${unitsPerStrip})`;
+      }
+
+      // Set default unit price
+      const priceInput = document.getElementById('pharMedicineUnitPrice');
+      if (priceInput) priceInput.value = Number(med.unitPrice).toFixed(2);
+
+      // Load FEIFO Batches
+      await loadMedicineBatchesForPOS(med.id);
+      updatePOSRateAndAmount();
+
+      // Update master select if not already synced
+      const medSelect = document.getElementById('pharMedicineSelect');
+      if (medSelect && medSelect.value !== String(med.id)) {
+        medSelect.value = med.id;
+      }
+    } catch (err) {
+      console.error('Error selecting medicine for POS:', err);
+    }
+  }
+
+  async function loadMedicineBatchesForPOS(medicineId) {
+    const mount = document.getElementById('pharBatchTrainMount');
+    const countText = document.getElementById('pharBatchCountText');
+    if (!mount) return;
+
+    mount.innerHTML = '<div style="padding:0.4rem; font-size:0.75rem; color:#64748b;">Loading batches...</div>';
+
+    try {
+      const res = await cvFetch(`/api/pharmacy/batches/medicine/${medicineId}`);
+      const batches = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+
+      if (countText) countText.textContent = `${batches.length} batch(es) registered`;
+
+      if (batches.length === 0) {
+        mount.innerHTML = `<div style="padding:0.4rem; font-size:0.75rem; color:var(--cv-danger); font-weight:700;">No batches available for this medicine. Please procure stock first.</div>`;
+        pharSelectedBatchForPOS = null;
         return;
       }
-      const numAmt = parseFloat(amtVal);
-      if (isNaN(numAmt) || numAmt <= 0) {
-        showToast('Payment amount must be greater than zero.', 'danger');
-        return;
-      }
 
-      // SUBSEQUENT PAYMENT ON ALREADY GENERATED PHARMACY BILL
-      if (pharActiveSavedBill) {
-        const curBal = (pharActiveSavedBill.balanceAmount != null)
-          ? parseFloat(pharActiveSavedBill.balanceAmount)
-          : Math.max(0, (pharActiveSavedBill.finalTotal || pharActiveSavedBill.totalAmount || 0) - (pharActiveSavedBill.paidAmount || 0));
+      // Sorted FEIFO (earliest expiry first)
+      let firstValidSelected = false;
 
-        if (curBal <= 0) {
-          showToast('This pharmacy bill is already fully paid.', 'info');
-          return;
-        }
-        if (numAmt > curBal + 0.001) {
-          showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
-          return;
+      mount.innerHTML = batches.map((b, idx) => {
+        const daysToExpiry = (b.expiryDate && !isNaN(new Date(b.expiryDate).getTime()))
+          ? Math.ceil((new Date(b.expiryDate) - new Date()) / 86400000)
+          : 0;
+        const isExpired = b.expired || (daysToExpiry <= 0) || false;
+        const isOutOfStock = (b.quantity <= 0);
+        const isDisabled = isExpired || isOutOfStock;
+
+        let isSelected = false;
+        if (!isDisabled && !firstValidSelected) {
+          isSelected = true;
+          firstValidSelected = true;
+          pharSelectedBatchForPOS = b;
         }
 
-        await executeBillPayment({
-          moduleType: 'PHARMACY',
-          billId: pharActiveSavedBill.id,
-          billNumber: pharActiveSavedBill.billNumber,
-          amount: numAmt,
-          balance: curBal,
-          paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
-          buttonEl: btn,
-          onSuccess: async (data) => {
-            pharActiveSavedBill.paidAmount = data.amountPaid;
-            pharActiveSavedBill.balanceAmount = data.balanceAmount;
-            pharActiveSavedBill.paymentStatus = data.paymentStatus;
-            pharActiveSavedBill.paymentMethod = data.paymentMethod;
+        let statusText = '';
+        if (isExpired) statusText = '<span style="color:#dc2626; font-size:0.62rem; font-weight:800;">EXPIRED (LOCKED)</span>';
+        else if (isOutOfStock) statusText = '<span style="color:#64748b; font-size:0.62rem; font-weight:800;">OUT OF STOCK</span>';
+        else if (b.nearExpiry || b.expiringSoon || (daysToExpiry > 0 && daysToExpiry <= 90)) statusText = `<span style="color:#d97706; font-size:0.62rem; font-weight:700;">Expiring Soon (${daysToExpiry}d)</span>`;
+        else statusText = `<span style="color:#16a34a; font-size:0.62rem; font-weight:700;">Valid (${daysToExpiry > 0 ? daysToExpiry + 'd left' : 'Fresh'})</span>`;
 
-            const isNowPaid = (data.balanceAmount <= 0);
-            const balElem = document.getElementById('pharBalanceAmount');
-            if (balElem) balElem.textContent = '₹' + formatCurrency(data.balanceAmount);
+        return `
+          <div class="cv-batch-card ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}" 
+               data-batch-id="${b.id}" data-batch-data='${JSON.stringify(b).replace(/'/g, "&apos;")}'>
+            <div class="cv-batch-card-header">
+              <span>${escapeHtml(b.batchNumber)}</span>
+              ${(idx === 0 && !isDisabled) ? '<span class="cv-batch-badge-feifo">FEIFO #1</span>' : ''}
+            </div>
+            <div class="cv-batch-card-meta">
+              <span>Stock: <strong>${b.quantity}</strong></span>
+              <span>₹${formatCurrency(b.mrp)}</span>
+            </div>
+            <div style="font-size:0.68rem; color:#64748b;">
+              Exp: ${escapeHtml(b.expiryDate || 'N/A')}
+            </div>
+            <div>${statusText}</div>
+          </div>
+        `;
+      }).join('');
 
-            const statusBadge = document.getElementById('pharPaymentStatusBadge');
-            if (statusBadge) {
-              statusBadge.textContent = data.paymentStatus;
-              statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-partial'}`;
-            }
-
-            const amtInput = document.getElementById('pharPaidAmount');
-            if (amtInput) {
-              amtInput.value = isNowPaid ? '0.00' : data.balanceAmount.toFixed(2);
-              amtInput.disabled = isNowPaid;
-            }
-
-            if (btn) {
-              btn.disabled = isNowPaid;
-              delete btn.dataset.processing;
-              btn.innerHTML = 'PAID';
-            }
-
-            showToast(`Pharmacy payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
-
-            if (pharAllSalesHistory && pharAllSalesHistory.length > 0) {
-              try {
-                const hRes = await cvFetch('/api/pharmacy/bills/history');
-                if (hRes && hRes.success && Array.isArray(hRes.data)) pharAllSalesHistory = hRes.data;
-              } catch (_) {}
-            }
+      // Wire batch cards click
+      mount.querySelectorAll('.cv-batch-card:not(.disabled)').forEach(card => {
+        card.addEventListener('click', () => {
+          mount.querySelectorAll('.cv-batch-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          try {
+            const bData = JSON.parse(card.getAttribute('data-batch-data'));
+            pharSelectedBatchForPOS = bData;
+            updatePOSRateAndAmount();
+          } catch (e) {
+            console.error('Error selecting batch:', e);
           }
         });
-        return;
-      }
-
-      // INITIAL PHARMACY BILL GENERATION + PAYMENT RECORDING
-      let patientName = '';
-      let uhid = '';
-      let phone = '';
-      let opId = '';
-      let ipId = '';
-      let doctorName = '';
-      let department = '';
-      let patientId = null;
-
-      if (pharSelectedPatient) {
-        patientId = pharSelectedPatient.id;
-        patientName = pharSelectedPatient.fullName || pharSelectedPatient.name || '';
-        uhid = pharSelectedPatient.uhid || '';
-        phone = pharSelectedPatient.phone || '';
-        opId = pharSelectedPatient.opId || '';
-        ipId = pharSelectedPatient.ipId || '';
-        doctorName = pharSelectedPatient.doctorName || '';
-        department = pharSelectedPatient.department || '';
-      } else {
-        const walkinName = document.getElementById('pharWalkinName')?.value?.trim();
-        const walkinPhone = document.getElementById('pharWalkinPhone')?.value?.trim();
-        if (!walkinName) {
-          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
-          document.getElementById('pharPatientSearchInput')?.focus();
-          return;
-        }
-        patientName = walkinName;
-        phone = walkinPhone || '';
-        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
-      }
-
-      if (!pharBillItems || pharBillItems.length === 0) {
-        showToast('Please add at least one medicine to the bill.', 'danger');
-        return;
-      }
-
-      for (const item of pharBillItems) {
-        if (item.quantity <= 0) {
-          showToast(`Invalid quantity for medicine ${item.medicineName}.`, 'danger');
-          return;
-        }
-        if (item.quantity > item.maxStock) {
-          showToast(`Only ${item.maxStock} units available for ${item.medicineName}.`, 'danger');
-          return;
-        }
-      }
-
-      let subtotal = 0;
-      const requestItems = pharBillItems.map(item => {
-        const q = parseInt(item.quantity);
-        const p = parseFloat(item.unitPrice);
-        const tot = parseFloat((q * p).toFixed(2));
-        subtotal += tot;
-        return {
-          medicineId: item.medicineId,
-          medicineCode: item.medicineCode,
-          medicineName: item.medicineName,
-          batchNumber: item.batchNumber,
-          expiryDate: item.expiryDate,
-          quantity: q,
-          unitPrice: p,
-          totalPrice: tot
-        };
       });
 
-      const discountPct = parseFloat(document.getElementById('pharDiscountPct')?.value) || 0;
-      const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
-      const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
-      const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
-      const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
-      const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
+      // Update stock pill
+      const stockPill = document.getElementById('pharStockStatusPill');
+      const med = pharSelectedMedicineForPOS;
+      if (stockPill && med) {
+        if (med.stockQuantity <= 0) {
+          stockPill.innerHTML = '<span class="cv-stock-info-pill cv-stock-out">OUT OF STOCK (0 units)</span>';
+        } else if (med.stockQuantity <= (med.reorderLevel || 15)) {
+          stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-low">LOW STOCK (${med.stockQuantity} units)</span>`;
+        } else {
+          stockPill.innerHTML = `<span class="cv-stock-info-pill cv-stock-in">${med.stockQuantity} units available</span>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error loading batches for POS:', err);
+    }
+  }
 
-      if (numAmt > finalTotal + 0.001) {
-        showToast(`Payment amount cannot exceed the bill total of ₹${formatCurrency(finalTotal)}.`, 'danger');
+  function updatePOSRateAndAmount() {
+    const med = pharSelectedMedicineForPOS;
+    if (!med) return;
+
+    const qtyInput = document.getElementById('pharMedicineQty');
+    const priceInput = document.getElementById('pharMedicineUnitPrice');
+    const amtInput = document.getElementById('pharMedicineAmount');
+    const stockHint = document.getElementById('pharStockErrorHint');
+
+    let baseRate = (pharSelectedBatchForPOS?.mrp != null) ? parseFloat(pharSelectedBatchForPOS.mrp) : parseFloat(med.unitPrice || 0);
+
+    const unitsPerStrip = med.unitsPerStrip || 10;
+    if (pharSelectedUnitForPOS === 'strip') {
+      baseRate = baseRate * unitsPerStrip;
+    }
+
+    if (priceInput && document.activeElement !== priceInput) {
+      priceInput.value = baseRate.toFixed(2);
+    }
+
+    const currentRate = parseFloat(priceInput?.value) || baseRate;
+    const qty = parseInt(qtyInput?.value) || 1;
+    const tot = (qty * currentRate).toFixed(2);
+    if (amtInput) amtInput.value = tot;
+
+    // Check available batch stock
+    if (pharSelectedBatchForPOS && stockHint) {
+      const basicUnitsRequested = (pharSelectedUnitForPOS === 'strip') ? (qty * unitsPerStrip) : qty;
+      if (basicUnitsRequested > pharSelectedBatchForPOS.quantity) {
+        stockHint.textContent = `Batch ${pharSelectedBatchForPOS.batchNumber} has only ${pharSelectedBatchForPOS.quantity} units available (requested ${basicUnitsRequested}).`;
+        stockHint.style.display = 'block';
+      } else {
+        stockHint.style.display = 'none';
+      }
+    }
+  }
+
+  function addMedicineToBill() {
+    const med = pharSelectedMedicineForPOS;
+    if (!med) {
+      alert('Please search and select a medicine first.');
+      return;
+    }
+
+    const batch = pharSelectedBatchForPOS;
+    if (!batch) {
+      alert('Please select an active, non-expired batch for this medicine.');
+      return;
+    }
+
+    if (batch.expired) {
+      alert('The selected batch is expired and cannot be dispensed.');
+      return;
+    }
+
+    const qty = parseInt(document.getElementById('pharMedicineQty')?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('pharMedicineUnitPrice')?.value) || 0;
+    const unitsPerStrip = med.unitsPerStrip || 10;
+
+    if (qty <= 0) {
+      alert('Please enter a valid quantity of 1 or more.');
+      return;
+    }
+
+    const basicUnitQuantity = (pharSelectedUnitForPOS === 'strip') ? (qty * unitsPerStrip) : qty;
+    if (basicUnitQuantity > batch.quantity) {
+      alert(`Insufficient stock in batch ${batch.batchNumber}. Available: ${batch.quantity} units, Requested: ${basicUnitQuantity} units.`);
+      return;
+    }
+
+    const existingIdx = pharBillItems.findIndex(i => i.medicineId === med.id && i.batchId === batch.id && i.unit === pharSelectedUnitForPOS);
+    const lineTotal = parseFloat((qty * unitPrice).toFixed(2));
+
+    if (existingIdx >= 0) {
+      const newTotalBasic = pharBillItems[existingIdx].basicUnitQuantity + basicUnitQuantity;
+      if (newTotalBasic > batch.quantity) {
+        alert(`Total requested quantity (${newTotalBasic} units) exceeds available stock (${batch.quantity} units).`);
         return;
       }
+      pharBillItems[existingIdx].quantity += qty;
+      pharBillItems[existingIdx].basicUnitQuantity = newTotalBasic;
+      pharBillItems[existingIdx].unitPrice = unitPrice;
+      pharBillItems[existingIdx].amount = parseFloat((pharBillItems[existingIdx].quantity * unitPrice).toFixed(2));
+    } else {
+      pharBillItems.push({
+        medicineId: med.id,
+        medicineCode: med.medicineCode,
+        medicineName: med.name,
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        expiryDate: batch.expiryDate,
+        unit: pharSelectedUnitForPOS,
+        quantity: qty,
+        basicUnitQuantity: basicUnitQuantity,
+        unitsPerStrip: unitsPerStrip,
+        unitPrice: unitPrice,
+        amount: lineTotal,
+        maxStock: batch.quantity,
+        hasPrescription: med.prescriptionRequired || false,
+        hsnCode: med.hsnCode || '3004',
+        gstPercentage: med.gstPercentage || 5.0
+      });
+    }
 
-      const payload = {
-        patientId: patientId,
-        patientName: patientName,
-        uhid: uhid,
-        phone: phone,
-        opId: opId,
-        ipId: ipId,
-        doctorName: doctorName,
-        department: department,
-        discountPercentage: discountPct,
-        discountAmount: discountAmount,
-        gstNumber: document.getElementById('pharGstNumber')?.value?.trim() || '22AAAAA0000A1Z5',
-        gstPercentage: gstPct,
-        gstAmount: gstAmount,
-        paidAmount: numAmt,
-        paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
-        notes: document.getElementById('pharNotes')?.value?.trim() || '',
-        items: requestItems
-      };
-
-      btn.disabled = true;
-      btn.dataset.processing = 'true';
-      btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-
-      try {
-        const res = await Api.post('/api/pharmacy/bills/create', payload);
-        if (res && res.success && res.data) {
-          const savedBill = res.data;
-          pharActiveSavedBill = savedBill;
-
-          // Clear cart items to prevent duplicate medicine deduction
-          pharBillItems = [];
-          const tbody = document.getElementById('pharBillTableBody');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Bill ${escapeHtml(savedBill.billNumber)} generated and saved to MySQL.</td></tr>`;
-
-          const isNowPaid = (savedBill.balanceAmount <= 0);
-
-          const balElem = document.getElementById('pharBalanceAmount');
-          if (balElem) balElem.textContent = '₹' + formatCurrency(savedBill.balanceAmount);
-
-          const statusBadge = document.getElementById('pharPaymentStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = savedBill.paymentStatus;
-            statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-partial'}`;
-          }
-
-          const amtInput = document.getElementById('pharPaidAmount');
-          if (amtInput) {
-            amtInput.value = isNowPaid ? '0.00' : savedBill.balanceAmount.toFixed(2);
-            amtInput.disabled = isNowPaid;
-          }
-
-          btn.disabled = isNowPaid;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-
-          showToast(`Pharmacy payment of ₹${formatCurrency(numAmt)} recorded for Bill ${savedBill.billNumber}. Total Paid: ₹${formatCurrency(savedBill.paidAmount)}, Balance: ₹${formatCurrency(savedBill.balanceAmount)}`, 'success');
-
-          if (pharAllSalesHistory && pharAllSalesHistory.length > 0) {
-            try {
-              const hRes = await cvFetch('/api/pharmacy/bills/history');
-              if (hRes && hRes.success && Array.isArray(hRes.data)) pharAllSalesHistory = hRes.data;
-            } catch (_) {}
-          }
-        } else {
-          showToast((res && res.message) ? res.message : 'Failed to save pharmacy payment.', 'danger');
-          btn.disabled = false;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-        }
-      } catch (err) {
-        showToast('Error recording pharmacy payment: ' + (err.message || err), 'danger');
-        btn.disabled = false;
-        delete btn.dataset.processing;
-        btn.innerHTML = 'PAID';
-      }
-    });
+    refreshBillTable();
+    showToast(`Added ${med.name} (Batch: ${batch.batchNumber}) to cart.`, 'success');
   }
 
   function selectPharmacyPatient(p) {
@@ -7080,6 +7700,12 @@ function renderPharmacyModule(activeTab = 'billing') {
       container.innerHTML = renderPatientAutofillHtml(pharSelectedPatient);
       document.getElementById('btnPharClearPatient')?.addEventListener('click', clearPharmacyPatient);
     }
+
+    // Preselect doctor if specified in patient op record and not locked
+    if (!pharLockedDoctor && p.doctorName) {
+      const docSelect = document.getElementById('pharDoctorSelect');
+      if (docSelect) docSelect.value = p.doctorName;
+    }
   }
 
   function clearPharmacyPatient() {
@@ -7088,78 +7714,79 @@ function renderPharmacyModule(activeTab = 'billing') {
     const searchInput = document.getElementById('pharPatientSearchInput');
     const container = document.getElementById('pharPatientAutofillContainer');
     if (searchInput) searchInput.value = '';
-    if (container) {
-      container.innerHTML = renderPatientAutofillHtml(null);
-    }
+    if (container) container.innerHTML = renderPatientAutofillHtml(null);
   }
 
-  function addMedicineToBill() {
-    const medSelect = document.getElementById('pharMedicineSelect');
-    const opt = medSelect?.selectedOptions?.[0];
-    if (!opt || !opt.value) {
-      alert('Please select a medicine to add to bill.');
-      return;
+  async function showPatientHistoryModal(query) {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="patHistBackdrop" style="padding:1rem;">
+        <div style="background:#ffffff; width:760px; max-width:95vw; border-radius:12px; box-shadow:0 20px 45px rgba(15,23,42,0.25); border:1px solid #e2e8f0; overflow:hidden;">
+          <div style="padding:0.9rem 1.25rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:800; font-size:1rem; color:#0f172a;">
+              Patient Purchase History &bull; Last 5 Transactions
+            </div>
+            <button type="button" id="btnClosePatHist" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+          <div style="padding:1rem 1.25rem; max-height:70vh; overflow-y:auto;">
+            <div id="patHistContent"><div class="cv-loading-spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => { modalHost.innerHTML = ''; };
+    document.getElementById('btnClosePatHist')?.addEventListener('click', closeModal);
+    document.getElementById('patHistBackdrop')?.addEventListener('click', (e) => {
+      if (e.target.id === 'patHistBackdrop') closeModal();
+    });
+
+    try {
+      const res = await cvFetch(`/api/pharmacy/sales/patient-history?q=${encodeURIComponent(query)}`);
+      const list = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+      const mount = document.getElementById('patHistContent');
+      if (!mount) return;
+
+      if (list.length === 0) {
+        mount.innerHTML = '<p style="color:#64748b; text-align:center; padding:1.5rem;">No previous dispensary sales history found for this patient.</p>';
+        return;
+      }
+
+      mount.innerHTML = `
+        <table class="cv-bill-table">
+          <thead>
+            <tr>
+              <th>Bill #</th>
+              <th>Date</th>
+              <th>Doctor</th>
+              <th>Items</th>
+              <th style="text-align:right;">Total (₹)</th>
+              <th style="text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(b => `
+              <tr>
+                <td><strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber)}</strong></td>
+                <td style="font-size:0.8rem;">${escapeHtml(b.billDate)}</td>
+                <td style="font-size:0.82rem;">${escapeHtml(b.doctorName || 'Consultant')}</td>
+                <td style="font-size:0.8rem;">${b.items ? b.items.map(i => i.medicineName).join(', ') : 'Medicines'}</td>
+                <td style="text-align:right; font-weight:700;">₹${formatCurrency(b.finalTotal || b.totalAmount)}</td>
+                <td style="text-align:center;">
+                  <span class="cv-payment-balance-badge ${b.paymentStatus === 'PAID' ? 'cv-badge-paid' : 'cv-badge-partial'}">
+                    ${escapeHtml(b.paymentStatus)}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      console.error('Error fetching patient history:', err);
     }
-
-    const medId = parseInt(opt.value);
-    const medCode = opt.getAttribute('data-code');
-    const medName = opt.getAttribute('data-name');
-    const batch = opt.getAttribute('data-batch');
-    const exp = opt.getAttribute('data-exp');
-    const maxStock = parseInt(opt.getAttribute('data-stock')) || 0;
-
-    const qty = parseInt(document.getElementById('pharMedicineQty')?.value) || 0;
-    const unitPrice = parseFloat(document.getElementById('pharMedicineUnitPrice')?.value) || 0;
-
-    if (qty <= 0) {
-      alert('Please enter a valid quantity of 1 or more.');
-      return;
-    }
-
-    // Stock validation
-    if (maxStock <= 0) {
-      alert('This medicine is out of stock.');
-      return;
-    }
-
-    const existingIdx = pharBillItems.findIndex(i => i.medicineId === medId && i.batchNumber === batch);
-    const alreadyAddedQty = existingIdx >= 0 ? pharBillItems[existingIdx].quantity : 0;
-    const totalRequested = alreadyAddedQty + qty;
-
-    if (totalRequested > maxStock) {
-      alert(`Only ${maxStock} units are available.`);
-      return;
-    }
-
-    if (existingIdx >= 0) {
-      pharBillItems[existingIdx].quantity = totalRequested;
-      pharBillItems[existingIdx].unitPrice = unitPrice;
-      pharBillItems[existingIdx].amount = parseFloat((totalRequested * unitPrice).toFixed(2));
-    } else {
-      pharBillItems.push({
-        medicineId: medId,
-        medicineCode: medCode,
-        medicineName: medName,
-        batchNumber: batch,
-        expiryDate: exp,
-        quantity: qty,
-        unitPrice: unitPrice,
-        amount: parseFloat((qty * unitPrice).toFixed(2)),
-        maxStock: maxStock
-      });
-    }
-
-    // Reset inputs
-    medSelect.value = '';
-    document.getElementById('pharMedicineBatch').value = '';
-    document.getElementById('pharMedicineExpiry').value = '';
-    document.getElementById('pharMedicineUnitPrice').value = '0.00';
-    document.getElementById('pharMedicineAmount').value = '0.00';
-    document.getElementById('pharMedicineQty').value = '1';
-    document.getElementById('pharStockStatusPill').innerHTML = `<span class="cv-stock-info-pill cv-stock-in">Select a medicine to view stock</span>`;
-    document.getElementById('pharStockErrorHint').style.display = 'none';
-
-    refreshBillTable();
   }
 
   function refreshBillTable() {
@@ -7173,7 +7800,6 @@ function renderPharmacyModule(activeTab = 'billing') {
   }
 
   function wireBillTableInputs() {
-    // Quantity inline edit
     document.querySelectorAll('.phar-item-qty').forEach(input => {
       input.addEventListener('change', (e) => {
         const idx = parseInt(e.target.getAttribute('data-index'));
@@ -7183,19 +7809,20 @@ function renderPharmacyModule(activeTab = 'billing') {
         let newQty = parseInt(e.target.value) || 1;
         if (newQty <= 0) newQty = 1;
 
-        if (newQty > item.maxStock) {
-          alert(`Only ${item.maxStock} units are available.`);
-          newQty = item.maxStock;
+        const basicNeeded = (item.unit === 'strip') ? (newQty * (item.unitsPerStrip || 10)) : newQty;
+        if (basicNeeded > item.maxStock) {
+          alert(`Only ${item.maxStock} units available in this batch.`);
+          newQty = Math.floor(item.maxStock / ((item.unit === 'strip') ? (item.unitsPerStrip || 10) : 1)) || 1;
           e.target.value = newQty;
         }
 
         item.quantity = newQty;
+        item.basicUnitQuantity = (item.unit === 'strip') ? (newQty * (item.unitsPerStrip || 10)) : newQty;
         item.amount = parseFloat((newQty * item.unitPrice).toFixed(2));
         refreshBillTable();
       });
     });
 
-    // Rate inline edit
     document.querySelectorAll('.phar-item-rate').forEach(input => {
       input.addEventListener('change', (e) => {
         const idx = parseInt(e.target.getAttribute('data-index'));
@@ -7211,11 +7838,9 @@ function renderPharmacyModule(activeTab = 'billing') {
       });
     });
 
-    // Remove buttons
     document.querySelectorAll('.btn-remove-phar-item').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const btnElem = e.currentTarget;
-        const idx = parseInt(btnElem.getAttribute('data-index'));
+        const idx = parseInt(e.currentTarget.getAttribute('data-index'));
         if (idx >= 0 && idx < pharBillItems.length) {
           pharBillItems.splice(idx, 1);
           refreshBillTable();
@@ -7268,7 +7893,6 @@ function renderPharmacyModule(activeTab = 'billing') {
       balance = 0;
     }
 
-    // Update DOM displays
     const subtotalElem = document.getElementById('pharSummarySubtotal');
     if (subtotalElem) subtotalElem.textContent = `₹${formatCurrency(subtotal)}`;
 
@@ -7294,15 +7918,23 @@ function renderPharmacyModule(activeTab = 'billing') {
     }
   }
 
-  async function generatePharmacyBill() {
-    // 1. Patient validation
+  // ------------------------------------------------------------------
+  // CHECKOUT WORKFLOW: PRESCRIPTION CONFIRMATION & BILL CREATION
+  // ------------------------------------------------------------------
+  async function checkoutPharmacyBill(isDirectPaid = false) {
+    if (!pharBillItems || pharBillItems.length === 0) {
+      alert('Please add at least one medicine to the bill.');
+      return;
+    }
+
+    // 1. Patient check
     let patientName = '';
     let uhid = '';
     let phone = '';
     let opId = '';
     let ipId = '';
-    let doctorName = '';
-    let department = '';
+    let doctorName = document.getElementById('pharDoctorSelect')?.value || '';
+    let department = document.getElementById('pharDoctorSelect')?.selectedOptions[0]?.getAttribute('data-dept') || '';
     let patientId = null;
 
     if (pharSelectedPatient) {
@@ -7312,13 +7944,13 @@ function renderPharmacyModule(activeTab = 'billing') {
       phone = pharSelectedPatient.phone || '';
       opId = pharSelectedPatient.opId || '';
       ipId = pharSelectedPatient.ipId || '';
-      doctorName = pharSelectedPatient.doctorName || '';
-      department = pharSelectedPatient.department || '';
+      if (!doctorName) doctorName = pharSelectedPatient.doctorName || '';
+      if (!department) department = pharSelectedPatient.department || '';
     } else {
       const walkinName = document.getElementById('pharWalkinName')?.value?.trim();
       const walkinPhone = document.getElementById('pharWalkinPhone')?.value?.trim();
       if (!walkinName) {
-        alert('Please search and select an existing patient, or enter a Walk-in patient name.');
+        alert('Please search and select a patient, or enter a Walk-in patient name.');
         document.getElementById('pharPatientSearchInput')?.focus();
         return;
       }
@@ -7327,33 +7959,23 @@ function renderPharmacyModule(activeTab = 'billing') {
       uhid = 'WALKIN-' + Date.now().toString().slice(-6);
     }
 
-    // 2. Medicines validation
-    if (!pharBillItems || pharBillItems.length === 0) {
-      alert('Please add at least one medicine to the bill.');
-      return;
-    }
-
-    // 3. Stock validation
-    for (const item of pharBillItems) {
-      if (item.quantity <= 0) {
-        alert(`Invalid quantity for medicine ${item.medicineName}.`);
-        return;
-      }
-      if (item.quantity > item.maxStock) {
-        alert(`Only ${item.maxStock} units are available for ${item.medicineName}.`);
-        return;
-      }
-    }
-
-    // Calculate financials
+    // 2. High Discount Confirmation (> 15%)
     const discountPct = parseFloat(document.getElementById('pharDiscountPct')?.value) || 0;
-    const gstNumber = document.getElementById('pharGstNumber')?.value?.trim() || '22AAAAA0000A1Z5';
-    const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
-    const paidAmount = parseFloat(document.getElementById('pharPaidAmount')?.value) || 0;
-    const paymentMethod = document.getElementById('pharPaymentMethod')?.value || 'CASH';
-    const notes = document.getElementById('pharNotes')?.value?.trim() || '';
+    if (discountPct > 15) {
+      if (!confirm(`Warning: The applied discount is ${discountPct}%, which exceeds the standard 15% threshold. Do you wish to proceed?`)) {
+        return;
+      }
+    }
 
-    // Calculate subtotal
+    // 3. Prescription Verification Check (Rx check)
+    const rxItems = pharBillItems.filter(i => i.hasPrescription);
+    if (rxItems.length > 0) {
+      const rxNames = rxItems.map(i => i.medicineName).join(', ');
+      const confirmed = await showPrescriptionVerificationModal(rxNames);
+      if (!confirmed) return;
+    }
+
+    // 4. Calculate final payload
     let subtotal = 0;
     const requestItems = pharBillItems.map(item => {
       const q = parseInt(item.quantity);
@@ -7364,17 +7986,30 @@ function renderPharmacyModule(activeTab = 'billing') {
         medicineId: item.medicineId,
         medicineCode: item.medicineCode,
         medicineName: item.medicineName,
+        batchId: item.batchId,
         batchNumber: item.batchNumber,
         expiryDate: item.expiryDate,
+        unit: item.unit,
+        basicUnitQuantity: item.basicUnitQuantity,
         quantity: q,
         unitPrice: p,
-        totalPrice: tot
+        totalPrice: tot,
+        hasPrescription: item.hasPrescription,
+        hsnCode: item.hsnCode,
+        gstPercentage: item.gstPercentage
       };
     });
 
     const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
     const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
+    const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
     const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
+    const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
+
+    let paidAmount = parseFloat(document.getElementById('pharPaidAmount')?.value) || 0;
+    if (isDirectPaid) {
+      paidAmount = finalTotal;
+    }
 
     const payload = {
       patientId: patientId,
@@ -7383,23 +8018,23 @@ function renderPharmacyModule(activeTab = 'billing') {
       phone: phone,
       opId: opId,
       ipId: ipId,
-      doctorName: doctorName,
-      department: department,
+      doctorName: doctorName || 'Dr. On Duty',
+      department: department || 'General Medicine',
       discountPercentage: discountPct,
       discountAmount: discountAmount,
-      gstNumber: gstNumber,
+      gstNumber: document.getElementById('pharGstNumber')?.value?.trim() || '22AAAAA0000A1Z5',
       gstPercentage: gstPct,
       gstAmount: gstAmount,
       paidAmount: paidAmount,
-      paymentMethod: paymentMethod,
-      notes: notes,
+      paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
+      notes: document.getElementById('pharNotes')?.value?.trim() || '',
       items: requestItems
     };
 
-    const generateBtn = document.getElementById('btnPharGenerateBill');
-    if (generateBtn) {
-      generateBtn.disabled = true;
-      generateBtn.innerHTML = `<span class="cv-loading-spinner" style="width:16px; height:16px; border-width:2px; display:inline-block;"></span> Generating Bill...`;
+    const submitBtn = document.getElementById(isDirectPaid ? 'btnPharDirectPaid' : 'btnPharGenerateBill');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; margin-right:4px;"></span> Dispensing...';
     }
 
     try {
@@ -7410,39 +8045,1747 @@ function renderPharmacyModule(activeTab = 'billing') {
       });
 
       if (res && res.success && res.data) {
-        alert('Pharmacy bill generated successfully.');
-
+        showToast('Pharmacy bill generated and medicines dispensed successfully!', 'success');
         const savedBill = res.data;
 
-        // Clear current active bill
+        // Reset cart
         pharBillItems = [];
-        pharSelectedPatient = null;
+        if (!pharLockedDoctor) {
+          pharSelectedPatient = null;
+        }
 
-        // Open Invoice Print Modal
+        // Display Invoice Modal
         showPharmacyInvoiceModal(savedBill);
 
-        // Re-render billing tab to refresh fresh stock balances
+        // Re-render billing tab to update stock quantities
         renderPharmacyBillingTab();
       } else {
         alert(res?.message || 'Failed to generate pharmacy bill.');
       }
     } catch (err) {
-      console.error('Error creating pharmacy bill:', err);
-      alert('An error occurred while generating the pharmacy bill: ' + err.message);
+      alert('Error during bill checkout: ' + err.message);
     } finally {
-      if (generateBtn) {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = `
-          <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Generate &amp; Save Bill
-        `;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = isDirectPaid ? 'PAID' : 'Generate & Save Bill';
       }
     }
   }
 
+  function showPrescriptionVerificationModal(rxNames) {
+    return new Promise((resolve) => {
+      const modalHost = document.getElementById('pharModalHost') || document.body;
+      const modalDiv = document.createElement('div');
+      modalDiv.className = 'cv-modal-backdrop show';
+      modalDiv.style.padding = '1rem';
+
+      modalDiv.innerHTML = `
+        <div style="background:#ffffff; border-radius:12px; width:520px; max-width:92vw; padding:1.5rem; box-shadow:0 20px 45px rgba(15,23,42,0.3); border:1px solid #fed7aa; animation:cvModalIn 0.2s ease;">
+          <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+            <div style="background:#ffedd5; color:#ea580c; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg style="width:22px; height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div>
+              <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:#0f172a;">Prescription Verification Required</h3>
+              <p style="margin:0.2rem 0 0 0; font-size:0.78rem; color:#64748b;">Statutory Drug Regulatory Check</p>
+            </div>
+          </div>
+
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem; margin-bottom:1.25rem; font-size:0.82rem; color:#991b1b; line-height:1.4;">
+            <strong>Scheduled Rx Medicines:</strong>
+            <p style="margin:0.25rem 0 0 0; font-weight:700; color:#dc2626;">${escapeHtml(rxNames)}</p>
+            <p style="margin:0.5rem 0 0 0; font-size:0.76rem; color:#475569;">
+              By law, these prescription-required medicines can only be dispensed after verifying a valid signed medical prescription from a registered medical practitioner.
+            </p>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+            <button type="button" class="cv-btn-secondary" id="btnCancelRxVerify" style="padding:0.45rem 1.1rem; font-size:0.84rem;">Cancel / Review</button>
+            <button type="button" class="cv-btn-primary" id="btnConfirmRxVerify" style="padding:0.45rem 1.25rem; font-size:0.84rem; font-weight:700; background:#ea580c; border-color:#ea580c;">
+              Yes, Verified &amp; Dispense
+            </button>
+          </div>
+        </div>
+      `;
+
+      modalHost.appendChild(modalDiv);
+
+      document.getElementById('btnConfirmRxVerify')?.addEventListener('click', () => {
+        modalDiv.remove();
+        resolve(true);
+      });
+      document.getElementById('btnCancelRxVerify')?.addEventListener('click', () => {
+        modalDiv.remove();
+        resolve(false);
+      });
+    });
+  }
+
+
+
+  // ====================================================================
+  // TAB 3: MEDICINE MASTER & PHYSICAL PLACEMENT
+  // ====================================================================
+  async function renderPharmacyInventoryTab() {
+    const container = document.getElementById('pharTabContent');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+        <div class="cv-loading-spinner"></div>
+      </div>
+    `;
+
+    let medicines = [];
+    try {
+      const res = await cvFetch('/api/pharmacy/medicines');
+      if (res && res.success && Array.isArray(res.data)) medicines = res.data;
+    } catch (err) {
+      console.error('Failed to load medicines:', err);
+    }
+
+    container.innerHTML = `
+      <!-- Top Actions Card -->
+      <div class="cv-pharmacy-card cv-pharmacy-inventory-card">
+        <div class="cv-pharmacy-card-header">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Medicine Master &amp; Physical Storage Placement
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Manage hospital formulary, packaging units, shelf/rack mapping, and batch inventory.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:280px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="pharInventorySearchInput" placeholder="Search name, generic, shelf rack, code..." autocomplete="off">
+            </div>
+
+            <select id="pharCategoryFilter" class="cv-form-select" style="height:34px; font-size:0.8rem; width:130px;">
+              <option value="ALL">All Categories</option>
+              <option value="Tablet">Tablet</option>
+              <option value="Capsule">Capsule</option>
+              <option value="Syrup">Syrup</option>
+              <option value="Injection">Injection</option>
+              <option value="Cream">Cream</option>
+              <option value="Drops">Drops</option>
+              <option value="Inhaler">Inhaler</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <button type="button" class="cv-btn-primary" id="btnOpenAddMedicineModal" style="padding:0.45rem 1rem; font-size:0.84rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Medicine
+            </button>
+          </div>
+        </div>
+
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table">
+            <thead>
+              <tr>
+                <th style="width:100px;">Medicine ID</th>
+                <th>Medicine Name &amp; Generic</th>
+                <th>Category &bull; Form</th>
+                <th>Placement (Shelf / Rack)</th>
+                <th>Packaging</th>
+                <th style="text-align:center;">Active Batches</th>
+                <th style="text-align:right;">MRP (₹)</th>
+                <th style="text-align:center;">Total Stock</th>
+                <th style="text-align:center;">Reorder</th>
+                <th style="text-align:center;">Status</th>
+                <th style="text-align:center; width:220px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pharInventoryTableBody">
+              <!-- Populated via renderInventoryTable -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    function updateInventoryView() {
+      const q = (document.getElementById('pharInventorySearchInput')?.value || '').toLowerCase().trim();
+      const cat = document.getElementById('pharCategoryFilter')?.value || 'ALL';
+
+      let filtered = medicines;
+      if (cat !== 'ALL') {
+        filtered = filtered.filter(m => (m.category || '').toLowerCase() === cat.toLowerCase());
+      }
+      if (q) {
+        filtered = filtered.filter(m =>
+          (m.name && m.name.toLowerCase().includes(q)) ||
+          (m.genericName && m.genericName.toLowerCase().includes(q)) ||
+          (m.medicineCode && m.medicineCode.toLowerCase().includes(q)) ||
+          (m.rackLocation && m.rackLocation.toLowerCase().includes(q)) ||
+          (m.supplier && m.supplier.toLowerCase().includes(q)) ||
+          (m.manufacturer && m.manufacturer.toLowerCase().includes(q))
+        );
+      }
+
+      const tbody = document.getElementById('pharInventoryTableBody');
+      if (!tbody) return;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">No medicines match the selected filter.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(m => {
+        let stockPill = `<span class="cv-stock-info-pill cv-stock-in">${m.stockQuantity} in stock</span>`;
+        if (m.expired) {
+          stockPill = '<span class="cv-stock-info-pill cv-stock-out">EXPIRED</span>';
+        } else if (m.stockQuantity <= 0) {
+          stockPill = '<span class="cv-stock-info-pill cv-stock-out">OUT OF STOCK (0)</span>';
+        } else if (m.nearExpiry) {
+          stockPill = '<span class="cv-stock-info-pill cv-stock-low" style="background:#ffedd5; color:#c2410c;">NEAR EXPIRY</span>';
+        } else if (m.lowStock) {
+          stockPill = `<span class="cv-stock-info-pill cv-stock-low">LOW STOCK (${m.stockQuantity})</span>`;
+        }
+
+        const placementBadge = m.rackLocation
+          ? `<span class="cv-placement-tag"><svg style="width:11px; height:11px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>${escapeHtml(m.rackLocation)}</span>`
+          : '<span style="color:#94a3b8; font-size:0.75rem;">Not Assigned</span>';
+
+        const rxTag = m.prescriptionRequired
+          ? '<span style="background:#fee2e2; color:#dc2626; font-size:0.65rem; font-weight:800; padding:0.1rem 0.4rem; border-radius:10px; margin-left:0.35rem;">Rx</span>'
+          : '<span style="background:#dcfce7; color:#15803d; font-size:0.65rem; font-weight:800; padding:0.1rem 0.4rem; border-radius:10px; margin-left:0.35rem;">OTC</span>';
+
+        return `
+          <tr>
+            <td><strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(m.medicineCode)}</strong></td>
+            <td>
+              <div style="font-weight:700; color:var(--cv-text-main); display:flex; align-items:center;">
+                ${escapeHtml(m.name)} ${rxTag}
+              </div>
+              <div style="font-size:0.75rem; color:var(--cv-text-muted); font-style:italic;">${escapeHtml(m.genericName || '')}</div>
+            </td>
+            <td>
+              <span style="font-size:0.75rem; background:#f1f5f9; padding:0.2rem 0.5rem; border-radius:4px; font-weight:600;">
+                ${escapeHtml(m.category || 'Tablet')} &bull; ${escapeHtml(m.medicineForm || m.category || 'Tablet')}
+              </span>
+            </td>
+            <td>${placementBadge}</td>
+            <td style="font-size:0.8rem; color:#475569;">
+              ${escapeHtml(m.soldAs || 'Tablet')} (Strip: ${m.unitsPerStrip || 10})
+            </td>
+            <td style="text-align:center; font-weight:700; color:#0369a1;">
+              ${m.activeBatchesCount || 1} batch(es)
+            </td>
+            <td style="text-align:right; font-weight:700; color:#0f172a;">
+              ₹${formatCurrency(m.unitPrice)}
+            </td>
+            <td style="text-align:center; font-weight:800; font-size:0.95rem;">
+              ${m.stockQuantity}
+            </td>
+            <td style="text-align:center; font-weight:600; color:var(--cv-text-muted);">
+              ${m.reorderLevel || 10}
+            </td>
+            <td style="text-align:center;">${stockPill}</td>
+            <td style="text-align:center; white-space:nowrap;">
+              <button type="button" class="cv-btn-secondary btn-med-batches" data-med-id="${m.id}" title="View and manage batches for this medicine" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:#0284c7;">
+                Batches
+              </button>
+              <button type="button" class="cv-btn-secondary btn-med-restock" data-med-id="${m.id}" title="Procure stock into this medicine" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:#15803d; margin-left:0.25rem;">
+                Restock
+              </button>
+              <button type="button" class="cv-btn-secondary btn-med-edit" data-med-id="${m.id}" title="Edit medicine attributes" style="padding:0.25rem 0.55rem; font-size:0.75rem; margin-left:0.25rem;">
+                Edit
+              </button>
+              <button type="button" class="cv-btn-secondary btn-med-delete" data-med-id="${m.id}" data-med-name="${escapeHtml(m.name)}" title="Archive medicine" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:var(--cv-danger); margin-left:0.25rem;">
+                Del
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Wire Row Buttons
+      tbody.querySelectorAll('.btn-med-batches').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const medId = e.currentTarget.getAttribute('data-med-id');
+          showBatchManagementModal(medId);
+        });
+      });
+
+      tbody.querySelectorAll('.btn-med-restock').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const medId = e.currentTarget.getAttribute('data-med-id');
+          pharPreselectedRestockMedId = medId;
+          switchPharTab('procurement', true);
+        });
+      });
+
+      tbody.querySelectorAll('.btn-med-edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const medId = e.currentTarget.getAttribute('data-med-id');
+          const mObj = medicines.find(x => String(x.id) === String(medId));
+          if (mObj) showEditMedicineModal(mObj);
+        });
+      });
+
+      tbody.querySelectorAll('.btn-med-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const medId = e.currentTarget.getAttribute('data-med-id');
+          const medName = e.currentTarget.getAttribute('data-med-name');
+          if (!confirm(`Are you sure you want to archive/delete medicine "${medName}" and all associated batches?`)) return;
+
+          try {
+            const res = await cvFetch(`/api/pharmacy/medicines/${medId}`, { method: 'DELETE' });
+            if (res && res.success) {
+              showToast(`Medicine "${medName}" removed successfully.`, 'success');
+              medicines = medicines.filter(x => String(x.id) !== String(medId));
+              updateInventoryView();
+            } else {
+              alert(res?.message || 'Failed to delete medicine.');
+            }
+          } catch (err) {
+            alert('Error deleting medicine: ' + err.message);
+          }
+        });
+      });
+    }
+
+    document.getElementById('pharInventorySearchInput')?.addEventListener('input', updateInventoryView);
+    document.getElementById('pharCategoryFilter')?.addEventListener('change', updateInventoryView);
+    document.getElementById('btnOpenAddMedicineModal')?.addEventListener('click', showAddMedicineModal);
+
+    updateInventoryView();
+  }
+
   // ------------------------------------------------------------------
-  // TAB 2: PHARMACY SALES HISTORY
+  // BATCH MANAGEMENT MODAL (Medicine -> Batches -> FEIFO -> Purge)
   // ------------------------------------------------------------------
+  async function showBatchManagementModal(medicineId) {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="batchModalBackdrop" style="padding:1rem;">
+        <div style="background:#ffffff; width:920px; max-width:96vw; border-radius:12px; box-shadow:0 20px 45px rgba(15,23,42,0.25); border:1px solid #e2e8f0; display:flex; flex-direction:column; max-height:90vh; overflow:hidden;">
+          
+          <!-- Header -->
+          <div style="padding:0.9rem 1.25rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <h3 id="bmModalTitle" style="margin:0; font-size:1.05rem; font-weight:800; color:#0f172a;">Batch Inventory Management</h3>
+                <span id="bmModalCode" style="font-family:monospace; background:#e0f2fe; color:#0369a1; padding:0.15rem 0.45rem; border-radius:4px; font-size:0.75rem; font-weight:700;">MED-0001</span>
+              </div>
+              <p id="bmModalPlacement" style="margin:0.2rem 0 0 0; font-size:0.75rem; color:var(--cv-text-muted);">
+                Shelf Placement: Unassigned &bull; FEIFO Stock Allocation
+              </p>
+            </div>
+            <button type="button" id="btnCloseBatchModal" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+
+          <!-- Actions Toolbar -->
+          <div style="padding:0.75rem 1.25rem; background:#ffffff; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <div id="bmTotalStockBadge" style="font-size:0.85rem; font-weight:800; color:#0f172a;">
+              Total Stock: Loading...
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button type="button" class="cv-btn-secondary" id="btnPurgeEmptyBatches" style="padding:0.35rem 0.8rem; font-size:0.78rem; color:var(--cv-danger); border-color:#fca5a5;">
+                <svg style="width:13px; height:13px; display:inline-block; vertical-align:middle; margin-right:3px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Purge Empty Batches
+              </button>
+              <button type="button" class="cv-btn-primary" id="btnOpenAddNewBatchForm" style="padding:0.35rem 0.85rem; font-size:0.78rem; font-weight:700;">
+                + Add New Batch
+              </button>
+            </div>
+          </div>
+
+          <!-- Inline Add/Edit Batch Form (collapsible) -->
+          <div id="bmFormWrapper" style="display:none; background:#f0fdf4; border-bottom:1px solid #bbf7d0; padding:0.85rem 1.25rem;">
+            <form id="formSaveBatch" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) 130px; gap:0.6rem; align-items:flex-end;">
+              <input type="hidden" id="bmBatchId" value="">
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">BATCH NUMBER *</label>
+                <input type="text" id="bmBatchNumber" class="cv-form-input" required placeholder="BATCH-001" style="height:32px; font-size:0.8rem; font-family:monospace;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">EXPIRY DATE *</label>
+                <input type="date" id="bmExpiryDate" class="cv-form-input" required style="height:32px; font-size:0.8rem;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">MFG DATE</label>
+                <input type="date" id="bmMfgDate" class="cv-form-input" style="height:32px; font-size:0.8rem;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">QUANTITY *</label>
+                <input type="number" id="bmQuantity" class="cv-form-input" min="0" required value="50" style="height:32px; font-size:0.8rem; font-weight:700; text-align:right;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">COST (₹)</label>
+                <input type="number" id="bmCost" class="cv-form-input" min="0" step="0.01" value="10.00" style="height:32px; font-size:0.8rem; text-align:right;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">MRP (₹)</label>
+                <input type="number" id="bmMrp" class="cv-form-input" min="0" step="0.01" value="20.00" style="height:32px; font-size:0.8rem; font-weight:700; text-align:right;">
+              </div>
+              <div>
+                <label style="font-size:0.68rem; font-weight:700; color:#15803d; display:block; margin-bottom:0.15rem;">SUPPLIER</label>
+                <input type="text" id="bmSupplier" class="cv-form-input" placeholder="Supplier" style="height:32px; font-size:0.8rem;">
+              </div>
+              <div style="display:flex; gap:0.35rem;">
+                <button type="submit" class="cv-btn-primary" style="height:32px; font-size:0.78rem; padding:0 0.8rem; flex:1;">Save</button>
+                <button type="button" id="btnCancelBmForm" class="cv-btn-secondary" style="height:32px; font-size:0.78rem; padding:0 0.5rem;">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Batches Table -->
+          <div style="flex:1; overflow-y:auto; padding:0 1.25rem 1rem 1.25rem;">
+            <table class="cv-bill-table" style="margin-top:0.75rem;">
+              <thead>
+                <tr>
+                  <th>Batch Number</th>
+                  <th>Manufacturing</th>
+                  <th>Expiry Date</th>
+                  <th style="text-align:center;">Quantity</th>
+                  <th style="text-align:right;">Cost (₹)</th>
+                  <th style="text-align:right;">MRP (₹)</th>
+                  <th>Supplier / Agency</th>
+                  <th style="text-align:center;">Status</th>
+                  <th style="text-align:center; width:130px;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="bmBatchesTableBody">
+                <tr><td colspan="9" style="text-align:center; padding:2rem;"><div class="cv-loading-spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding:0.75rem 1.25rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+            <button type="button" class="cv-btn-secondary" id="btnCloseBatchModalFooter" style="padding:0.4rem 1.1rem; font-size:0.84rem;">Close</button>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => {
+      modalHost.innerHTML = '';
+      document.removeEventListener('keydown', onEscKey);
+    };
+    const onEscKey = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onEscKey);
+
+    document.getElementById('btnCloseBatchModal')?.addEventListener('click', closeModal);
+    document.getElementById('btnCloseBatchModalFooter')?.addEventListener('click', closeModal);
+    document.getElementById('batchModalBackdrop')?.addEventListener('click', (e) => {
+      if (e.target.id === 'batchModalBackdrop') closeModal();
+    });
+
+    // Load data
+    let currentBatches = [];
+    let currentMed = null;
+
+    async function reloadBatches() {
+      try {
+        const [medRes, bRes] = await Promise.all([
+          cvFetch(`/api/pharmacy/medicines/${medicineId}`),
+          cvFetch(`/api/pharmacy/batches/medicine/${medicineId}`)
+        ]);
+
+        if (medRes && medRes.success && medRes.data) {
+          currentMed = medRes.data;
+          document.getElementById('bmModalTitle').textContent = `Batches for: ${currentMed.name}`;
+          document.getElementById('bmModalCode').textContent = currentMed.medicineCode;
+          document.getElementById('bmModalPlacement').innerHTML = currentMed.rackLocation
+            ? `<span class="cv-placement-tag">📍 Shelf / Rack: ${escapeHtml(currentMed.rackLocation)}</span> &bull; Formula &bull; FEIFO Queue`
+            : 'Shelf: Unassigned &bull; FEIFO Queue';
+          document.getElementById('bmTotalStockBadge').innerHTML = `Total Available Stock: <span style="color:var(--cv-primary); font-size:1.05rem;">${currentMed.stockQuantity}</span> units`;
+        }
+
+        if (bRes && bRes.success && Array.isArray(bRes.data)) {
+          currentBatches = bRes.data;
+        }
+
+        renderBatchRows();
+      } catch (err) {
+        console.error('Error reloading batches:', err);
+      }
+    }
+
+    function renderBatchRows() {
+      const tbody = document.getElementById('bmBatchesTableBody');
+      if (!tbody) return;
+
+      if (currentBatches.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No batches registered for this medicine yet. Click <strong>+ Add New Batch</strong>.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = currentBatches.map((b, idx) => {
+        let statusBadge = '<span style="color:#16a34a; font-weight:700; font-size:0.75rem;">Active</span>';
+        if (b.expired) {
+          statusBadge = '<span style="color:#dc2626; font-weight:800; font-size:0.75rem;">Expired</span>';
+        } else if (b.quantity <= 0) {
+          statusBadge = '<span style="color:#64748b; font-weight:700; font-size:0.75rem;">Empty (0)</span>';
+        } else if (b.nearExpiry) {
+          statusBadge = `<span style="color:#d97706; font-weight:700; font-size:0.75rem;">Expiring Soon (${b.daysToExpiry}d)</span>`;
+        }
+
+        return `
+          <tr>
+            <td>
+              <strong style="font-family:monospace; color:var(--cv-text-main);">${escapeHtml(b.batchNumber)}</strong>
+              ${idx === 0 && !b.expired && b.quantity > 0 ? '<span class="cv-batch-badge-feifo" style="margin-left:0.35rem;">FEIFO Next</span>' : ''}
+            </td>
+            <td style="font-size:0.8rem; color:#64748b;">${escapeHtml(b.manufacturingDate || '—')}</td>
+            <td style="font-size:0.82rem; ${b.expired ? 'color:var(--cv-danger); font-weight:700;' : ''}">${escapeHtml(b.expiryDate)}</td>
+            <td style="text-align:center; font-weight:800; font-size:0.95rem; color:${b.quantity <= 0 ? 'var(--cv-danger)' : '#0f172a'};">${b.quantity}</td>
+            <td style="text-align:right; font-size:0.82rem;">₹${formatCurrency(b.costPerUnit || 0)}</td>
+            <td style="text-align:right; font-weight:700;">₹${formatCurrency(b.mrp)}</td>
+            <td style="font-size:0.8rem;">${escapeHtml(b.supplierName || 'Standard')}</td>
+            <td style="text-align:center;">${statusBadge}</td>
+            <td style="text-align:center; white-space:nowrap;">
+              <button type="button" class="cv-btn-secondary btn-edit-batch" data-batch-id="${b.id}" style="padding:0.2rem 0.5rem; font-size:0.72rem;">Edit</button>
+              <button type="button" class="cv-btn-secondary btn-del-batch" data-batch-id="${b.id}" data-batch-no="${escapeHtml(b.batchNumber)}" style="padding:0.2rem 0.5rem; font-size:0.72rem; color:var(--cv-danger); margin-left:0.25rem;">Del</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('.btn-edit-batch').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const bId = e.currentTarget.getAttribute('data-batch-id');
+          const batch = currentBatches.find(x => String(x.id) === String(bId));
+          if (batch) openEditBatchForm(batch);
+        });
+      });
+
+      tbody.querySelectorAll('.btn-del-batch').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const bId = e.currentTarget.getAttribute('data-batch-id');
+          const bNo = e.currentTarget.getAttribute('data-batch-no');
+          if (!confirm(`Are you sure you want to archive batch "${bNo}"?`)) return;
+
+          try {
+            const res = await cvFetch(`/api/pharmacy/batches/${bId}?context=ManualDelete`, { method: 'DELETE' });
+            if (res && res.success) {
+              showToast(`Batch ${bNo} archived successfully.`, 'success');
+              await reloadBatches();
+              renderPharmacyInventoryTab();
+            } else {
+              alert(res?.message || 'Failed to delete batch.');
+            }
+          } catch (err) {
+            alert('Error deleting batch: ' + err.message);
+          }
+        });
+      });
+    }
+
+    // Toggle Add Batch Form
+    const formWrapper = document.getElementById('bmFormWrapper');
+    document.getElementById('btnOpenAddNewBatchForm')?.addEventListener('click', () => {
+      document.getElementById('formSaveBatch').reset();
+      document.getElementById('bmBatchId').value = '';
+      if (currentMed) {
+        document.getElementById('bmCost').value = Number(currentMed.costPrice || 10).toFixed(2);
+        document.getElementById('bmMrp').value = Number(currentMed.unitPrice || 20).toFixed(2);
+        document.getElementById('bmSupplier').value = currentMed.supplier || '';
+      }
+      formWrapper.style.display = 'block';
+    });
+
+    document.getElementById('btnCancelBmForm')?.addEventListener('click', () => {
+      formWrapper.style.display = 'none';
+    });
+
+    function openEditBatchForm(b) {
+      document.getElementById('bmBatchId').value = b.id;
+      document.getElementById('bmBatchNumber').value = b.batchNumber;
+      document.getElementById('bmExpiryDate').value = b.expiryDate || '';
+      document.getElementById('bmMfgDate').value = b.manufacturingDate || '';
+      document.getElementById('bmQuantity').value = b.quantity;
+      document.getElementById('bmCost').value = Number(b.costPerUnit || 0).toFixed(2);
+      document.getElementById('bmMrp').value = Number(b.mrp || 0).toFixed(2);
+      document.getElementById('bmSupplier').value = b.supplierName || '';
+      formWrapper.style.display = 'block';
+    }
+
+    // Save batch submit
+    document.getElementById('formSaveBatch')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const bId = document.getElementById('bmBatchId').value;
+      const payload = {
+        medicineId: medicineId,
+        batchNumber: document.getElementById('bmBatchNumber').value.trim(),
+        expiryDate: document.getElementById('bmExpiryDate').value,
+        manufacturingDate: document.getElementById('bmMfgDate').value || null,
+        quantity: parseInt(document.getElementById('bmQuantity').value) || 0,
+        costPerUnit: parseFloat(document.getElementById('bmCost').value) || 0,
+        mrp: parseFloat(document.getElementById('bmMrp').value) || 0,
+        supplierName: document.getElementById('bmSupplier').value.trim()
+      };
+
+      try {
+        let res;
+        if (bId) {
+          res = await cvFetch(`/api/pharmacy/batches/${bId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          res = await cvFetch('/api/pharmacy/batches/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (res && res.success) {
+          showToast('Batch record saved successfully.', 'success');
+          formWrapper.style.display = 'none';
+          await reloadBatches();
+          renderPharmacyInventoryTab();
+        } else {
+          alert(res?.message || 'Failed to save batch.');
+        }
+      } catch (err) {
+        alert('Error saving batch: ' + err.message);
+      }
+    });
+
+    // Purge empty batches
+    document.getElementById('btnPurgeEmptyBatches')?.addEventListener('click', async () => {
+      if (!confirm('Purge all zero-quantity batches for this medicine? Empty batches will be permanently archived.')) return;
+
+      try {
+        const res = await cvFetch(`/api/pharmacy/batches/empty-batches/${medicineId}`, { method: 'DELETE' });
+        if (res && res.success) {
+          showToast(`Purged ${res.data} empty batch(es).`, 'success');
+          await reloadBatches();
+          renderPharmacyInventoryTab();
+        } else {
+          alert(res?.message || 'Failed to purge empty batches.');
+        }
+      } catch (err) {
+        alert('Error purging batches: ' + err.message);
+      }
+    });
+
+    reloadBatches();
+  }
+
+
+
+  // ------------------------------------------------------------------
+  // ADD MEDICINE MODAL (FORMULARY, PACKAGING, PLACEMENT, OPENING BATCH)
+  // ------------------------------------------------------------------
+  async function showAddMedicineModal() {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    let defaultCode = '';
+    let existingSuppliers = [];
+
+    try {
+      const [codeRes, supRes] = await Promise.all([
+        cvFetch('/api/pharmacy/medicines/next-code'),
+        cvFetch('/api/pharmacy/suppliers')
+      ]);
+      if (codeRes && codeRes.success && codeRes.data) defaultCode = codeRes.data;
+      if (supRes && supRes.success && Array.isArray(supRes.data)) existingSuppliers = supRes.data;
+    } catch (err) {
+      console.warn('Could not prefetch code/suppliers:', err);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="addMedBackdrop" style="padding:1rem;">
+        <div class="cv-med-modal-compact" style="width:920px; max-height:92vh; overflow-y:auto;">
+          
+          <!-- Header -->
+          <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:0.75rem 1.25rem; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <div style="background:#dbeafe; color:var(--cv-primary); width:32px; height:32px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              </div>
+              <div>
+                <h3 style="margin:0; font-size:1.02rem; font-weight:800; color:#0f172a;">Register New Hospital Medicine</h3>
+                <p style="margin:0; font-size:0.72rem; color:var(--cv-text-muted);">Formulary record, shelf placement, packaging &amp; initial stock lot</p>
+              </div>
+            </div>
+            <button type="button" id="btnCloseAddMedModal" style="background:none; border:none; font-size:1.35rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+
+          <!-- Form Grid -->
+          <form id="formAddMedicine" style="display:flex; flex-direction:column; padding:0.9rem 1.25rem;">
+            
+            <div class="cv-med-compact-grid">
+              
+              <!-- ROW 1: Name, Code, Generic -->
+              <div>
+                <label for="newMedName">MEDICINE NAME <span style="color:var(--cv-danger);">*</span></label>
+                <input type="text" id="newMedName" class="cv-form-input" required placeholder="e.g. Paracetamol 500mg">
+              </div>
+
+              <div>
+                <label for="newMedCode">MEDICINE ID / CODE <span style="color:var(--cv-danger);">*</span></label>
+                <input type="text" id="newMedCode" class="cv-form-input" required value="${escapeHtml(defaultCode)}" style="font-family:monospace; font-weight:700; text-transform:uppercase;">
+              </div>
+
+              <div>
+                <label for="newMedGeneric">GENERIC COMPOSITION</label>
+                <input type="text" id="newMedGeneric" class="cv-form-input" placeholder="e.g. Paracetamol IP">
+              </div>
+
+              <!-- ROW 2: Category, Form, Strength -->
+              <div>
+                <label for="newMedCategory">CATEGORY</label>
+                <select id="newMedCategory" class="cv-form-select">
+                  <option value="Tablet">Tablet</option>
+                  <option value="Capsule">Capsule</option>
+                  <option value="Syrup">Syrup</option>
+                  <option value="Injection">Injection</option>
+                  <option value="Cream">Cream</option>
+                  <option value="Drops">Drops</option>
+                  <option value="Inhaler">Inhaler</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="newMedForm">MEDICINE FORM</label>
+                <select id="newMedForm" class="cv-form-select">
+                  <option value="Tablet">Tablet</option>
+                  <option value="Capsule">Capsule</option>
+                  <option value="Liquid / Syrup">Liquid / Syrup</option>
+                  <option value="Injection / Ampoule">Injection / Ampoule</option>
+                  <option value="Cream / Gel">Cream / Gel</option>
+                  <option value="Eye / Ear Drops">Eye / Ear Drops</option>
+                  <option value="Suspension">Suspension</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="newMedDosage">DOSAGE STRENGTH</label>
+                <input type="text" id="newMedDosage" class="cv-form-input" placeholder="e.g. 500 mg, 10 ml">
+              </div>
+
+              <!-- ROW 3: Packaging & Placement -->
+              <div>
+                <label for="newMedSoldAs">PACKAGING (SOLD AS)</label>
+                <select id="newMedSoldAs" class="cv-form-select">
+                  <option value="tablet">Tablet</option>
+                  <option value="strip">Strip</option>
+                  <option value="capsule">Capsule</option>
+                  <option value="bottle">Bottle</option>
+                  <option value="vial">Vial / Ampoule</option>
+                  <option value="tube">Tube</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="newMedUnitsPerStrip">UNITS PER STRIP / BOX</label>
+                <input type="number" id="newMedUnitsPerStrip" class="cv-form-input" min="1" value="10" style="text-align:right; font-weight:700;">
+              </div>
+
+              <div>
+                <label for="newMedPlacement" style="color:var(--cv-primary);">
+                  <span>📍 SHELF / RACK LOCATION <span style="color:var(--cv-danger);">*</span></span>
+                </label>
+                <input type="text" id="newMedPlacement" class="cv-form-input" placeholder="e.g. Rack A-3, Shelf 2" style="font-weight:600; border-color:#93c5fd;">
+              </div>
+
+              <!-- ROW 4: Manufacturer, Supplier, HSN -->
+              <div>
+                <label for="newMedManufacturer">MANUFACTURER</label>
+                <input type="text" id="newMedManufacturer" class="cv-form-input" placeholder="e.g. Cipla Ltd, Sun Pharma">
+              </div>
+
+              <div>
+                <label for="newMedSupplier">SUPPLIER / VENDOR</label>
+                <input type="text" id="newMedSupplier" list="pharSupplierDatalist" class="cv-form-input" placeholder="Select or enter supplier">
+                <datalist id="pharSupplierDatalist">
+                  ${existingSuppliers.map(s => `<option value="${escapeHtml(s)}">`).join('')}
+                </datalist>
+              </div>
+
+              <div>
+                <label for="newMedHsn">HSN CODE</label>
+                <input type="text" id="newMedHsn" class="cv-form-input" value="3004" placeholder="3004" style="font-family:monospace;">
+              </div>
+
+              <!-- ROW 5: Regulatory Rx & Pricing -->
+              <div style="display:flex; align-items:center; gap:0.5rem; padding-top:0.6rem;">
+                <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.75rem; font-weight:700; color:#dc2626; text-transform:none;">
+                  <input type="checkbox" id="newMedRxRequired" style="accent-color:#dc2626; width:16px; height:16px;">
+                  <span>Prescription Required (Rx Only)</span>
+                </label>
+              </div>
+
+              <div>
+                <label for="newMedCostPrice">DEFAULT COST (₹)</label>
+                <input type="number" id="newMedCostPrice" class="cv-form-input" min="0" step="0.01" value="12.00" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="newMedUnitPrice">SELLING PRICE / MRP (₹) <span style="color:var(--cv-danger);">*</span></label>
+                <input type="number" id="newMedUnitPrice" class="cv-form-input" min="0" step="0.01" required value="20.00" style="font-weight:700; text-align:right;">
+              </div>
+
+              <!-- ROW 6: Reorder Level, GST -->
+              <div>
+                <label for="newMedReorder">REORDER LEVEL</label>
+                <input type="number" id="newMedReorder" class="cv-form-input" min="1" value="15" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="newMedGst">GST RATE (%)</label>
+                <select id="newMedGst" class="cv-form-select">
+                  <option value="0">0% (Exempt)</option>
+                  <option value="5" selected>5% (Standard Medicines)</option>
+                  <option value="12">12%</option>
+                  <option value="18">18%</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="newMedNotes">NOTES / STORAGE</label>
+                <input type="text" id="newMedNotes" class="cv-form-input" placeholder="e.g. Store below 25°C">
+              </div>
+
+            </div>
+
+            <!-- OPENING BATCH SUB-PANEL -->
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.75rem 1rem; margin-top:0.75rem;">
+              <div style="font-size:0.78rem; font-weight:800; color:#1e40af; margin-bottom:0.45rem; display:flex; align-items:center; gap:0.4rem;">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                INITIAL OPENING STOCK BATCH LOT
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.6rem;">
+                <div>
+                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">BATCH NUMBER *</label>
+                  <input type="text" id="newMedBatch" class="cv-form-input" required placeholder="BATCH-01" style="height:30px; font-family:monospace; font-weight:700;">
+                </div>
+                <div>
+                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">EXPIRY DATE *</label>
+                  <input type="date" id="newMedExpiry" class="cv-form-input" required style="height:30px;">
+                </div>
+                <div>
+                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">OPENING UNITS *</label>
+                  <input type="number" id="newMedStock" class="cv-form-input" min="0" required value="100" style="height:30px; font-weight:800; text-align:right;">
+                </div>
+              </div>
+            </div>
+
+            <div id="addMedFormError" style="display:none; background:#fee2e2; border:1px solid #fecaca; color:#b91c1c; padding:0.35rem 0.75rem; border-radius:6px; font-size:0.78rem; font-weight:600; margin-top:0.5rem;"></div>
+
+            <!-- Footer Actions -->
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.65rem; margin-top:0.6rem; border-top:1px solid #f1f5f9;">
+              <button type="button" class="cv-btn-secondary" id="btnCancelAddMed" style="padding:0.4rem 1.15rem; font-size:0.82rem;">Cancel</button>
+              <button type="submit" class="cv-btn-primary" id="btnSubmitAddMed" style="padding:0.4rem 1.35rem; font-size:0.82rem; font-weight:700;">
+                Save &amp; Register Medicine
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const form = document.getElementById('formAddMedicine');
+    const expiryInput = document.getElementById('newMedExpiry');
+    const errorBox = document.getElementById('addMedFormError');
+    const submitBtn = document.getElementById('btnSubmitAddMed');
+    const backdrop = document.getElementById('addMedBackdrop');
+
+    const closeModal = () => { modalHost.innerHTML = ''; };
+    backdrop?.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+    document.getElementById('btnCloseAddMedModal')?.addEventListener('click', closeModal);
+    document.getElementById('btnCancelAddMed')?.addEventListener('click', closeModal);
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (errorBox) errorBox.style.display = 'none';
+
+      const expVal = expiryInput?.value;
+      if (expVal && expVal < todayStr) {
+        if (errorBox) {
+          errorBox.textContent = 'Cannot register batch with past expiry date. Medicine lot is already expired.';
+          errorBox.style.display = 'block';
+        }
+        return;
+      }
+
+      const payload = {
+        name: document.getElementById('newMedName')?.value?.trim(),
+        medicineCode: document.getElementById('newMedCode')?.value?.trim().toUpperCase(),
+        genericName: document.getElementById('newMedGeneric')?.value?.trim(),
+        category: document.getElementById('newMedCategory')?.value,
+        medicineForm: document.getElementById('newMedForm')?.value,
+        dosageStrength: document.getElementById('newMedDosage')?.value?.trim(),
+        manufacturer: document.getElementById('newMedManufacturer')?.value?.trim(),
+        supplier: document.getElementById('newMedSupplier')?.value?.trim(),
+        soldAs: document.getElementById('newMedSoldAs')?.value || 'tablet',
+        unitsPerStrip: parseInt(document.getElementById('newMedUnitsPerStrip')?.value) || 10,
+        rackLocation: document.getElementById('newMedPlacement')?.value?.trim(),
+        placement: document.getElementById('newMedPlacement')?.value?.trim(),
+        prescriptionRequired: document.getElementById('newMedRxRequired')?.checked || false,
+        hsnCode: document.getElementById('newMedHsn')?.value?.trim() || '3004',
+        batchNumber: document.getElementById('newMedBatch')?.value?.trim(),
+        expiryDate: expVal,
+        costPrice: parseFloat(document.getElementById('newMedCostPrice')?.value) || 0,
+        unitPrice: parseFloat(document.getElementById('newMedUnitPrice')?.value) || 0,
+        stockQuantity: parseInt(document.getElementById('newMedStock')?.value) || 0,
+        reorderLevel: parseInt(document.getElementById('newMedReorder')?.value) || 15,
+        gstPercentage: parseFloat(document.getElementById('newMedGst')?.value) || 5.0,
+        notes: document.getElementById('newMedNotes')?.value?.trim()
+      };
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Saving...';
+
+      try {
+        const res = await cvFetch('/api/pharmacy/medicines/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+          showToast('Medicine and initial batch added successfully.', 'success');
+          closeModal();
+          renderPharmacyInventoryTab();
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Save & Register Medicine';
+          if (errorBox) {
+            errorBox.textContent = res?.message || 'Failed to save medicine.';
+            errorBox.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Save & Register Medicine';
+        alert('Error adding medicine: ' + err.message);
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // EDIT MEDICINE MODAL
+  // ------------------------------------------------------------------
+  function showEditMedicineModal(med) {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="editMedBackdrop" style="padding:1rem;">
+        <div class="cv-med-modal-compact" style="width:880px; max-height:92vh; overflow-y:auto;">
+          
+          <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:0.75rem 1.25rem; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <h3 style="margin:0; font-size:1.02rem; font-weight:800; color:#0f172a;">Edit Medicine: ${escapeHtml(med.name)}</h3>
+              <p style="margin:0; font-size:0.72rem; color:var(--cv-text-muted);">Update formulary details, packaging, shelf rack, and reorder levels</p>
+            </div>
+            <button type="button" id="btnCloseEditMedModal" style="background:none; border:none; font-size:1.35rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+
+          <form id="formEditMedicine" style="display:flex; flex-direction:column; padding:0.9rem 1.25rem;">
+            <div class="cv-med-compact-grid">
+              
+              <div>
+                <label for="editMedName">MEDICINE NAME *</label>
+                <input type="text" id="editMedName" class="cv-form-input" required value="${escapeHtml(med.name)}">
+              </div>
+
+              <div>
+                <label>MEDICINE ID</label>
+                <input type="text" class="cv-form-input" disabled value="${escapeHtml(med.medicineCode)}" style="font-family:monospace; background:#f1f5f9;">
+              </div>
+
+              <div>
+                <label for="editMedGeneric">GENERIC COMPOSITION</label>
+                <input type="text" id="editMedGeneric" class="cv-form-input" value="${escapeHtml(med.genericName || '')}">
+              </div>
+
+              <div>
+                <label for="editMedCategory">CATEGORY</label>
+                <input type="text" id="editMedCategory" class="cv-form-input" value="${escapeHtml(med.category || 'Tablet')}">
+              </div>
+
+              <div>
+                <label for="editMedForm">MEDICINE FORM</label>
+                <input type="text" id="editMedForm" class="cv-form-input" value="${escapeHtml(med.medicineForm || 'Tablet')}">
+              </div>
+
+              <div>
+                <label for="editMedDosage">DOSAGE STRENGTH</label>
+                <input type="text" id="editMedDosage" class="cv-form-input" value="${escapeHtml(med.dosageStrength || '')}">
+              </div>
+
+              <div>
+                <label for="editMedSoldAs">PACKAGING (SOLD AS)</label>
+                <input type="text" id="editMedSoldAs" class="cv-form-input" value="${escapeHtml(med.soldAs || 'tablet')}">
+              </div>
+
+              <div>
+                <label for="editMedUnitsPerStrip">UNITS PER STRIP</label>
+                <input type="number" id="editMedUnitsPerStrip" class="cv-form-input" min="1" value="${med.unitsPerStrip || 10}" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="editMedPlacement" style="color:var(--cv-primary);">📍 SHELF / RACK LOCATION</label>
+                <input type="text" id="editMedPlacement" class="cv-form-input" value="${escapeHtml(med.rackLocation || '')}" style="font-weight:600; border-color:#93c5fd;">
+              </div>
+
+              <div>
+                <label for="editMedManufacturer">MANUFACTURER</label>
+                <input type="text" id="editMedManufacturer" class="cv-form-input" value="${escapeHtml(med.manufacturer || '')}">
+              </div>
+
+              <div>
+                <label for="editMedSupplier">SUPPLIER</label>
+                <input type="text" id="editMedSupplier" class="cv-form-input" value="${escapeHtml(med.supplier || '')}">
+              </div>
+
+              <div>
+                <label for="editMedHsn">HSN CODE</label>
+                <input type="text" id="editMedHsn" class="cv-form-input" value="${escapeHtml(med.hsnCode || '3004')}">
+              </div>
+
+              <div style="display:flex; align-items:center; padding-top:0.6rem;">
+                <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.75rem; font-weight:700; color:#dc2626; text-transform:none;">
+                  <input type="checkbox" id="editMedRxRequired" ${med.prescriptionRequired ? 'checked' : ''} style="accent-color:#dc2626; width:16px; height:16px;">
+                  <span>Prescription Required (Rx Only)</span>
+                </label>
+              </div>
+
+              <div>
+                <label for="editMedUnitPrice">SELLING PRICE / MRP (₹) *</label>
+                <input type="number" id="editMedUnitPrice" class="cv-form-input" min="0" step="0.01" required value="${Number(med.unitPrice).toFixed(2)}" style="font-weight:700; text-align:right;">
+              </div>
+
+              <div>
+                <label for="editMedCostPrice">DEFAULT COST (₹)</label>
+                <input type="number" id="editMedCostPrice" class="cv-form-input" min="0" step="0.01" value="${Number(med.costPrice || 0).toFixed(2)}" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="editMedReorder">REORDER LEVEL</label>
+                <input type="number" id="editMedReorder" class="cv-form-input" min="1" value="${med.reorderLevel || 10}" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="editMedGst">GST RATE (%)</label>
+                <input type="number" id="editMedGst" class="cv-form-input" min="0" max="28" step="0.5" value="${med.gstPercentage || 5.0}" style="text-align:right;">
+              </div>
+
+              <div>
+                <label for="editMedNotes">NOTES</label>
+                <input type="text" id="editMedNotes" class="cv-form-input" value="${escapeHtml(med.notes || '')}">
+              </div>
+
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.65rem; margin-top:0.6rem; border-top:1px solid #f1f5f9;">
+              <button type="button" class="cv-btn-secondary" id="btnCancelEditMed" style="padding:0.4rem 1.15rem; font-size:0.82rem;">Cancel</button>
+              <button type="submit" class="cv-btn-primary" id="btnSubmitEditMed" style="padding:0.4rem 1.35rem; font-size:0.82rem; font-weight:700;">
+                Update Medicine
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => { modalHost.innerHTML = ''; };
+    document.getElementById('btnCloseEditMedModal')?.addEventListener('click', closeModal);
+    document.getElementById('btnCancelEditMed')?.addEventListener('click', closeModal);
+    document.getElementById('editMedBackdrop')?.addEventListener('click', (e) => {
+      if (e.target.id === 'editMedBackdrop') closeModal();
+    });
+
+    document.getElementById('formEditMedicine')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('editMedName').value.trim(),
+        genericName: document.getElementById('editMedGeneric').value.trim(),
+        category: document.getElementById('editMedCategory').value.trim(),
+        medicineForm: document.getElementById('editMedForm').value.trim(),
+        dosageStrength: document.getElementById('editMedDosage').value.trim(),
+        soldAs: document.getElementById('editMedSoldAs').value.trim(),
+        unitsPerStrip: parseInt(document.getElementById('editMedUnitsPerStrip').value) || 10,
+        rackLocation: document.getElementById('editMedPlacement').value.trim(),
+        placement: document.getElementById('editMedPlacement').value.trim(),
+        manufacturer: document.getElementById('editMedManufacturer').value.trim(),
+        supplier: document.getElementById('editMedSupplier').value.trim(),
+        hsnCode: document.getElementById('editMedHsn').value.trim(),
+        prescriptionRequired: document.getElementById('editMedRxRequired').checked,
+        unitPrice: parseFloat(document.getElementById('editMedUnitPrice').value) || 0,
+        costPrice: parseFloat(document.getElementById('editMedCostPrice').value) || 0,
+        reorderLevel: parseInt(document.getElementById('editMedReorder').value) || 10,
+        gstPercentage: parseFloat(document.getElementById('editMedGst').value) || 5.0,
+        notes: document.getElementById('editMedNotes').value.trim()
+      };
+
+      try {
+        const res = await cvFetch(`/api/pharmacy/medicines/${med.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+          showToast('Medicine details updated successfully.', 'success');
+          closeModal();
+          renderPharmacyInventoryTab();
+        } else {
+          alert(res?.message || 'Failed to update medicine.');
+        }
+      } catch (err) {
+        alert('Error updating medicine: ' + err.message);
+      }
+    });
+  }
+
+
+
+  // ====================================================================
+  // TAB 4: STOCK PROCUREMENT & IMMUTABLE AUDIT LEDGER
+  // ====================================================================
+  async function renderPharmacyProcurementTab() {
+    const container = document.getElementById('pharTabContent');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+        <div class="cv-loading-spinner"></div>
+      </div>
+    `;
+
+    let medicines = [];
+    let suppliers = [];
+    let movements = [];
+
+    try {
+      const [mRes, sRes, movRes] = await Promise.all([
+        cvFetch('/api/pharmacy/medicines'),
+        cvFetch('/api/pharmacy/suppliers/list'),
+        cvFetch('/api/pharmacy/stock/movements?limit=100')
+      ]);
+      if (mRes && mRes.success && Array.isArray(mRes.data)) medicines = mRes.data;
+      if (sRes && sRes.success && Array.isArray(sRes.data)) suppliers = sRes.data;
+      if (movRes && movRes.success && Array.isArray(movRes.data)) movements = movRes.data;
+    } catch (err) {
+      console.error('Error loading procurement data:', err);
+    }
+
+    container.innerHTML = `
+      <div class="cv-pharmacy-flow">
+        
+        <!-- SECTION 1: Stock Procurement Form -->
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header">
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Stock Procurement &amp; Inventory Receipt
+            </div>
+            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Replenish Batches &bull; Basic Units or Strips</span>
+          </div>
+
+          <form id="formStockReceipt" style="padding:0.25rem 0;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:0.85rem; margin-bottom:0.75rem;">
+              
+              <!-- Select Medicine -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  MEDICINE MASTER <span style="color:var(--cv-danger);">*</span>
+                </label>
+                <select id="rcptMedSelect" class="cv-form-select" required style="height:36px; font-size:0.85rem; width:100%;">
+                  <option value="">-- Choose Medicine to Restock --</option>
+                  ${medicines.map(m => `
+                    <option value="${m.id}" data-units-per-strip="${m.unitsPerStrip || 10}" data-sold-as="${escapeHtml(m.soldAs || 'tablet')}" ${pharPreselectedRestockMedId && String(pharPreselectedRestockMedId) === String(m.id) ? 'selected' : ''}>
+                      ${escapeHtml(m.name)} (${escapeHtml(m.medicineCode)}) | Stock: ${m.stockQuantity}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <!-- Batch Choice (Existing vs New) -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  BATCH ALLOCATION
+                </label>
+                <select id="rcptBatchMode" class="cv-form-select" style="height:36px; font-size:0.85rem; width:100%;">
+                  <option value="NEW">Create New Batch Lot</option>
+                  <option value="EXISTING">Add to Existing Batch</option>
+                </select>
+              </div>
+
+              <!-- Existing Batch Dropdown (conditional) -->
+              <div id="rcptExistingBatchCol" style="display:none;">
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  EXISTING BATCH LOT
+                </label>
+                <select id="rcptExistingBatchSelect" class="cv-form-select" style="height:36px; font-size:0.85rem; width:100%;">
+                  <option value="">-- Select Batch --</option>
+                </select>
+              </div>
+
+              <!-- New Batch Number -->
+              <div id="rcptNewBatchCol">
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  BATCH NUMBER <span style="color:var(--cv-danger);">*</span>
+                </label>
+                <input type="text" id="rcptBatchNumber" class="cv-form-input" placeholder="e.g. BATCH-2026-X" style="height:36px; font-family:monospace; font-weight:700;">
+              </div>
+
+              <!-- Expiry Date -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  EXPIRY DATE <span style="color:var(--cv-danger);">*</span>
+                </label>
+                <input type="date" id="rcptExpiryDate" class="cv-form-input" style="height:36px;">
+              </div>
+
+              <!-- Quantity & Packaging Unit -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  QUANTITY &amp; UNIT <span style="color:var(--cv-danger);">*</span>
+                </label>
+                <div style="display:flex; gap:0.35rem;">
+                  <input type="number" id="rcptQuantity" class="cv-form-input" min="1" required value="50" style="height:36px; width:90px; text-align:right; font-weight:800;">
+                  <select id="rcptUnit" class="cv-form-select" style="height:36px; flex:1; font-size:0.82rem;">
+                    <option value="basic">Basic Units</option>
+                    <option value="strip">Strips / Boxes</option>
+                  </select>
+                </div>
+                <div id="rcptUnitHint" style="font-size:0.7rem; color:#0369a1; font-weight:600; margin-top:0.2rem;"></div>
+              </div>
+
+              <!-- Cost Per Unit -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  PURCHASE COST / UNIT (₹)
+                </label>
+                <input type="number" id="rcptCostPrice" class="cv-form-input" min="0" step="0.01" value="12.00" style="height:36px; text-align:right;">
+              </div>
+
+              <!-- Supplier -->
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">
+                  VENDOR / SUPPLIER
+                </label>
+                <select id="rcptSupplier" class="cv-form-select" style="height:36px; font-size:0.85rem; width:100%;">
+                  <option value="">-- Choose Vendor / Supplier --</option>
+                  ${suppliers.map(s => `
+                    <option value="${escapeHtml(s.name)}">${escapeHtml(s.name)} ${s.agencyName ? '(' + escapeHtml(s.agencyName) + ')' : ''}</option>
+                  `).join('')}
+                </select>
+              </div>
+
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.5rem; border-top:1px solid #f1f5f9;">
+              <button type="submit" class="cv-btn-primary" id="btnSubmitStockReceipt" style="padding:0.5rem 1.4rem; font-size:0.86rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Record Stock Receipt
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SECTION 2: Immutable Stock Movement Audit Ledger -->
+        <div class="cv-pharmacy-card">
+          <div class="cv-pharmacy-card-header">
+            <div>
+              <div class="cv-pharmacy-card-title">
+                <svg style="width:19px; height:19px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Immutable Stock Movement Audit Trail
+              </div>
+              <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+                Audit log tracking receipts, POS dispensing deductions, manual edits, and purges.
+              </p>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <select id="ledgerMedFilter" class="cv-form-select" style="height:32px; font-size:0.8rem; width:220px;">
+                <option value="ALL">All Medicines</option>
+                ${medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')}
+              </select>
+              <button type="button" class="cv-btn-secondary" id="btnRefreshLedger" style="padding:0.35rem 0.75rem; font-size:0.78rem;">
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="cv-bill-table-wrapper" style="margin-top:0;">
+            <table class="cv-bill-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Medicine Name</th>
+                  <th>Batch Number</th>
+                  <th>Movement Reason / Reference</th>
+                  <th style="text-align:center;">Quantity Change</th>
+                  <th style="text-align:center;">Resulting Balance</th>
+                  <th>Recorded By</th>
+                </tr>
+              </thead>
+              <tbody id="stockLedgerTableBody">
+                ${renderLedgerTableRows(movements)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    // Clear preselected med id after load
+    pharPreselectedRestockMedId = null;
+
+    // Toggle mode
+    const modeSelect = document.getElementById('rcptBatchMode');
+    const existingCol = document.getElementById('rcptExistingBatchCol');
+    const newCol = document.getElementById('rcptNewBatchCol');
+    const medSelect = document.getElementById('rcptMedSelect');
+    const existingBatchSelect = document.getElementById('rcptExistingBatchSelect');
+
+    async function loadBatchesForReceipt() {
+      const medId = medSelect.value;
+      if (!medId) return;
+
+      try {
+        const res = await cvFetch(`/api/pharmacy/batches/medicine/${medId}`);
+        if (res && res.success && Array.isArray(res.data)) {
+          existingBatchSelect.innerHTML = '<option value="">-- Select Batch --</option>' + res.data.map(b => `
+            <option value="${b.id}" data-bnum="${escapeHtml(b.batchNumber)}" data-exp="${b.expiryDate}" data-cost="${b.costPerUnit || ''}">
+              ${escapeHtml(b.batchNumber)} (Stock: ${b.quantity}, Exp: ${b.expiryDate})
+            </option>
+          `).join('');
+        }
+      } catch (err) {
+        console.error('Error loading batches for receipt:', err);
+      }
+    }
+
+    modeSelect?.addEventListener('change', () => {
+      if (modeSelect.value === 'EXISTING') {
+        existingCol.style.display = 'block';
+        newCol.style.display = 'none';
+        loadBatchesForReceipt();
+      } else {
+        existingCol.style.display = 'none';
+        newCol.style.display = 'block';
+      }
+    });
+
+    medSelect?.addEventListener('change', () => {
+      if (modeSelect.value === 'EXISTING') {
+        loadBatchesForReceipt();
+      }
+      updateUnitHint();
+    });
+
+    existingBatchSelect?.addEventListener('change', () => {
+      const opt = existingBatchSelect.selectedOptions[0];
+      if (opt && opt.value) {
+        const exp = opt.getAttribute('data-exp');
+        const cost = opt.getAttribute('data-cost');
+        if (exp) document.getElementById('rcptExpiryDate').value = exp;
+        if (cost) document.getElementById('rcptCostPrice').value = Number(cost).toFixed(2);
+      }
+    });
+
+    function updateUnitHint() {
+      const opt = medSelect?.selectedOptions?.[0];
+      const unit = document.getElementById('rcptUnit')?.value;
+      const hint = document.getElementById('rcptUnitHint');
+      const qty = parseInt(document.getElementById('rcptQuantity')?.value) || 0;
+
+      if (opt && opt.value && hint) {
+        const ups = parseInt(opt.getAttribute('data-units-per-strip')) || 10;
+        if (unit === 'strip') {
+          hint.textContent = `= ${qty * ups} basic units (${qty} strips × ${ups} per strip)`;
+        } else {
+          hint.textContent = `= ${qty} basic units`;
+        }
+      }
+    }
+
+    document.getElementById('rcptQuantity')?.addEventListener('input', updateUnitHint);
+    document.getElementById('rcptUnit')?.addEventListener('change', updateUnitHint);
+
+    // Initial check if preselected
+    if (medSelect.value) {
+      updateUnitHint();
+    }
+
+    // Submit Receipt
+    document.getElementById('formStockReceipt')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const medId = medSelect.value;
+      if (!medId) {
+        alert('Please choose a medicine to replenish.');
+        return;
+      }
+
+      const isExisting = (modeSelect.value === 'EXISTING');
+      const batchId = isExisting ? existingBatchSelect.value : null;
+      const batchNum = isExisting ? '' : document.getElementById('rcptBatchNumber').value.trim();
+
+      if (isExisting && !batchId) {
+        alert('Please select an existing batch.');
+        return;
+      }
+      if (!isExisting && !batchNum) {
+        alert('Please enter a new batch number.');
+        return;
+      }
+
+      const payload = {
+        medicineId: parseInt(medId),
+        batchId: batchId ? parseInt(batchId) : null,
+        batchNumber: batchNum,
+        expiryDate: document.getElementById('rcptExpiryDate').value,
+        quantity: parseInt(document.getElementById('rcptQuantity').value) || 1,
+        unit: document.getElementById('rcptUnit').value || 'basic',
+        costPerUnit: parseFloat(document.getElementById('rcptCostPrice').value) || 0,
+        supplierName: document.getElementById('rcptSupplier').value.trim()
+      };
+
+      const btn = document.getElementById('btnSubmitStockReceipt');
+      btn.disabled = true;
+      btn.innerHTML = 'Recording...';
+
+      try {
+        const res = await cvFetch('/api/pharmacy/stock/receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+          showToast('Stock receipt recorded and inventory ledger updated!', 'success');
+          renderPharmacyProcurementTab();
+        } else {
+          alert(res?.message || 'Failed to record stock receipt.');
+        }
+      } catch (err) {
+        alert('Error recording stock receipt: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Record Stock Receipt';
+      }
+    });
+
+    // Ledger filter
+    const ledgerFilter = document.getElementById('ledgerMedFilter');
+    ledgerFilter?.addEventListener('change', async () => {
+      const val = ledgerFilter.value;
+      const url = (val === 'ALL') ? '/api/pharmacy/stock/movements?limit=100' : `/api/pharmacy/stock/movements?medicineId=${val}&limit=100`;
+      try {
+        const res = await cvFetch(url);
+        if (res && res.success && Array.isArray(res.data)) {
+          document.getElementById('stockLedgerTableBody').innerHTML = renderLedgerTableRows(res.data);
+        }
+      } catch (e) {
+        console.error('Error filtering ledger:', e);
+      }
+    });
+
+    document.getElementById('btnRefreshLedger')?.addEventListener('click', () => {
+      ledgerFilter.dispatchEvent(new Event('change'));
+    });
+  }
+
+  function renderLedgerTableRows(list) {
+    if (!list || list.length === 0) {
+      return '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No stock movement audit records found.</td></tr>';
+    }
+
+    return list.map(m => {
+      const change = (m.changeAmount !== undefined && m.changeAmount !== null) ? m.changeAmount : ((m.quantityDelta !== undefined && m.quantityDelta !== null) ? m.quantityDelta : 0);
+      const balance = (m.balanceAfter !== undefined && m.balanceAfter !== null) ? m.balanceAfter : ((m.resultingStock !== undefined && m.resultingStock !== null) ? m.resultingStock : 0);
+      const reason = m.reason || m.movementReason || 'Stock Movement';
+      const isPositive = (change > 0);
+      const deltaClass = isPositive ? 'color:var(--cv-success); font-weight:800;' : 'color:var(--cv-danger); font-weight:800;';
+      const deltaSign = isPositive ? '+' : '';
+
+      return `
+        <tr>
+          <td style="font-size:0.78rem; color:var(--cv-text-muted);">${escapeHtml(m.createdAt || '')}</td>
+          <td>
+            <strong style="color:var(--cv-text-main);">${escapeHtml(m.medicineName || '')}</strong>
+            <span style="font-family:monospace; font-size:0.72rem; color:var(--cv-primary); margin-left:0.3rem;">(${escapeHtml(m.medicineCode || '')})</span>
+          </td>
+          <td><span style="font-family:monospace; font-size:0.8rem; background:#f1f5f9; padding:0.15rem 0.4rem; border-radius:4px;">${escapeHtml(m.batchNumber || 'N/A')}</span></td>
+          <td style="font-size:0.82rem; color:#334155;">${escapeHtml(reason)}</td>
+          <td style="text-align:center; font-size:0.9rem; ${deltaClass}">${deltaSign}${change}</td>
+          <td style="text-align:center; font-weight:700;">${balance}</td>
+          <td style="font-size:0.78rem; color:#64748b;">${escapeHtml(m.performedBy || 'System')}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ====================================================================
+  // TAB 5: SUPPLIERS DIRECTORY
+  // ====================================================================
+  async function renderPharmacySuppliersTab() {
+    const container = document.getElementById('pharTabContent');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
+        <div class="cv-loading-spinner"></div>
+      </div>
+    `;
+
+    let suppliers = [];
+    try {
+      const res = await cvFetch('/api/pharmacy/suppliers/list');
+      if (res && res.success && Array.isArray(res.data)) suppliers = res.data;
+    } catch (err) {
+      console.error('Error loading suppliers:', err);
+    }
+
+    container.innerHTML = `
+      <div class="cv-pharmacy-card">
+        <div class="cv-pharmacy-card-header">
+          <div>
+            <div class="cv-pharmacy-card-title">
+              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Pharmacy Vendors &amp; Supplier Directory
+            </div>
+            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
+              Maintain registered drug agencies, procurement distributors, contact persons, and GSTIN.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.6rem; align-items:center;">
+            <div class="cv-search-icon-input" style="width:260px;">
+              <i class="fas fa-search">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="pharSupplierSearchInput" placeholder="Search supplier or agency..." autocomplete="off">
+            </div>
+            <button type="button" class="cv-btn-primary" id="btnOpenAddSupplierModal" style="padding:0.45rem 1rem; font-size:0.84rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              + Add Supplier
+            </button>
+          </div>
+        </div>
+
+        <div class="cv-bill-table-wrapper" style="margin-top:0;">
+          <table class="cv-bill-table">
+            <thead>
+              <tr>
+                <th>Supplier Name</th>
+                <th>Agency / Distributor</th>
+                <th>Contact Phone</th>
+                <th>Email Address</th>
+                <th>GSTIN</th>
+                <th>Address</th>
+                <th style="text-align:center; width:130px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="pharSupplierTableBody">
+              <!-- Populated via updateSupplierView -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    function updateSupplierView() {
+      const q = (document.getElementById('pharSupplierSearchInput')?.value || '').toLowerCase().trim();
+      let filtered = suppliers;
+      if (q) {
+        filtered = filtered.filter(s =>
+          (s.name && s.name.toLowerCase().includes(q)) ||
+          (s.agencyName && s.agencyName.toLowerCase().includes(q)) ||
+          (s.contactNumber && s.contactNumber.toLowerCase().includes(q)) ||
+          (s.gstNumber && s.gstNumber.toLowerCase().includes(q))
+        );
+      }
+
+      const tbody = document.getElementById('pharSupplierTableBody');
+      if (!tbody) return;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No suppliers found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(s => `
+        <tr>
+          <td><strong style="color:var(--cv-text-main);">${escapeHtml(s.name)}</strong></td>
+          <td>${escapeHtml(s.agencyName || '—')}</td>
+          <td>${escapeHtml(s.contactNumber || '—')}</td>
+          <td style="font-size:0.8rem; color:#64748b;">${escapeHtml(s.email || '—')}</td>
+          <td><span style="font-family:monospace; font-size:0.75rem; background:#f1f5f9; padding:0.15rem 0.45rem; border-radius:4px;">${escapeHtml(s.gstNumber || 'N/A')}</span></td>
+          <td style="font-size:0.8rem; color:#475569;">${escapeHtml(s.address || '—')}</td>
+          <td style="text-align:center; white-space:nowrap;">
+            <button type="button" class="cv-btn-secondary btn-edit-sup" data-id="${s.id}" style="padding:0.25rem 0.55rem; font-size:0.75rem;">Edit</button>
+            <button type="button" class="cv-btn-secondary btn-del-sup" data-id="${s.id}" data-name="${escapeHtml(s.name)}" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:var(--cv-danger); margin-left:0.25rem;">Del</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.btn-edit-sup').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.currentTarget.getAttribute('data-id');
+          const obj = suppliers.find(x => String(x.id) === String(id));
+          if (obj) showAddOrEditSupplierModal(obj);
+        });
+      });
+
+      tbody.querySelectorAll('.btn-del-sup').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.getAttribute('data-id');
+          const name = e.currentTarget.getAttribute('data-name');
+          if (!confirm(`Are you sure you want to delete supplier "${name}"?`)) return;
+
+          try {
+            const res = await cvFetch(`/api/pharmacy/suppliers/${id}`, { method: 'DELETE' });
+            if (res && res.success) {
+              showToast(`Supplier "${name}" deleted.`, 'success');
+              suppliers = suppliers.filter(x => String(x.id) !== String(id));
+              updateSupplierView();
+            } else {
+              alert(res?.message || 'Failed to delete supplier.');
+            }
+          } catch (err) {
+            alert('Error deleting supplier: ' + err.message);
+          }
+        });
+      });
+    }
+
+    document.getElementById('pharSupplierSearchInput')?.addEventListener('input', updateSupplierView);
+    document.getElementById('btnOpenAddSupplierModal')?.addEventListener('click', () => showAddOrEditSupplierModal(null));
+
+    updateSupplierView();
+  }
+
+  function showAddOrEditSupplierModal(supplier = null) {
+    const modalHost = document.getElementById('pharModalHost') || document.body;
+    if (!modalHost) return;
+
+    const isEdit = !!supplier;
+
+    modalHost.innerHTML = `
+      <div class="cv-modal-backdrop show" id="supModalBackdrop" style="padding:1rem;">
+        <div style="background:#ffffff; width:520px; max-width:92vw; border-radius:12px; box-shadow:0 20px 45px rgba(15,23,42,0.25); border:1px solid #e2e8f0; overflow:hidden;">
+          <div style="padding:0.9rem 1.25rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1.02rem; font-weight:800; color:#0f172a;">
+              ${isEdit ? 'Edit Supplier' : 'Register New Vendor / Supplier'}
+            </h3>
+            <button type="button" id="btnCloseSupModal" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+          </div>
+
+          <form id="formSupplierModal" style="padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.65rem;">
+            <div>
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">SUPPLIER NAME *</label>
+              <input type="text" id="supName" class="cv-form-input" required value="${escapeHtml(supplier?.name || '')}" placeholder="e.g. Metro Pharma Distributor">
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">AGENCY / FIRM NAME</label>
+              <input type="text" id="supAgency" class="cv-form-input" value="${escapeHtml(supplier?.agencyName || '')}" placeholder="e.g. Metro Healthcare Agency">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">CONTACT NUMBER</label>
+                <input type="text" id="supPhone" class="cv-form-input" value="${escapeHtml(supplier?.contactNumber || '')}" placeholder="e.g. 9876543210">
+              </div>
+              <div>
+                <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">EMAIL ADDRESS</label>
+                <input type="email" id="supEmail" class="cv-form-input" value="${escapeHtml(supplier?.email || '')}" placeholder="vendor@domain.com">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">GSTIN / GST NUMBER</label>
+              <input type="text" id="supGst" class="cv-form-input" value="${escapeHtml(supplier?.gstNumber || '')}" placeholder="22AAAAA0000A1Z5" style="font-family:monospace; text-transform:uppercase;">
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">ADDRESS / WAREHOUSE LOCATION</label>
+              <input type="text" id="supAddress" class="cv-form-input" value="${escapeHtml(supplier?.address || '')}" placeholder="Plot 12, Industrial Area...">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.6rem; border-top:1px solid #f1f5f9; margin-top:0.4rem;">
+              <button type="button" class="cv-btn-secondary" id="btnCancelSupModal" style="padding:0.4rem 1rem; font-size:0.84rem;">Cancel</button>
+              <button type="submit" class="cv-btn-primary" style="padding:0.4rem 1.25rem; font-size:0.84rem; font-weight:700;">
+                ${isEdit ? 'Update Supplier' : 'Save Supplier'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => { modalHost.innerHTML = ''; };
+    document.getElementById('btnCloseSupModal')?.addEventListener('click', closeModal);
+    document.getElementById('btnCancelSupModal')?.addEventListener('click', closeModal);
+    document.getElementById('supModalBackdrop')?.addEventListener('click', (e) => {
+      if (e.target.id === 'supModalBackdrop') closeModal();
+    });
+
+    document.getElementById('formSupplierModal')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('supName').value.trim(),
+        agencyName: document.getElementById('supAgency').value.trim(),
+        contactNumber: document.getElementById('supPhone').value.trim(),
+        email: document.getElementById('supEmail').value.trim(),
+        address: document.getElementById('supAddress').value.trim(),
+        gstNumber: document.getElementById('supGst').value.trim()
+      };
+
+      try {
+        let res;
+        if (isEdit) {
+          res = await cvFetch(`/api/pharmacy/suppliers/${supplier.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          res = await cvFetch('/api/pharmacy/suppliers/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (res && res.success) {
+          showToast(`Supplier ${isEdit ? 'updated' : 'registered'} successfully.`, 'success');
+          closeModal();
+          renderPharmacySuppliersTab();
+        } else {
+          alert(res?.message || 'Failed to save supplier.');
+        }
+      } catch (err) {
+        alert('Error saving supplier: ' + err.message);
+      }
+    });
+  }
+
+  // ====================================================================
+  // TAB 6: PHARMACY SALES HISTORY
+  // ====================================================================
   let pharHistoryPagination = null;
 
   async function renderPharmacyHistoryTab() {
@@ -7493,7 +9836,7 @@ function renderPharmacyModule(activeTab = 'billing') {
               Pharmacy Sales &amp; Invoicing History
             </div>
             <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
-              Search across historical medicine sales, inspect line-items, and reprint dispensary tax invoices.
+              Inspect past dispensing bills, view batch-level breakdowns, and reprint tax invoices.
             </p>
           </div>
           <div style="display:flex; gap:0.5rem; align-items:center;">
@@ -7501,7 +9844,7 @@ function renderPharmacyModule(activeTab = 'billing') {
               <i class="fas fa-search">
                 <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               </i>
-              <input type="text" id="pharHistorySearchInput" placeholder="Search by Patient, UHID, OP ID, IP ID, Bill No..." autocomplete="off">
+              <input type="text" id="pharHistorySearchInput" placeholder="Search by Patient, UHID, Bill No, Doctor..." autocomplete="off">
             </div>
             <button type="button" class="cv-btn-secondary" id="btnRefreshPharHistory" style="padding:0.5rem 0.85rem; font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
               <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -7543,8 +9886,7 @@ function renderPharmacyModule(activeTab = 'billing') {
           return (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
                  (b.patientName && b.patientName.toLowerCase().includes(q)) ||
                  (b.uhid && b.uhid.toLowerCase().includes(q)) ||
-                 (b.opId && b.opId.toLowerCase().includes(q)) ||
-                 (b.ipId && b.ipId.toLowerCase().includes(q)) ||
+                 (b.doctorName && b.doctorName.toLowerCase().includes(q)) ||
                  (b.phone && b.phone.toLowerCase().includes(q));
         });
       }
@@ -7558,31 +9900,16 @@ function renderPharmacyModule(activeTab = 'billing') {
       }
     }
 
-    // Filter event
-    const searchInput = document.getElementById('pharHistorySearchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => updatePharHistoryView(false));
-    }
-
+    document.getElementById('pharHistorySearchInput')?.addEventListener('input', () => updatePharHistoryView(false));
     document.getElementById('btnRefreshPharHistory')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btnRefreshPharHistory');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Refreshing...';
-      }
       try {
         const res = await cvFetch('/api/pharmacy/bills/history');
         if (res && res.success && Array.isArray(res.data)) {
           pharAllSalesHistory = res.data;
+          updatePharHistoryView(true);
         }
-        updatePharHistoryView(true);
       } catch (e) {
-        console.error('Error refreshing pharmacy history:', e);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Refresh';
-        }
+        console.error('Error refreshing history:', e);
       }
     });
 
@@ -7591,13 +9918,7 @@ function renderPharmacyModule(activeTab = 'billing') {
 
   function renderHistoryTableBodyHtml(bills) {
     if (!bills || bills.length === 0) {
-      return `
-        <tr>
-          <td colspan="10" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
-            No pharmacy sales records found.
-          </td>
-        </tr>
-      `;
+      return '<tr><td colspan="10" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">No pharmacy sales records found.</td></tr>';
     }
 
     return bills.map(b => {
@@ -7606,14 +9927,12 @@ function renderPharmacyModule(activeTab = 'billing') {
       else if (b.paymentStatus === 'PARTIALLY PAID') statusBadgeClass = 'cv-badge-partial';
 
       const itemsSummary = (b.items && b.items.length > 0)
-        ? `${b.items.length} meds (${b.items.map(i => i.medicineName).slice(0, 2).join(', ')}${b.items.length > 2 ? '...' : ''})`
+        ? `${b.items.length} item(s) (${b.items.map(i => i.medicineName).slice(0, 2).join(', ')}${b.items.length > 2 ? '...' : ''})`
         : 'Medicines Dispensed';
 
       return `
         <tr>
-          <td>
-            <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber)}</strong>
-          </td>
+          <td><strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(b.billNumber)}</strong></td>
           <td style="font-size:0.8rem; color:var(--cv-text-muted);">
             <div>${escapeHtml(b.billDate || '')}</div>
             <div style="font-size:0.72rem;">${escapeHtml(b.billTime || '')}</div>
@@ -7622,34 +9941,22 @@ function renderPharmacyModule(activeTab = 'billing') {
             <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(b.patientName)}</div>
             <div style="font-size:0.72rem; color:var(--cv-text-muted);">
               UHID: <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(b.uhid || 'N/A')}</span>
-              ${b.opId ? `&bull; OP: ${escapeHtml(b.opId)}` : ''}
-              ${b.ipId ? `&bull; IP: ${escapeHtml(b.ipId)}` : ''}
+              ${b.phone ? '&bull; ' + escapeHtml(b.phone) : ''}
             </div>
           </td>
           <td style="font-size:0.8rem;">
             <div>${escapeHtml(b.doctorName || 'Consultant')}</div>
             <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(b.department || 'General')}</div>
           </td>
-          <td style="font-size:0.8rem; color:var(--cv-text-main);">
-            ${escapeHtml(itemsSummary)}
-          </td>
-          <td style="text-align:right; font-weight:700; color:#0f172a;">
-            ₹${formatCurrency(b.finalTotal || b.totalAmount)}
-          </td>
-          <td style="text-align:right; font-weight:600; color:var(--cv-success);">
-            ₹${formatCurrency(b.paidAmount)}
-          </td>
-          <td style="text-align:right; font-weight:700; color:${b.balanceAmount > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">
-            ₹${formatCurrency(b.balanceAmount)}
-          </td>
+          <td style="font-size:0.8rem; color:var(--cv-text-main);">${escapeHtml(itemsSummary)}</td>
+          <td style="text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(b.finalTotal || b.totalAmount)}</td>
+          <td style="text-align:right; font-weight:600; color:var(--cv-success);">₹${formatCurrency(b.paidAmount)}</td>
+          <td style="text-align:right; font-weight:700; color:${b.balanceAmount > 0 ? 'var(--cv-danger)' : 'var(--cv-text-muted)'};">₹${formatCurrency(b.balanceAmount)}</td>
           <td style="text-align:center;">
-            <span class="cv-payment-balance-badge ${statusBadgeClass}">
-              ${escapeHtml(b.paymentStatus)}
-            </span>
+            <span class="cv-payment-balance-badge ${statusBadgeClass}">${escapeHtml(b.paymentStatus)}</span>
           </td>
           <td style="text-align:center; white-space:nowrap;">
-            <button type="button" class="cv-btn-secondary btn-view-phar-invoice" data-bill-id="${b.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem; display:inline-flex; align-items:center; gap:0.3rem;">
-              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <button type="button" class="cv-btn-secondary btn-view-phar-invoice" data-bill-id="${b.id}" style="padding:0.3rem 0.65rem; font-size:0.75rem;">
               Invoice
             </button>
             <button type="button" class="cv-btn-secondary btn-payments-phar" data-bill-id="${b.id}" data-bill-no="${escapeHtml(b.billNumber)}" style="padding:0.3rem 0.65rem; font-size:0.75rem; color:#0284c7; margin-left:0.3rem;">
@@ -7673,8 +9980,7 @@ function renderPharmacyModule(activeTab = 'billing') {
             alert('Failed to load invoice details.');
           }
         } catch (err) {
-          console.error('Error loading invoice:', err);
-          alert('Could not retrieve invoice.');
+          alert('Could not retrieve invoice: ' + err.message);
         }
       });
     });
@@ -7689,622 +9995,16 @@ function renderPharmacyModule(activeTab = 'billing') {
   }
 
   // ------------------------------------------------------------------
-  // TAB 3: MEDICINE MASTER & STOCK
-  // ------------------------------------------------------------------
-  async function renderPharmacyInventoryTab() {
-    const container = document.getElementById('pharTabContent');
-    if (!container) return;
-
-    container.innerHTML = `
-      <div style="display:flex; justify-content:center; align-items:center; min-height:220px;">
-        <div class="cv-loading-spinner"></div>
-      </div>
-    `;
-
-    let summary = { totalMedicines: 0, lowStockCount: 0, todayBillsCount: 0, todayRevenue: 0 };
-    let medicines = [];
-
-    try {
-      const [sumRes, medRes] = await Promise.all([
-        cvFetch('/api/pharmacy/summary'),
-        cvFetch('/api/pharmacy/medicines')
-      ]);
-
-      if (sumRes && sumRes.success && sumRes.data) summary = sumRes.data;
-      if (medRes && medRes.success && Array.isArray(medRes.data)) medicines = medRes.data;
-    } catch (err) {
-      console.error('Failed to load pharmacy summary/inventory:', err);
-    }
-
-    container.innerHTML = `
-      <!-- Top Metrics Row -->
-      <div class="cv-pharmacy-metrics-row">
-        <div class="cv-metric-card">
-          <div class="cv-metric-label">Medicine Master Items</div>
-          <div class="cv-metric-value" style="color:var(--cv-primary);">${summary.totalMedicines}</div>
-          <span class="cv-metric-badge" style="background:#e0f2fe; color:#0369a1;">Verified Inventory</span>
-        </div>
-        <div class="cv-metric-card">
-          <div class="cv-metric-label">Low Stock Alerts</div>
-          <div class="cv-metric-value" style="color:${summary.lowStockCount > 0 ? 'var(--cv-danger)' : 'var(--cv-success)'};">${summary.lowStockCount}</div>
-          <span class="cv-metric-badge" style="background:${summary.lowStockCount > 0 ? '#fee2e2' : '#dcfce7'}; color:${summary.lowStockCount > 0 ? '#b91c1c' : '#15803d'};">
-            ${summary.lowStockCount > 0 ? 'Reorder Needed' : 'Adequate Stock'}
-          </span>
-        </div>
-        <div class="cv-metric-card">
-          <div class="cv-metric-label">Today's Sales Count</div>
-          <div class="cv-metric-value">${summary.todayBillsCount}</div>
-          <span class="cv-metric-badge" style="background:#f0fdfa; color:#0d9488;">Dispensary Receipts</span>
-        </div>
-        <div class="cv-metric-card">
-          <div class="cv-metric-label">Today's Pharmacy Revenue</div>
-          <div class="cv-metric-value" style="color:var(--cv-deep-blue);">&#8377;${formatCurrency(summary.todayRevenue)}</div>
-          <span class="cv-metric-badge" style="background:#ecfdf5; color:#047857;">Money Management</span>
-        </div>
-      </div>
-
-      <!-- Medicine Master Table Card -->
-      <div class="cv-pharmacy-card cv-pharmacy-inventory-card">
-        <div class="cv-pharmacy-card-header">
-          <div>
-            <div class="cv-pharmacy-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Hospital Medicine Master &amp; Batch Stock
-            </div>
-            <p style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.25rem;">
-              Manage dispensary catalog, monitor real-time batch stocks, reorder levels, and expiration dates.
-            </p>
-          </div>
-          <div style="display:flex; gap:0.6rem; align-items:center;">
-            <div class="cv-search-icon-input" style="width:260px;">
-              <i class="fas fa-search">
-                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              </i>
-              <input type="text" id="pharInventorySearchInput" placeholder="Search medicines, generic, batch..." autocomplete="off">
-            </div>
-            <button type="button" class="cv-btn-primary" id="btnOpenAddMedicineModal" style="padding:0.5rem 1rem; font-size:0.85rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
-              <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              Add Medicine
-            </button>
-          </div>
-        </div>
-
-        <div class="cv-bill-table-wrapper" style="margin-top:0;">
-          <table class="cv-bill-table">
-            <thead>
-              <tr>
-                <th style="width:90px;">Medicine ID</th>
-                <th>Medicine Name &amp; Generic</th>
-                <th>Category &bull; Form</th>
-                <th>Strength</th>
-                <th>Batch</th>
-                <th>Supplier / Agency</th>
-                <th>Expiry Date</th>
-                <th style="text-align:right;">Purchase Price (₹)</th>
-                <th style="text-align:right;">Selling Price (₹)</th>
-                <th style="text-align:center;">Stock Qty</th>
-                <th style="text-align:center;">Reorder Level</th>
-                <th style="text-align:center;">Stock Status</th>
-                <th style="text-align:center;">Status</th>
-              </tr>
-            </thead>
-            <tbody id="pharInventoryTableBody">
-              ${renderInventoryTableBodyHtml(medicines)}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    // Filter event
-    const searchInput = document.getElementById('pharInventorySearchInput');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase().trim();
-        if (!q) {
-          document.getElementById('pharInventoryTableBody').innerHTML = renderInventoryTableBodyHtml(medicines);
-          return;
-        }
-
-        const filtered = medicines.filter(m => {
-          return (m.name && m.name.toLowerCase().includes(q)) ||
-                 (m.genericName && m.genericName.toLowerCase().includes(q)) ||
-                 (m.medicineCode && m.medicineCode.toLowerCase().includes(q)) ||
-                 (m.batchNumber && m.batchNumber.toLowerCase().includes(q)) ||
-                 (m.category && m.category.toLowerCase().includes(q)) ||
-                 (m.supplier && m.supplier.toLowerCase().includes(q)) ||
-                 (m.manufacturer && m.manufacturer.toLowerCase().includes(q));
-        });
-
-        document.getElementById('pharInventoryTableBody').innerHTML = renderInventoryTableBodyHtml(filtered);
-      });
-    }
-
-    document.getElementById('btnOpenAddMedicineModal')?.addEventListener('click', showAddMedicineModal);
-  }
-
-  function renderInventoryTableBodyHtml(medicines) {
-    if (!medicines || medicines.length === 0) {
-      return `
-        <tr>
-          <td colspan="13" style="text-align:center; padding:2.5rem; color:var(--cv-text-muted);">
-            No medicines in inventory yet. Click <strong>Add Medicine</strong> to register new inventory.
-          </td>
-        </tr>
-      `;
-    }
-
-    return medicines.map(m => {
-      let stockPillHtml = `<span class="cv-stock-info-pill cv-stock-in">${m.stockQuantity} in stock</span>`;
-      if (m.expired) {
-        stockPillHtml = `<span class="cv-stock-info-pill cv-stock-out">EXPIRED</span>`;
-      } else if (m.stockQuantity <= 0) {
-        stockPillHtml = `<span class="cv-stock-info-pill cv-stock-out">OUT OF STOCK (0)</span>`;
-      } else if (m.nearExpiry) {
-        stockPillHtml = `<span class="cv-stock-info-pill cv-stock-low" style="background:#ffedd5; color:#c2410c;">NEAR EXPIRY</span>`;
-      } else if (m.lowStock) {
-        stockPillHtml = `<span class="cv-stock-info-pill cv-stock-low">LOW STOCK (${m.stockQuantity})</span>`;
-      }
-
-      return `
-        <tr>
-          <td><strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(m.medicineCode)}</strong></td>
-          <td>
-            <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(m.name)}</div>
-            <div style="font-size:0.75rem; color:var(--cv-text-muted); font-style:italic;">${escapeHtml(m.genericName || '')}</div>
-          </td>
-          <td><span style="font-size:0.75rem; background:#f1f5f9; padding:0.2rem 0.5rem; border-radius:4px; font-weight:600;">${escapeHtml(m.category || 'Tablet')} &bull; ${escapeHtml(m.medicineForm || m.category || 'Tablet')}</span></td>
-          <td><span style="font-size:0.8rem; font-weight:600;">${escapeHtml(m.dosageStrength || '—')}</span></td>
-          <td><span style="font-family:monospace; font-size:0.8rem; background:#f8fafc; padding:0.15rem 0.4rem; border:1px solid #e2e8f0; border-radius:4px;">${escapeHtml(m.batchNumber)}</span></td>
-          <td style="font-size:0.8rem; color:var(--cv-text-main); font-weight:500;">${escapeHtml(m.supplier || 'Direct Supply')}</td>
-          <td style="font-size:0.82rem; ${m.expired ? 'color:var(--cv-danger); font-weight:700;' : ''}">${escapeHtml(m.expiryDate || 'N/A')}</td>
-          <td style="text-align:right; font-size:0.85rem; color:var(--cv-text-muted);">₹${formatCurrency(m.costPrice || 0)}</td>
-          <td style="text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(m.unitPrice)}</td>
-          <td style="text-align:center; font-weight:800; font-size:0.95rem;">${m.stockQuantity}</td>
-          <td style="text-align:center; font-weight:600; color:var(--cv-text-muted);">${m.reorderLevel}</td>
-          <td style="text-align:center;">${stockPillHtml}</td>
-          <td style="text-align:center;"><span style="font-size:0.7rem; font-weight:700; background:#e0f2fe; color:#0369a1; padding:0.15rem 0.45rem; border-radius:12px;">${m.status || 'ACTIVE'}</span></td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  // ------------------------------------------------------------------
-  // ADD MEDICINE MODAL (COMPACT ONE-SCREEN LAYOUT)
-  // ------------------------------------------------------------------
-  async function showAddMedicineModal() {
-    const modalHost = document.getElementById('pharModalHost') || document.body;
-    if (!modalHost) return;
-
-    // Fetch next code and suppliers
-    let defaultCode = '';
-    let existingSuppliers = [];
-
-    try {
-      const [codeRes, supRes] = await Promise.all([
-        cvFetch('/api/pharmacy/medicines/next-code'),
-        cvFetch('/api/pharmacy/suppliers')
-      ]);
-      if (codeRes && codeRes.success && codeRes.data) {
-        defaultCode = codeRes.data;
-      }
-      if (supRes && supRes.success && Array.isArray(supRes.data)) {
-        existingSuppliers = supRes.data;
-      }
-    } catch (err) {
-      console.warn('Could not prefetch medicine code or suppliers:', err);
-    }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    modalHost.innerHTML = `
-      <style>
-        .cv-med-modal-compact {
-          width: 890px;
-          max-width: 95vw;
-          background: #ffffff;
-          border-radius: 12px;
-          box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(15, 23, 42, 0.08);
-          border: 1px solid #e2e8f0;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          animation: cvModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .cv-med-compact-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          column-gap: 0.85rem;
-          row-gap: 0.48rem;
-        }
-        .cv-med-compact-grid .cv-form-input,
-        .cv-med-compact-grid .cv-form-select {
-          height: 32px !important;
-          padding: 0.2rem 0.55rem !important;
-          font-size: 0.8rem !important;
-          border-radius: 6px !important;
-          border: 1px solid #cbd5e1 !important;
-          background: #ffffff !important;
-          width: 100% !important;
-          box-sizing: border-box !important;
-        }
-        .cv-med-compact-grid .cv-form-input:focus,
-        .cv-med-compact-grid .cv-form-select:focus {
-          border-color: var(--cv-primary) !important;
-          box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
-          outline: none !important;
-        }
-        .cv-med-compact-grid label {
-          font-size: 0.67rem !important;
-          font-weight: 700 !important;
-          color: #475569 !important;
-          margin-bottom: 0.15rem !important;
-          display: flex !important;
-          justify-content: space-between !important;
-          align-items: center !important;
-          text-transform: uppercase !important;
-          letter-spacing: 0.025em !important;
-          line-height: 1.1 !important;
-        }
-        .cv-med-span-2 {
-          grid-column: span 2;
-        }
-        @media (max-width: 768px) {
-          .cv-med-modal-compact {
-            max-height: 92vh !important;
-          }
-          .cv-med-compact-grid {
-            grid-template-columns: 1fr !important;
-            gap: 0.5rem !important;
-          }
-          .cv-med-span-2 {
-            grid-column: span 1 !important;
-          }
-          #formAddMedicine {
-            overflow-y: auto !important;
-          }
-        }
-      </style>
-
-      <div class="cv-modal-backdrop show" id="addMedBackdrop" style="padding:1rem;">
-        <div class="cv-med-modal-compact" id="addMedModalInner">
-          
-          <!-- COMPACT HEADER -->
-          <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:0.65rem 1.25rem; display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:0.5rem;">
-              <div style="background:#dbeafe; color:var(--cv-primary); width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              </div>
-              <div>
-                <h3 style="margin:0; font-size:0.98rem; font-weight:800; color:#0f172a; line-height:1.2;">Add New Medicine</h3>
-                <p style="margin:0; font-size:0.71rem; color:var(--cv-text-muted); line-height:1.2;">Medicine master record, batch inventory, pricing &amp; supplier</p>
-              </div>
-            </div>
-            <button type="button" id="btnCloseAddMedModal" style="background:none; border:none; font-size:1.35rem; cursor:pointer; color:var(--cv-text-muted); line-height:1; padding:0.2rem 0.4rem;" title="Close">&times;</button>
-          </div>
-
-          <!-- COMPACT FORM (6 BALANCED ROWS) -->
-          <form id="formAddMedicine" style="display:flex; flex-direction:column; padding:0.75rem 1.25rem 0.5rem 1.25rem; overflow-y:visible;">
-            
-            <div class="cv-med-compact-grid" id="addMedGrid">
-              
-              <!-- ROW 1: Name, Code, Generic -->
-              <div>
-                <label for="newMedName">
-                  <span>MEDICINE NAME <span style="color:var(--cv-danger);">*</span></span>
-                </label>
-                <input type="text" id="newMedName" class="cv-form-input" required placeholder="e.g. Paracetamol 500mg">
-              </div>
-
-              <div>
-                <label for="newMedCode">
-                  <span>MEDICINE ID / CODE <span style="color:var(--cv-danger);">*</span></span>
-                </label>
-                <input type="text" id="newMedCode" class="cv-form-input" required placeholder="e.g. MED-0001" value="${escapeHtml(defaultCode)}" style="font-family:monospace; font-weight:700; text-transform:uppercase;">
-              </div>
-
-              <div>
-                <label for="newMedGeneric">
-                  <span>GENERIC NAME</span>
-                </label>
-                <input type="text" id="newMedGeneric" class="cv-form-input" placeholder="e.g. Paracetamol IP">
-              </div>
-
-              <!-- ROW 2: Category, Form, Strength -->
-              <div>
-                <label for="newMedCategory">
-                  <span>CATEGORY</span>
-                </label>
-                <select id="newMedCategory" class="cv-form-select">
-                  <option value="Tablet">Tablet</option>
-                  <option value="Capsule">Capsule</option>
-                  <option value="Syrup">Syrup</option>
-                  <option value="Injection">Injection</option>
-                  <option value="Cream">Cream</option>
-                  <option value="Ointment">Ointment</option>
-                  <option value="Drops">Drops</option>
-                  <option value="Inhaler">Inhaler</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label for="newMedForm">
-                  <span>MEDICINE FORM</span>
-                </label>
-                <select id="newMedForm" class="cv-form-select">
-                  <option value="Tablet">Tablet</option>
-                  <option value="Capsule">Capsule</option>
-                  <option value="Liquid / Syrup">Liquid / Syrup</option>
-                  <option value="Injection / Ampoule">Injection / Ampoule</option>
-                  <option value="Cream / Gel">Cream / Gel</option>
-                  <option value="Ointment">Ointment</option>
-                  <option value="Eye / Ear Drops">Eye / Ear Drops</option>
-                  <option value="Suspension">Suspension</option>
-                  <option value="Powder">Powder</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label for="newMedDosage">
-                  <span>STRENGTH / DOSAGE</span>
-                </label>
-                <input type="text" id="newMedDosage" class="cv-form-input" placeholder="e.g. 500 mg, 5 ml">
-              </div>
-
-              <!-- ROW 3: Manufacturer, Agency/Supplier, Batch -->
-              <div>
-                <label for="newMedManufacturer">
-                  <span>MANUFACTURER</span>
-                </label>
-                <input type="text" id="newMedManufacturer" class="cv-form-input" placeholder="e.g. Cipla Ltd, Sun Pharma">
-              </div>
-
-              <div>
-                <label for="newMedSupplier">
-                  <span>AGENCY / SUPPLIER</span>
-                </label>
-                <input type="text" id="newMedSupplier" list="pharSupplierDatalist" class="cv-form-input" placeholder="Select or enter supplier">
-                <datalist id="pharSupplierDatalist">
-                  ${existingSuppliers.map(s => `<option value="${escapeHtml(s)}">`).join('')}
-                </datalist>
-              </div>
-
-              <div>
-                <label for="newMedBatch">
-                  <span>BATCH NUMBER <span style="color:var(--cv-danger);">*</span></span>
-                </label>
-                <input type="text" id="newMedBatch" class="cv-form-input" required placeholder="e.g. BATCH-2026-01" style="font-family:monospace; font-weight:600;">
-              </div>
-
-              <!-- ROW 4: Purchase Date, Expiry Date, Quantity -->
-              <div>
-                <label for="newMedPurchaseDate">
-                  <span>PURCHASE DATE</span>
-                </label>
-                <input type="date" id="newMedPurchaseDate" class="cv-form-input" value="${todayStr}">
-              </div>
-
-              <div>
-                <label for="newMedExpiry">
-                  <span>EXPIRY DATE <span style="color:var(--cv-danger);">*</span></span>
-                  <span id="newMedExpiryWarning" style="display:none; color:var(--cv-danger); font-size:0.65rem; font-weight:800; text-transform:none;">Expired!</span>
-                </label>
-                <input type="date" id="newMedExpiry" class="cv-form-input" required>
-              </div>
-
-              <div>
-                <label for="newMedStock">
-                  <span>OPENING QUANTITY <span style="color:var(--cv-danger);">*</span></span>
-                </label>
-                <input type="number" id="newMedStock" class="cv-form-input" min="0" required value="100" style="font-weight:700; text-align:right;">
-              </div>
-
-              <!-- ROW 5: Purchase Price, Selling Price, Reorder Level -->
-              <div>
-                <label for="newMedCostPrice">
-                  <span>PURCHASE PRICE (₹)</span>
-                </label>
-                <input type="number" id="newMedCostPrice" class="cv-form-input" min="0" step="0.01" value="12.00" style="font-weight:600; text-align:right;">
-              </div>
-
-              <div>
-                <label for="newMedUnitPrice">
-                  <span>SELLING PRICE (₹) <span style="color:var(--cv-danger);">*</span></span>
-                </label>
-                <input type="number" id="newMedUnitPrice" class="cv-form-input" min="0" step="0.01" required value="20.00" style="font-weight:700; text-align:right;">
-              </div>
-
-              <div>
-                <label for="newMedReorder">
-                  <span>REORDER LEVEL</span>
-                </label>
-                <input type="number" id="newMedReorder" class="cv-form-input" min="1" value="20" style="text-align:right;">
-              </div>
-
-              <!-- ROW 6: GST %, Description / Notes (Spans 2 columns) -->
-              <div>
-                <label for="newMedGst">
-                  <span>GST %</span>
-                </label>
-                <select id="newMedGst" class="cv-form-select">
-                  <option value="0">0% (Nil)</option>
-                  <option value="5" selected>5% (Standard GST)</option>
-                  <option value="12">12%</option>
-                  <option value="18">18%</option>
-                  <option value="28">28%</option>
-                </select>
-              </div>
-
-              <div class="cv-med-span-2">
-                <label for="newMedNotes">
-                  <span>DESCRIPTION / NOTES</span>
-                </label>
-                <input type="text" id="newMedNotes" class="cv-form-input" placeholder="Storage guidelines, prescription notes, shelf instructions...">
-              </div>
-
-            </div>
-
-            <!-- COMPACT INLINE ERROR ALERT -->
-            <div id="addMedFormError" style="display:none; background:#fee2e2; border:1px solid #fecaca; color:#b91c1c; padding:0.35rem 0.75rem; border-radius:6px; font-size:0.78rem; font-weight:600; margin-top:0.4rem;"></div>
-
-            <!-- COMPACT FOOTER ACTIONS -->
-            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.55rem; margin-top:0.45rem; border-top:1px solid #f1f5f9;">
-              <button type="button" class="cv-btn-secondary" id="btnCancelAddMed" style="padding:0.4rem 1.15rem; font-size:0.82rem; font-weight:600;">Cancel</button>
-              <button type="submit" class="cv-btn-primary" id="btnSubmitAddMed" style="padding:0.4rem 1.35rem; font-size:0.82rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem; box-shadow:0 2px 8px rgba(37,99,235,0.25);">
-                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                Save Medicine
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `;
-
-    const form = document.getElementById('formAddMedicine');
-    const expiryInput = document.getElementById('newMedExpiry');
-    const expiryWarn = document.getElementById('newMedExpiryWarning');
-    const errorBox = document.getElementById('addMedFormError');
-    const submitBtn = document.getElementById('btnSubmitAddMed');
-    const backdrop = document.getElementById('addMedBackdrop');
-
-    const closeModal = () => {
-      modalHost.innerHTML = '';
-      document.removeEventListener('keydown', onEscKey);
-    };
-
-    const onEscKey = (e) => {
-      if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', onEscKey);
-
-    // Click outside to dismiss
-    backdrop?.addEventListener('click', (e) => {
-      if (e.target === backdrop) closeModal();
-    });
-
-    // Expiry live validation
-    expiryInput?.addEventListener('change', () => {
-      const val = expiryInput.value;
-      if (val && val < todayStr) {
-        if (expiryWarn) expiryWarn.style.display = 'inline';
-        expiryInput.style.borderColor = 'var(--cv-danger)';
-      } else {
-        if (expiryWarn) expiryWarn.style.display = 'none';
-        expiryInput.style.borderColor = '';
-      }
-    });
-
-    document.getElementById('btnCloseAddMedModal')?.addEventListener('click', closeModal);
-    document.getElementById('btnCancelAddMed')?.addEventListener('click', closeModal);
-
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (errorBox) errorBox.style.display = 'none';
-
-      const expVal = expiryInput?.value;
-      if (expVal && expVal < todayStr) {
-        if (errorBox) {
-          errorBox.textContent = 'Cannot add medicine with past expiry date. Medicine is already expired.';
-          errorBox.style.display = 'block';
-        }
-        return;
-      }
-
-      const payload = {
-        name: document.getElementById('newMedName')?.value?.trim(),
-        medicineCode: document.getElementById('newMedCode')?.value?.trim().toUpperCase(),
-        genericName: document.getElementById('newMedGeneric')?.value?.trim(),
-        category: document.getElementById('newMedCategory')?.value,
-        medicineForm: document.getElementById('newMedForm')?.value,
-        dosageStrength: document.getElementById('newMedDosage')?.value?.trim(),
-        manufacturer: document.getElementById('newMedManufacturer')?.value?.trim(),
-        supplier: document.getElementById('newMedSupplier')?.value?.trim(),
-        batchNumber: document.getElementById('newMedBatch')?.value?.trim(),
-        purchaseDate: document.getElementById('newMedPurchaseDate')?.value || todayStr,
-        expiryDate: expVal,
-        costPrice: parseFloat(document.getElementById('newMedCostPrice')?.value) || 0,
-        unitPrice: parseFloat(document.getElementById('newMedUnitPrice')?.value) || 0,
-        stockQuantity: parseInt(document.getElementById('newMedStock')?.value) || 0,
-        reorderLevel: parseInt(document.getElementById('newMedReorder')?.value) || 10,
-        gstPercentage: parseFloat(document.getElementById('newMedGst')?.value) || 5.0,
-        notes: document.getElementById('newMedNotes')?.value?.trim()
-      };
-
-      if (!payload.name) {
-        alert('Medicine name is required.');
-        return;
-      }
-      if (!payload.medicineCode) {
-        alert('Medicine ID / Code is required.');
-        return;
-      }
-      if (!payload.batchNumber) {
-        alert('Batch number is required.');
-        return;
-      }
-      if (!payload.expiryDate) {
-        alert('Expiry date is required.');
-        return;
-      }
-
-      // Show loading state
-      const originalBtnHtml = submitBtn.innerHTML;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `
-        <span style="display:inline-block; width:13px; height:13px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:cvSpin 0.6s linear infinite; margin-right:5px;"></span>
-        Saving medicine...
-      `;
-
-      try {
-        const res = await cvFetch('/api/pharmacy/medicines/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res && res.success) {
-          alert('Medicine added successfully.');
-          closeModal();
-          renderPharmacyInventoryTab();
-        } else {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = originalBtnHtml;
-          if (errorBox) {
-            errorBox.textContent = res?.message || 'Failed to save medicine.';
-            errorBox.style.display = 'block';
-          } else {
-            alert(res?.message || 'Failed to save medicine.');
-          }
-        }
-      } catch (err) {
-        console.error('Error adding medicine:', err);
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnHtml;
-        if (errorBox) {
-          errorBox.textContent = 'Failed to add medicine: ' + err.message;
-          errorBox.style.display = 'block';
-        } else {
-          alert('Failed to add medicine: ' + err.message);
-        }
-      }
-    });
-  }
-
-  // ------------------------------------------------------------------
-  // PRINTABLE PHARMACY INVOICE MODAL
+  // PRINTABLE TAX INVOICE MODAL
   // ------------------------------------------------------------------
   function showPharmacyInvoiceModal(bill) {
     if (!bill) return;
 
     const modalHost = document.getElementById('pharModalHost') || document.body;
-
     const modalDiv = document.createElement('div');
-    modalDiv.className = 'cv-modal-backdrop';
+    modalDiv.className = 'cv-modal-backdrop show';
     modalDiv.id = 'pharInvoiceModalBackdrop';
+    modalDiv.style.padding = '1rem';
 
     const items = bill.items || [];
     let itemsRowsHtml = items.map((it, idx) => `
@@ -8323,29 +10023,26 @@ function renderPharmacyModule(activeTab = 'billing') {
     `).join('');
 
     if (items.length === 0) {
-      itemsRowsHtml = `<tr><td colspan="7" style="text-align:center; padding:1rem; color:#64748b;">No itemized details.</td></tr>`;
+      itemsRowsHtml = '<tr><td colspan="7" style="text-align:center; padding:1rem; color:#64748b;">No itemized details.</td></tr>';
     }
 
     modalDiv.innerHTML = `
-      <div style="background:#ffffff; border-radius:12px; max-width:720px; width:95%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.2); margin:2rem auto; position:relative;">
+      <div style="background:#ffffff; border-radius:12px; max-width:740px; width:95%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.25); margin:1.5rem auto; position:relative; border:1px solid #e2e8f0;">
         
-        <!-- Header Actions (Hidden on Print) -->
-        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; padding:1rem 1.5rem; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-top-left-radius:12px; border-top-right-radius:12px;">
+        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; padding:0.85rem 1.25rem; border-bottom:1px solid #e2e8f0; background:#f8fafc; border-top-left-radius:12px; border-top-right-radius:12px;">
           <div style="font-weight:700; color:var(--cv-text-main); font-size:0.95rem;">
-            Pharmacy Tax Invoice &bull; ${escapeHtml(bill.billNumber)}
+            Pharmacy Dispensary Tax Invoice &bull; ${escapeHtml(bill.billNumber)}
           </div>
           <div style="display:flex; gap:0.5rem; align-items:center;">
-            <button type="button" class="cv-btn-primary" id="btnPrintPharBill" style="padding:0.4rem 0.9rem; font-size:0.82rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
-              <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-              Print Bill
+            <button type="button" class="cv-btn-primary" id="btnPrintPharBill" style="padding:0.35rem 0.9rem; font-size:0.82rem; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;">
+              <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+              Print Invoice
             </button>
-            <button type="button" class="cv-modal-close" id="btnClosePharInvoice" style="position:static; font-size:1.5rem;">&times;</button>
+            <button type="button" id="btnClosePharInvoice" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
           </div>
         </div>
 
-        <!-- Printable Bill Paper -->
         <div class="cv-invoice-paper" id="pharPrintablePaper">
-          <!-- Hospital Header -->
           <div style="text-align:center; border-bottom:2px solid #0f172a; padding-bottom:0.75rem; margin-bottom:1rem;">
             <div style="font-size:0.7rem; font-weight:800; letter-spacing:0.1em; color:#0284c7; text-transform:uppercase;">
               CAREVISTA HOSPITAL MANAGEMENT SAAS
@@ -8361,11 +10058,10 @@ function renderPharmacyModule(activeTab = 'billing') {
             </div>
           </div>
 
-          <!-- Bill & Patient Metadata Grid -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; padding:0.75rem; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:0.82rem;">
             <div>
               <div style="margin-bottom:0.35rem;">
-                <span style="color:#64748b; font-weight:600;">Bill No:</span>
+                <span style="color:#64748b; font-weight:600;">Invoice No:</span>
                 <strong style="color:#0f172a; font-family:monospace; margin-left:0.25rem;">${escapeHtml(bill.billNumber)}</strong>
               </div>
               <div style="margin-bottom:0.35rem;">
@@ -8386,17 +10082,14 @@ function renderPharmacyModule(activeTab = 'billing') {
               <div style="margin-bottom:0.35rem;">
                 <span style="color:#64748b; font-weight:600;">UHID:</span>
                 <strong style="color:#0284c7; font-family:monospace; margin-left:0.25rem;">${escapeHtml(bill.uhid || 'N/A')}</strong>
-                ${bill.opId ? `<span style="margin-left:0.5rem; color:#64748b;">OP: ${escapeHtml(bill.opId)}</span>` : ''}
-                ${bill.ipId ? `<span style="margin-left:0.5rem; color:#64748b;">IP: ${escapeHtml(bill.ipId)}</span>` : ''}
               </div>
               <div>
-                <span style="color:#64748b; font-weight:600;">Doctor / Dept:</span>
+                <span style="color:#64748b; font-weight:600;">Prescribing Doctor:</span>
                 <span style="color:#0f172a; margin-left:0.25rem;">${escapeHtml(bill.doctorName || 'Consultant')} (${escapeHtml(bill.department || 'General')})</span>
               </div>
             </div>
           </div>
 
-          <!-- Items Table -->
           <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
             <thead>
               <tr style="background:#f1f5f9; border-top:1px solid #cbd5e1; border-bottom:1px solid #cbd5e1;">
@@ -8414,13 +10107,12 @@ function renderPharmacyModule(activeTab = 'billing') {
             </tbody>
           </table>
 
-          <!-- Financial Breakdown -->
           <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e2e8f0;">
             <div style="font-size:0.78rem; color:#64748b; max-width:320px;">
               <p style="margin:0 0 0.35rem 0;"><strong>Payment Status:</strong> <span style="font-weight:700; color:#0f172a;">${escapeHtml(bill.paymentStatus)}</span></p>
               ${bill.notes ? `<p style="margin:0 0 0.35rem 0;"><strong>Notes:</strong> ${escapeHtml(bill.notes)}</p>` : ''}
               <p style="margin:0.5rem 0 0 0; font-size:0.72rem; color:#94a3b8;">
-                * Computer generated pharmacy dispensary tax invoice. Valid for healthcare reimbursement.
+                * Computer generated pharmacy dispensary tax invoice. Valid for healthcare insurance &amp; reimbursement.
               </p>
             </div>
 
@@ -8452,7 +10144,6 @@ function renderPharmacyModule(activeTab = 'billing') {
             </div>
           </div>
 
-          <!-- Signature row -->
           <div style="display:flex; justify-content:space-between; margin-top:2.5rem; padding-top:1.5rem; font-size:0.78rem; color:#475569;">
             <div style="border-top:1px solid #cbd5e1; padding-top:0.35rem; width:180px; text-align:center;">
               Customer / Attendant Signature
@@ -8465,19 +10156,11 @@ function renderPharmacyModule(activeTab = 'billing') {
       </div>
     `;
 
-    document.body.appendChild(modalDiv);
+    modalHost.appendChild(modalDiv);
 
-    document.getElementById('btnClosePharInvoice')?.addEventListener('click', () => {
-      modalDiv.remove();
-    });
-
-    document.getElementById('btnPrintPharBill')?.addEventListener('click', () => {
-      window.print();
-    });
-
-    modalDiv.addEventListener('click', (e) => {
-      if (e.target === modalDiv) modalDiv.remove();
-    });
+    document.getElementById('btnClosePharInvoice')?.addEventListener('click', () => { modalDiv.remove(); });
+    document.getElementById('btnPrintPharBill')?.addEventListener('click', () => { window.print(); });
+    modalDiv.addEventListener('click', (e) => { if (e.target === modalDiv) modalDiv.remove(); });
   }
 
 
@@ -16127,7 +17810,7 @@ function renderPharmacyModule(activeTab = 'billing') {
     `;
   }
 
-  async function renderMoneyManagementModule(period = currentMoneyPeriod, customStart = currentMoneyCustomStart, customEnd = currentMoneyCustomEnd) {
+  async function renderMoneyManagementModule(period = currentMoneyPeriod, customStart = currentMoneyCustomStart, customEnd = currentMoneyCustomEnd, forceRefresh = false) {
     const mainContent = document.getElementById('dashboardMain');
     if (!mainContent) return;
 
@@ -16136,14 +17819,14 @@ function renderPharmacyModule(activeTab = 'billing') {
     currentMoneyCustomEnd = customEnd;
 
     // Check if we have matching pre-fetched/cached data for the requested period
-    const hasCachedMatchingData = currentMoneyData && (
+    const hasCachedMatchingData = !forceRefresh && currentMoneyData && (
       period !== 'CUSTOM'
         ? (currentMoneyData.period === period || (!currentMoneyData.period && period === 'ONE_MONTH'))
         : (currentMoneyData.startDate === customStart && currentMoneyData.endDate === customEnd)
     );
 
     if (hasCachedMatchingData) {
-      // Instant seamless render without blank void or spinner delay!
+      // Instant seamless render without blank void or spinner delay
       renderMoneyDashboardHtml(mainContent, currentMoneyData);
     } else {
       // Structured full-layout skeleton with smooth shimmer animation
@@ -16158,29 +17841,74 @@ function renderPharmacyModule(activeTab = 'billing') {
 
       const res = await Api.get(url);
       if (!res || !res.success || !res.data) {
-        if (!hasCachedMatchingData) {
-          mainContent.innerHTML = `
-            <div class="cv-card" style="padding:2.5rem; text-align:center;">
-              <p style="color:var(--cv-danger); font-weight:700;">Could not load financial data: ${escapeHtml(res?.message || 'Server error')}</p>
-              <button type="button" class="cv-btn-secondary" onclick="Admin.renderMoneyManagementModule()" style="margin-top:1rem;">Retry</button>
-            </div>
-          `;
-        }
+        currentMoneyData = null;
+        renderMoneyErrorView(mainContent, res, period, customStart, customEnd);
         return;
       }
 
       currentMoneyData = res.data;
       renderMoneyDashboardHtml(mainContent, res.data);
     } catch (err) {
-      if (!hasCachedMatchingData) {
-        mainContent.innerHTML = `
-          <div class="cv-card" style="padding:2.5rem; text-align:center;">
-            <p style="color:var(--cv-danger); font-weight:700;">Network or server error while retrieving Money Management analytics.</p>
-            <button type="button" class="cv-btn-secondary" onclick="Admin.renderMoneyManagementModule()" style="margin-top:1rem;">Retry</button>
-          </div>
-        `;
-      }
+      currentMoneyData = null;
+      renderMoneyErrorView(mainContent, { success: false, status: 0, message: 'Network or connection error while retrieving financial data.' }, period, customStart, customEnd);
     }
+  }
+
+  function renderMoneyErrorView(container, res, period, customStart, customEnd) {
+    const isAuthError = res?.status === 401 || res?.isUnauthorized || (res?.message && res.message.toLowerCase().includes('log in'));
+    const isPermissionError = res?.status === 403 || res?.isForbidden;
+
+    const titleText = 'Could not load financial data';
+    const detailText = res?.message || (isAuthError ? 'Financial data access denied. Please log in to continue.' : 'Server error while retrieving Money Management analytics.');
+
+    container.innerHTML = `
+      <div class="cv-card" style="padding:2.5rem 1.5rem; text-align:center; max-width:580px; margin:2.5rem auto; box-shadow:var(--cv-shadow-md); border-radius:12px; border:1px solid #fee2e2;">
+        <div style="width:54px; height:54px; border-radius:50%; background:#fef2f2; color:#dc2626; display:inline-flex; align-items:center; justify-content:center; margin-bottom:1rem; border:1px solid #fecaca;">
+          <svg style="width:26px; height:26px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h3 style="font-size:1.15rem; font-weight:800; color:var(--cv-deep-blue); margin:0 0 0.5rem 0;">${escapeHtml(titleText)}</h3>
+        <p style="color:var(--cv-danger); font-weight:600; font-size:0.92rem; margin:0 0 0.75rem 0; line-height:1.45;">${escapeHtml(detailText)}</p>
+        <p style="color:#64748b; font-size:0.8rem; margin:0 0 1.5rem 0;">
+          ${isAuthError
+            ? 'Your authentication session may have expired. Please verify your credentials or sign in again.'
+            : isPermissionError
+              ? 'Access restricted: Only verified hospital administrators can inspect financial records.'
+              : 'Please check your connection or server status and retry retrieving the financial ledger.'}
+        </p>
+
+        <div style="display:flex; justify-content:center; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <button type="button" class="cv-btn-primary" id="btnMoneyRetry" onclick="Admin.retryLoadMoneyData()" style="padding:0.55rem 1.35rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+            <span id="moneyRetrySpinner" class="cv-spinner" style="display:none; width:14px; height:14px;"></span>
+            <svg id="moneyRetryIcon" style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <span id="moneyRetryText">Retry</span>
+          </button>
+          ${isAuthError ? `
+            <button type="button" class="cv-btn-secondary" onclick="Auth.logout()" style="padding:0.55rem 1.15rem; font-weight:600;">
+              Sign In Again
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  async function retryLoadMoneyData() {
+    const btn = document.getElementById('btnMoneyRetry');
+    const spinner = document.getElementById('moneyRetrySpinner');
+    const icon = document.getElementById('moneyRetryIcon');
+    const text = document.getElementById('moneyRetryText');
+
+    if (btn) {
+      btn.disabled = true;
+      if (spinner) spinner.style.display = 'inline-block';
+      if (icon) icon.style.display = 'none';
+      if (text) text.textContent = 'Loading financial data...';
+    }
+
+    // Force re-fetch from backend with current period and custom dates
+    await renderMoneyManagementModule(currentMoneyPeriod, currentMoneyCustomStart, currentMoneyCustomEnd, true);
   }
 
   function renderMoneyDashboardHtml(container, data) {
@@ -17444,7 +19172,8 @@ function renderPharmacyModule(activeTab = 'billing') {
     refreshCurrentBillingCategory: refreshCurrentBillingCategory,
     showPaymentConfirmationModal: showPaymentConfirmationModal,
     showBedPaymentModal: showBedPaymentModal,
-    showBillPaymentsModal: showBillPaymentsModal
+    showBillPaymentsModal: showBillPaymentsModal,
+    retryLoadMoneyData: retryLoadMoneyData
   };
 })();
 window.AdminModule = Admin;

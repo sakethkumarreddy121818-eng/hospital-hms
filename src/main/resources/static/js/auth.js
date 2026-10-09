@@ -91,6 +91,12 @@ const Auth = (function () {
 
       if (res.ok && res.data) {
         currentUser = res.data;
+        if (res.data.token) {
+          Api.setToken(res.data.token);
+        }
+        try {
+          localStorage.setItem('carevista_user', JSON.stringify(res.data));
+        } catch (e) {}
         showAlert('Login successful! Redirecting to dashboard...', 'success');
         setTimeout(() => {
           showDashboard(currentUser);
@@ -157,14 +163,26 @@ const Auth = (function () {
     const res = await Api.get('/api/auth/me');
     if (res.ok && res.data) {
       currentUser = res.data;
+      if (res.data.token) {
+        Api.setToken(res.data.token);
+      }
+      try {
+        localStorage.setItem('carevista_user', JSON.stringify(res.data));
+      } catch (e) {}
       showDashboard(currentUser);
     } else {
+      Api.setToken(null);
+      try { localStorage.removeItem('carevista_user'); } catch (e) {}
       showLogin();
     }
   }
 
   async function logout() {
-    await Api.post('/api/auth/logout', {});
+    try {
+      await Api.post('/api/auth/logout', {});
+    } catch (e) {}
+    Api.setToken(null);
+    try { localStorage.removeItem('carevista_user'); } catch (e) {}
     currentUser = null;
     showLogin();
   }

@@ -11,6 +11,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.carevista.hms.security.filter.TokenAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,12 +23,18 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final TokenAuthenticationFilter tokenAuthenticationFilter;
+
+    public SecurityConfig(TokenAuthenticationFilter tokenAuthenticationFilter) {
+        this.tokenAuthenticationFilter = tokenAuthenticationFilter;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .addFilterBefore(tokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 // Static resources & Frontend
                 .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/assets/**", "/favicon.ico").permitAll()
@@ -53,8 +62,17 @@ public class SecurityConfig {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     Map<String, Object> body = new HashMap<>();
                     body.put("success", false);
-                    body.put("message", "Access denied. Please log in to continue.");
+                    body.put("message", "Financial data access denied. Please log in to continue.");
                     body.put("error", authException.getMessage());
+                    objectMapper.writeValue(response.getOutputStream(), body);
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    Map<String, Object> body = new HashMap<>();
+                    body.put("success", false);
+                    body.put("message", "Access denied: You do not have permission to access this resource.");
+                    body.put("error", accessDeniedException.getMessage());
                     objectMapper.writeValue(response.getOutputStream(), body);
                 })
             )

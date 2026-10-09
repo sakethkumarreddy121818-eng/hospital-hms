@@ -3,6 +3,9 @@ package com.carevista.hms.pharmacy.dto;
 import com.carevista.hms.pharmacy.entity.Medicine;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class MedicineDto {
 
@@ -25,10 +28,19 @@ public class MedicineDto {
     private String notes;
     private String manufacturer;
     private String rackLocation;
+    private String placement;
+    private String soldAs;
+    private Integer unitsPerStrip;
+    private Boolean prescriptionRequired;
+    private String hsnCode;
+    private Boolean isDeleted;
     private String status;
     private boolean lowStock;
+    private boolean outOfStock;
     private boolean expired;
     private boolean nearExpiry;
+    private int batchesCount;
+    private List<PharmacyBatchDto> batches = new ArrayList<>();
 
     public MedicineDto() {}
 
@@ -56,10 +68,28 @@ public class MedicineDto {
         dto.setNotes(m.getNotes());
         dto.setManufacturer(m.getManufacturer());
         dto.setRackLocation(m.getRackLocation());
+        dto.setPlacement(m.getRackLocation());
+        dto.setSoldAs(m.getSoldAs());
+        dto.setUnitsPerStrip(m.getUnitsPerStrip());
+        dto.setPrescriptionRequired(m.getPrescriptionRequired());
+        dto.setHsnCode(m.getHsnCode());
+        dto.setIsDeleted(m.getIsDeleted());
         dto.setStatus(m.getStatus());
         dto.setLowStock(m.isLowStock());
+        dto.setOutOfStock(m.isOutOfStock());
         dto.setExpired(m.isExpired());
         dto.setNearExpiry(m.isNearExpiry());
+
+        if (m.getBatches() != null && !m.getBatches().isEmpty()) {
+            dto.setBatches(m.getBatches().stream()
+                    .filter(b -> !b.getIsDeleted())
+                    .map(PharmacyBatchDto::fromEntity)
+                    .collect(Collectors.toList()));
+            dto.setBatchesCount(dto.getBatches().size());
+        } else {
+            dto.setBatchesCount(0);
+        }
+
         return dto;
     }
 
@@ -120,16 +150,42 @@ public class MedicineDto {
     public String getRackLocation() { return rackLocation; }
     public void setRackLocation(String rackLocation) { this.rackLocation = rackLocation; }
 
+    public String getPlacement() { return placement != null ? placement : rackLocation; }
+    public void setPlacement(String placement) { this.placement = placement; this.rackLocation = placement; }
+
+    public String getSoldAs() { return soldAs; }
+    public void setSoldAs(String soldAs) { this.soldAs = soldAs; }
+
+    public Integer getUnitsPerStrip() { return unitsPerStrip != null ? unitsPerStrip : 10; }
+    public void setUnitsPerStrip(Integer unitsPerStrip) { this.unitsPerStrip = unitsPerStrip; }
+
+    public Boolean getPrescriptionRequired() { return prescriptionRequired != null && prescriptionRequired; }
+    public void setPrescriptionRequired(Boolean prescriptionRequired) { this.prescriptionRequired = prescriptionRequired; }
+
+    public String getHsnCode() { return hsnCode; }
+    public void setHsnCode(String hsnCode) { this.hsnCode = hsnCode; }
+
+    public Boolean getIsDeleted() { return isDeleted != null && isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
     public boolean isLowStock() { return lowStock; }
     public void setLowStock(boolean lowStock) { this.lowStock = lowStock; }
 
+    public boolean isOutOfStock() { return outOfStock; }
+    public void setOutOfStock(boolean outOfStock) { this.outOfStock = outOfStock; }
+
     public boolean isExpired() { return expired; }
     public void setExpired(boolean expired) { this.expired = expired; }
 
     public boolean isNearExpiry() { return nearExpiry; }
     public void setNearExpiry(boolean nearExpiry) { this.nearExpiry = nearExpiry; }
-}
 
+    public int getBatchesCount() { return batchesCount; }
+    public void setBatchesCount(int batchesCount) { this.batchesCount = batchesCount; }
+
+    public List<PharmacyBatchDto> getBatches() { return batches; }
+    public void setBatches(List<PharmacyBatchDto> batches) { this.batches = batches; }
+}

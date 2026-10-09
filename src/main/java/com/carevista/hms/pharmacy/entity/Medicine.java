@@ -1,17 +1,21 @@
 package com.carevista.hms.pharmacy.entity;
 
 import com.carevista.hms.tenant.entity.Tenant;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "pharmacy_medicines", indexes = {
     @Index(name = "idx_med_tenant", columnList = "tenant_id"),
     @Index(name = "idx_med_code", columnList = "medicine_code"),
     @Index(name = "idx_med_name", columnList = "name"),
-    @Index(name = "idx_med_batch", columnList = "batch_number")
+    @Index(name = "idx_med_batch", columnList = "batch_number"),
+    @Index(name = "idx_med_deleted", columnList = "is_deleted")
 })
 public class Medicine {
 
@@ -35,10 +39,10 @@ public class Medicine {
     @Column(name = "category", length = 50)
     private String category = "Tablet"; // Tablet, Capsule, Syrup, Injection, Ointment, Drops, Inhaler
 
-    @Column(name = "batch_number", nullable = false, length = 50)
+    @Column(name = "batch_number", length = 50)
     private String batchNumber;
 
-    @Column(name = "expiry_date", nullable = false)
+    @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
@@ -77,11 +81,33 @@ public class Medicine {
     @Column(name = "rack_location", length = 50)
     private String rackLocation;
 
+    @Column(name = "sold_as", length = 30)
+    private String soldAs = "tablet"; // tablet, capsule, other
+
+    @Column(name = "units_per_strip")
+    private Integer unitsPerStrip = 10;
+
+    @Column(name = "prescription_required", nullable = false)
+    private Boolean prescriptionRequired = false;
+
+    @Column(name = "hsn_code", length = 30)
+    private String hsnCode = "3004";
+
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
     @Column(name = "status", length = 30)
     private String status = "ACTIVE"; // ACTIVE, DISCONTINUED
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PharmacyBatch> batches = new ArrayList<>();
 
     public Medicine() {}
 
@@ -93,7 +119,8 @@ public class Medicine {
         this.name = name;
         this.genericName = genericName;
         this.category = category != null ? category : "Tablet";
-        this.medicineForm = "Tablet";
+        this.medicineForm = this.category;
+        this.soldAs = "Capsule".equalsIgnoreCase(category) ? "capsule" : ("Tablet".equalsIgnoreCase(category) ? "tablet" : "other");
         this.batchNumber = batchNumber;
         this.expiryDate = expiryDate;
         this.unitPrice = unitPrice != null ? unitPrice : BigDecimal.ZERO;
@@ -102,8 +129,11 @@ public class Medicine {
         this.reorderLevel = reorderLevel != null ? reorderLevel : 10;
         this.manufacturer = manufacturer;
         this.rackLocation = rackLocation;
+        this.prescriptionRequired = false;
+        this.isDeleted = false;
         this.status = "ACTIVE";
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
@@ -166,11 +196,35 @@ public class Medicine {
     public String getRackLocation() { return rackLocation; }
     public void setRackLocation(String rackLocation) { this.rackLocation = rackLocation; }
 
+    public String getPlacement() { return rackLocation; }
+    public void setPlacement(String placement) { this.rackLocation = placement; }
+
+    public String getSoldAs() { return soldAs; }
+    public void setSoldAs(String soldAs) { this.soldAs = soldAs; }
+
+    public Integer getUnitsPerStrip() { return unitsPerStrip != null ? unitsPerStrip : 10; }
+    public void setUnitsPerStrip(Integer unitsPerStrip) { this.unitsPerStrip = unitsPerStrip; }
+
+    public Boolean getPrescriptionRequired() { return prescriptionRequired != null && prescriptionRequired; }
+    public void setPrescriptionRequired(Boolean prescriptionRequired) { this.prescriptionRequired = prescriptionRequired; }
+
+    public String getHsnCode() { return hsnCode; }
+    public void setHsnCode(String hsnCode) { this.hsnCode = hsnCode; }
+
+    public Boolean getIsDeleted() { return isDeleted != null && isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public List<PharmacyBatch> getBatches() { return batches; }
+    public void setBatches(List<PharmacyBatch> batches) { this.batches = batches; }
 
     public boolean isExpired() {
         return expiryDate != null && expiryDate.isBefore(LocalDate.now());
@@ -182,6 +236,10 @@ public class Medicine {
     }
 
     public boolean isLowStock() {
-        return stockQuantity != null && stockQuantity <= reorderLevel;
+        return stockQuantity != null && stockQuantity <= reorderLevel && stockQuantity > 0;
+    }
+
+    public boolean isOutOfStock() {
+        return stockQuantity == null || stockQuantity <= 0;
     }
 }
