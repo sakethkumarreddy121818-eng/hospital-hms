@@ -33,6 +33,13 @@ public class MoneyDashboardSummaryDto {
     private ExpenseBreakdownDto expenseBreakdown;
     private List<FinancialTransactionDto> recentTransactions = new ArrayList<>();
 
+    // Dedicated Financial Sections
+    private OpFinancialSectionDto opFinancials;
+    private IpFinancialSectionDto ipFinancials;
+    private LabFinancialSectionDto labFinancials;
+    private PharmacyFinancialSectionDto pharmacyFinancials;
+    private DoctorFinancialSectionDto doctorFinancials;
+
     public MoneyDashboardSummaryDto() {}
 
     public String getHospitalName() { return hospitalName; }
@@ -94,4 +101,19 @@ public class MoneyDashboardSummaryDto {
 
     public List<FinancialTransactionDto> getRecentTransactions() { return recentTransactions; }
     public void setRecentTransactions(List<FinancialTransactionDto> recentTransactions) { this.recentTransactions = recentTransactions; }
+
+    public OpFinancialSectionDto getOpFinancials() { return opFinancials; }
+    public void setOpFinancials(OpFinancialSectionDto opFinancials) { this.opFinancials = opFinancials; }
+
+    public IpFinancialSectionDto getIpFinancials() { return ipFinancials; }
+    public void setIpFinancials(IpFinancialSectionDto ipFinancials) { this.ipFinancials = ipFinancials; }
+
+    public LabFinancialSectionDto getLabFinancials() { return labFinancials; }
+    public void setLabFinancials(LabFinancialSectionDto labFinancials) { this.labFinancials = labFinancials; }
+
+    public PharmacyFinancialSectionDto getPharmacyFinancials() { return pharmacyFinancials; }
+    public void setPharmacyFinancials(PharmacyFinancialSectionDto pharmacyFinancials) { this.pharmacyFinancials = pharmacyFinancials; }
+
+    public DoctorFinancialSectionDto getDoctorFinancials() { return doctorFinancials; }
+    public void setDoctorFinancials(DoctorFinancialSectionDto doctorFinancials) { this.doctorFinancials = doctorFinancials; }
 }

@@ -4,6 +4,9 @@ import com.carevista.hms.admin.money.dto.*;
 import com.carevista.hms.admin.money.entity.HospitalExpense;
 import com.carevista.hms.admin.money.repository.HospitalExpenseRepository;
 import com.carevista.hms.audit.service.AuditService;
+import com.carevista.hms.billing.entity.CentralBill;
+import com.carevista.hms.billing.entity.PaymentRecord;
+import com.carevista.hms.billing.repository.CentralBillRepository;
 import com.carevista.hms.billing.repository.PaymentRecordRepository;
 import com.carevista.hms.doctor.entity.Doctor;
 import com.carevista.hms.doctor.repository.DoctorRepository;
@@ -48,6 +51,7 @@ public class MoneyManagementService {
     private final RoomRepository roomRepository;
     private final BedRepository bedRepository;
     private final PaymentRecordRepository paymentRecordRepository;
+    private final CentralBillRepository centralBillRepository;
     private final AuditService auditService;
 
     private static final DateTimeFormatter DD_MM_YYYY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -64,6 +68,7 @@ public class MoneyManagementService {
                                   RoomRepository roomRepository,
                                   BedRepository bedRepository,
                                   PaymentRecordRepository paymentRecordRepository,
+                                  CentralBillRepository centralBillRepository,
                                   AuditService auditService) {
         this.tenantRepository = tenantRepository;
         this.opRegistrationRepository = opRegistrationRepository;
@@ -76,6 +81,7 @@ public class MoneyManagementService {
         this.roomRepository = roomRepository;
         this.bedRepository = bedRepository;
         this.paymentRecordRepository = paymentRecordRepository;
+        this.centralBillRepository = centralBillRepository;
         this.auditService = auditService;
     }
 
@@ -512,6 +518,39 @@ public class MoneyManagementService {
         // 8. Unified Transaction History
         List<FinancialTransactionDto> transactions = buildTransactionHistory(periodOps, periodIps, periodPhars, periodLabs, periodMeds, periodExpenses);
         summary.setRecentTransactions(transactions);
+
+        // 9. Fetch Central Bills & Payment Records for accurate invoice/tax linking
+        List<CentralBill> allCentralBills = centralBillRepository != null ? centralBillRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
+        List<PaymentRecord> allPaymentRecords = paymentRecordRepository != null ? paymentRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
+
+        Map<String, CentralBill> centralBillsByOpId = new HashMap<>();
+        Map<String, CentralBill> centralBillsByIpId = new HashMap<>();
+        for (CentralBill cb : allCentralBills) {
+            if (cb.getOpId() != null && !cb.getOpId().trim().isEmpty()) {
+                centralBillsByOpId.putIfAbsent(cb.getOpId().trim(), cb);
+            }
+            if (cb.getIpId() != null && !cb.getIpId().trim().isEmpty()) {
+                centralBillsByIpId.putIfAbsent(cb.getIpId().trim(), cb);
+            }
+        }
+
+        Map<String, PaymentRecord> paymentsByOpId = new HashMap<>();
+        Map<String, PaymentRecord> paymentsByIpId = new HashMap<>();
+        for (PaymentRecord pr : allPaymentRecords) {
+            if (pr.getOpId() != null && !pr.getOpId().trim().isEmpty()) {
+                paymentsByOpId.putIfAbsent(pr.getOpId().trim(), pr);
+            }
+            if (pr.getIpId() != null && !pr.getIpId().trim().isEmpty()) {
+                paymentsByIpId.putIfAbsent(pr.getIpId().trim(), pr);
+            }
+        }
+
+        // 10. Dedicated Independent Financial Sections (OP, IP, Laboratory, Pharmacy, Doctors)
+        summary.setOpFinancials(buildOpFinancialSection(periodOps, centralBillsByOpId, paymentsByOpId));
+        summary.setIpFinancials(buildIpFinancialSection(periodIps, customConfiguredTypes, centralBillsByIpId, paymentsByIpId));
+        summary.setLabFinancials(buildLabFinancialSection(periodLabs));
+        summary.setPharmacyFinancials(buildPharmacyFinancialSection(periodPhars));
+        summary.setDoctorFinancials(buildDoctorFinancialSection(docList, totalRevBilled, totalRevCollected));
 
         return summary;
     }
@@ -986,5 +1025,354 @@ public class MoneyManagementService {
     private static class ExpenseStatAccumulator {
         BigDecimal amount = BigDecimal.ZERO;
         long count = 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // DEDICATED FINANCIAL SECTION BUILDERS (OP, IP, LAB, PHARMACY, DOCTORS)
+    // -------------------------------------------------------------------------
+
+    private OpFinancialSectionDto buildOpFinancialSection(
+            List<OpRegistration> periodOps,
+            Map<String, CentralBill> centralBillsByOpId,
+            Map<String, PaymentRecord> paymentsByOpId) {
+        OpFinancialSectionDto section = new OpFinancialSectionDto();
+        section.setTotalBills(periodOps.size());
+
+        BigDecimal totalBilled = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+        BigDecimal totalDiscounts = BigDecimal.ZERO;
+        BigDecimal totalGst = BigDecimal.ZERO;
+
+        List<OpFinancialRecordDto> records = new ArrayList<>();
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("hh:mm a");
+
+        for (OpRegistration op : periodOps) {
+            BigDecimal fee = op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO;
+            totalBilled = totalBilled.add(fee);
+
+            BigDecimal paid = BigDecimal.ZERO;
+            if ("PAID".equalsIgnoreCase(op.getPaymentStatus())) {
+                paid = fee;
+            } else if (op.getPaidAmount() != null) {
+                paid = op.getPaidAmount().min(fee);
+            }
+            totalCollected = totalCollected.add(paid);
+
+            CentralBill cb = op.getOpId() != null ? centralBillsByOpId.get(op.getOpId().trim()) : null;
+            PaymentRecord pr = op.getOpId() != null ? paymentsByOpId.get(op.getOpId().trim()) : null;
+
+            BigDecimal disc = cb != null && cb.getDiscountAmount() != null ? cb.getDiscountAmount() : BigDecimal.ZERO;
+            BigDecimal gst = cb != null && cb.getGstAmount() != null ? cb.getGstAmount() : BigDecimal.ZERO;
+            totalDiscounts = totalDiscounts.add(disc);
+            totalGst = totalGst.add(gst);
+
+            String invNo = (cb != null && cb.getInvoiceNumber() != null && !cb.getInvoiceNumber().trim().isEmpty())
+                    ? cb.getInvoiceNumber()
+                    : ((pr != null && pr.getInvoiceNumber() != null && !pr.getInvoiceNumber().trim().isEmpty())
+                    ? pr.getInvoiceNumber()
+                    : ((cb != null && cb.getBillNumber() != null) ? cb.getBillNumber() : "INV-OP-" + String.format("%04d", op.getId())));
+
+            String date = op.getVisitDate() != null ? op.getVisitDate().format(DD_MM_YYYY) : "-";
+            String time = op.getRegistrationTime() != null ? op.getRegistrationTime() : (op.getCreatedAt() != null ? op.getCreatedAt().format(timeFmt) : "-");
+
+            OpFinancialRecordDto rec = new OpFinancialRecordDto();
+            rec.setId(op.getId());
+            rec.setOpId(op.getOpId());
+            rec.setInvoiceNumber(invNo);
+            rec.setPatientName(op.getPatient() != null ? op.getPatient().getFullName() : "-");
+            rec.setUhid(op.getPatient() != null ? op.getPatient().getUhid() : "-");
+            rec.setDoctorName(op.getDoctorName() != null ? op.getDoctorName() : "-");
+            rec.setDepartment(op.getDepartment() != null ? op.getDepartment() : "General");
+            rec.setDate(date);
+            rec.setTime(time);
+            rec.setConsultationFee(fee);
+            rec.setTotalBill(fee);
+            rec.setPaidAmount(paid);
+            rec.setBalanceAmount(fee.subtract(paid).max(BigDecimal.ZERO));
+            rec.setDiscountAmount(disc);
+            rec.setGstAmount(gst);
+            rec.setPaymentStatus(op.getPaymentStatus() != null ? op.getPaymentStatus() : "PAID");
+            rec.setPaymentMethod(op.getPaymentMethod() != null ? op.getPaymentMethod() : "CASH");
+            records.add(rec);
+        }
+
+        section.setTotalBilledAmount(totalBilled);
+        section.setTotalCollections(totalCollected);
+        section.setTotalOutstanding(totalBilled.subtract(totalCollected).max(BigDecimal.ZERO));
+        section.setTotalDiscounts(totalDiscounts);
+        section.setTotalGst(totalGst);
+        section.setRecords(records);
+        return section;
+    }
+
+    private IpFinancialSectionDto buildIpFinancialSection(
+            List<IpAdmission> periodIps,
+            Set<String> customConfiguredTypes,
+            Map<String, CentralBill> centralBillsByIpId,
+            Map<String, PaymentRecord> paymentsByIpId) {
+        IpFinancialSectionDto section = new IpFinancialSectionDto();
+        section.setTotalAdmissions(periodIps.size());
+
+        BigDecimal totalBilled = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+        BigDecimal totalRoom = BigDecimal.ZERO;
+        BigDecimal totalBed = BigDecimal.ZERO;
+        BigDecimal totalOther = BigDecimal.ZERO;
+        BigDecimal totalDiscounts = BigDecimal.ZERO;
+        BigDecimal totalGst = BigDecimal.ZERO;
+
+        List<IpFinancialRecordDto> records = new ArrayList<>();
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("hh:mm a");
+
+        for (IpAdmission ip : periodIps) {
+            BigDecimal chg = getIpTotalCharges(ip);
+            BigDecimal roomChg = ip.getRoomPrice() != null ? ip.getRoomPrice() : BigDecimal.ZERO;
+            BigDecimal bedChg = ip.getBedPrice() != null ? ip.getBedPrice() : BigDecimal.ZERO;
+            BigDecimal otherChg = chg.subtract(roomChg).subtract(bedChg).max(BigDecimal.ZERO);
+
+            totalBilled = totalBilled.add(chg);
+            totalRoom = totalRoom.add(roomChg);
+            totalBed = totalBed.add(bedChg);
+            totalOther = totalOther.add(otherChg);
+
+            BigDecimal paid = BigDecimal.ZERO;
+            if ("PAID".equalsIgnoreCase(ip.getPaymentStatus())) {
+                paid = chg;
+            } else if (ip.getPaidAmount() != null) {
+                paid = ip.getPaidAmount().min(chg);
+            } else if (ip.getDepositAmount() != null) {
+                paid = ip.getDepositAmount().min(chg);
+            }
+            totalCollected = totalCollected.add(paid);
+
+            CentralBill cb = ip.getIpId() != null ? centralBillsByIpId.get(ip.getIpId().trim()) : null;
+            PaymentRecord pr = ip.getIpId() != null ? paymentsByIpId.get(ip.getIpId().trim()) : null;
+
+            BigDecimal disc = cb != null && cb.getDiscountAmount() != null ? cb.getDiscountAmount() : BigDecimal.ZERO;
+            BigDecimal gst = cb != null && cb.getGstAmount() != null ? cb.getGstAmount() : BigDecimal.ZERO;
+            totalDiscounts = totalDiscounts.add(disc);
+            totalGst = totalGst.add(gst);
+
+            String invNo = (cb != null && cb.getInvoiceNumber() != null && !cb.getInvoiceNumber().trim().isEmpty())
+                    ? cb.getInvoiceNumber()
+                    : ((pr != null && pr.getInvoiceNumber() != null && !pr.getInvoiceNumber().trim().isEmpty())
+                    ? pr.getInvoiceNumber()
+                    : ((cb != null && cb.getBillNumber() != null) ? cb.getBillNumber() : "INV-IP-" + String.format("%04d", ip.getId())));
+
+            String date = ip.getAdmissionDate() != null ? ip.getAdmissionDate().format(DD_MM_YYYY) : "-";
+            String time = ip.getAdmissionTime() != null ? ip.getAdmissionTime() : (ip.getCreatedAt() != null ? ip.getCreatedAt().format(timeFmt) : "-");
+            String ward = resolveWardCategory(ip.getRoom() != null ? ip.getRoom().getRoomType() : null, ip.getWardName(), customConfiguredTypes);
+
+            IpFinancialRecordDto rec = new IpFinancialRecordDto();
+            rec.setId(ip.getId());
+            rec.setIpId(ip.getIpId());
+            rec.setInvoiceNumber(invNo);
+            rec.setPatientName(ip.getPatient() != null ? ip.getPatient().getFullName() : "-");
+            rec.setUhid(ip.getPatient() != null ? ip.getPatient().getUhid() : "-");
+            rec.setDoctorName(ip.getDoctorName() != null ? ip.getDoctorName() : "-");
+            rec.setDepartment(ip.getDepartment() != null ? ip.getDepartment() : "General Medicine");
+            rec.setAdmissionDate(date);
+            rec.setAdmissionTime(time);
+            rec.setRoomNumber(ip.getRoomNumber() != null ? ip.getRoomNumber() : (ip.getRoom() != null ? ip.getRoom().getRoomNumber() : "-"));
+            rec.setWardType(ward);
+            rec.setBedNumber(ip.getBedNumber() != null ? ip.getBedNumber() : (ip.getBed() != null ? ip.getBed().getBedNumber() : "-"));
+            rec.setRoomCharges(roomChg);
+            rec.setBedCharges(bedChg);
+            rec.setOtherCharges(otherChg);
+            rec.setTotalBill(chg);
+            rec.setPaidAmount(paid);
+            rec.setBalanceAmount(chg.subtract(paid).max(BigDecimal.ZERO));
+            rec.setDiscountAmount(disc);
+            rec.setGstAmount(gst);
+            rec.setPaymentStatus(ip.getPaymentStatus() != null ? ip.getPaymentStatus() : "PAID");
+            rec.setPaymentMethod(ip.getPaymentMethod() != null ? ip.getPaymentMethod() : "CASH");
+            records.add(rec);
+        }
+
+        section.setTotalBilledAmount(totalBilled);
+        section.setTotalCollections(totalCollected);
+        section.setTotalOutstanding(totalBilled.subtract(totalCollected).max(BigDecimal.ZERO));
+        section.setTotalRoomCharges(totalRoom);
+        section.setTotalBedCharges(totalBed);
+        section.setTotalOtherCharges(totalOther);
+        section.setTotalDiscounts(totalDiscounts);
+        section.setTotalGst(totalGst);
+        section.setRecords(records);
+        return section;
+    }
+
+    private LabFinancialSectionDto buildLabFinancialSection(List<LabOrder> periodLabs) {
+        LabFinancialSectionDto section = new LabFinancialSectionDto();
+        section.setTotalOrders(periodLabs.size());
+
+        BigDecimal totalBilled = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+        BigDecimal totalDiscounts = BigDecimal.ZERO;
+        BigDecimal totalGst = BigDecimal.ZERO;
+
+        List<LabFinancialRecordDto> records = new ArrayList<>();
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("hh:mm a");
+
+        for (LabOrder l : periodLabs) {
+            BigDecimal tot = l.getTotalAmount() != null && l.getTotalAmount().compareTo(BigDecimal.ZERO) > 0
+                    ? l.getTotalAmount()
+                    : (l.getTestPrice() != null ? l.getTestPrice() : BigDecimal.ZERO);
+            BigDecimal paid = l.getPaidAmount() != null ? l.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal disc = l.getDiscountAmount() != null ? l.getDiscountAmount() : BigDecimal.ZERO;
+            BigDecimal gst = l.getGstAmount() != null ? l.getGstAmount() : BigDecimal.ZERO;
+            BigDecimal sub = l.getSubtotal() != null && l.getSubtotal().compareTo(BigDecimal.ZERO) > 0 ? l.getSubtotal() : tot;
+
+            totalBilled = totalBilled.add(tot);
+            totalCollected = totalCollected.add(paid);
+            totalDiscounts = totalDiscounts.add(disc);
+            totalGst = totalGst.add(gst);
+
+            String date = l.getOrderDate() != null ? l.getOrderDate().format(DD_MM_YYYY) : "-";
+            String time = l.getCreatedAt() != null ? l.getCreatedAt().format(timeFmt) : "-";
+
+            LabFinancialRecordDto rec = new LabFinancialRecordDto();
+            rec.setId(l.getId());
+            rec.setOrderNumber(l.getOrderNumber());
+            rec.setInvoiceNumber(l.getOrderNumber() != null ? l.getOrderNumber() : "INV-LAB-" + String.format("%04d", l.getId()));
+            rec.setPatientName(l.getPatientName() != null ? l.getPatientName() : (l.getPatient() != null ? l.getPatient().getFullName() : "-"));
+            rec.setUhid(l.getUhid() != null ? l.getUhid() : (l.getPatient() != null ? l.getPatient().getUhid() : "-"));
+            rec.setDoctorName(l.getDoctorName() != null ? l.getDoctorName() : "-");
+            rec.setTestNames(l.getTestName());
+            rec.setCategory(l.getCategory() != null ? l.getCategory() : "GENERAL");
+            rec.setOrderDate(date);
+            rec.setOrderTime(time);
+            rec.setSubtotal(sub);
+            rec.setDiscountAmount(disc);
+            rec.setGstAmount(gst);
+            rec.setTotalAmount(tot);
+            rec.setPaidAmount(paid);
+            rec.setBalanceAmount(tot.subtract(paid).max(BigDecimal.ZERO));
+            rec.setPaymentStatus(l.getPaymentStatus() != null ? l.getPaymentStatus() : "PAID");
+            rec.setPaymentMethod(l.getPaymentMethod() != null ? l.getPaymentMethod() : "CASH");
+            records.add(rec);
+        }
+
+        section.setTotalBilledAmount(totalBilled);
+        section.setTotalCollections(totalCollected);
+        section.setTotalOutstanding(totalBilled.subtract(totalCollected).max(BigDecimal.ZERO));
+        section.setTotalDiscounts(totalDiscounts);
+        section.setTotalGst(totalGst);
+        section.setRecords(records);
+        return section;
+    }
+
+    private PharmacyFinancialSectionDto buildPharmacyFinancialSection(List<PharmacyBill> periodPhars) {
+        PharmacyFinancialSectionDto section = new PharmacyFinancialSectionDto();
+        section.setTotalBills(periodPhars.size());
+
+        BigDecimal totalSales = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+        BigDecimal totalDiscounts = BigDecimal.ZERO;
+        BigDecimal totalGst = BigDecimal.ZERO;
+
+        List<PharmacyFinancialRecordDto> records = new ArrayList<>();
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("hh:mm a");
+
+        for (PharmacyBill p : periodPhars) {
+            BigDecimal tot = p.getTotalAmount() != null ? p.getTotalAmount() : BigDecimal.ZERO;
+            BigDecimal paid = p.getPaidAmount() != null ? p.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal disc = p.getDiscountAmount() != null ? p.getDiscountAmount() : BigDecimal.ZERO;
+            BigDecimal gst = p.getGstAmount() != null ? p.getGstAmount() : BigDecimal.ZERO;
+            BigDecimal sub = p.getSubtotal() != null ? p.getSubtotal() : tot;
+
+            totalSales = totalSales.add(tot);
+            totalCollected = totalCollected.add(paid);
+            totalDiscounts = totalDiscounts.add(disc);
+            totalGst = totalGst.add(gst);
+
+            String date = p.getBillDate() != null ? p.getBillDate().format(DD_MM_YYYY) : "-";
+            String time = p.getBillTime() != null ? p.getBillTime() : (p.getCreatedAt() != null ? p.getCreatedAt().format(timeFmt) : "-");
+
+            String medsSummary;
+            int totalQty = 0;
+            if (p.getItems() != null && !p.getItems().isEmpty()) {
+                medsSummary = p.getItems().stream()
+                        .map(i -> (i.getMedicineName() != null ? i.getMedicineName() : "Item") + " (" + (i.getQuantity() != null ? i.getQuantity() : 1) + ")")
+                        .collect(Collectors.joining(", "));
+                totalQty = p.getItems().stream().mapToInt(i -> i.getQuantity() != null ? i.getQuantity() : 0).sum();
+            } else {
+                medsSummary = "Prescription Medicines";
+                totalQty = 1;
+            }
+
+            PharmacyFinancialRecordDto rec = new PharmacyFinancialRecordDto();
+            rec.setId(p.getId());
+            rec.setBillNumber(p.getBillNumber());
+            rec.setInvoiceNumber(p.getBillNumber() != null ? p.getBillNumber() : "INV-PHAR-" + String.format("%04d", p.getId()));
+            rec.setBillDate(date);
+            rec.setBillTime(time);
+            rec.setCustomerName(p.getPatientName() != null ? p.getPatientName() : (p.getPatient() != null ? p.getPatient().getFullName() : "Walk-in Customer"));
+            rec.setUhid(p.getUhid() != null ? p.getUhid() : (p.getPatient() != null ? p.getPatient().getUhid() : "-"));
+            rec.setDoctorName(p.getDoctorName() != null ? p.getDoctorName() : "-");
+            rec.setMedicinesSold(medsSummary);
+            rec.setTotalQuantity(totalQty);
+            rec.setSubtotal(sub);
+            rec.setDiscountAmount(disc);
+            rec.setGstAmount(gst);
+            rec.setTotalAmount(tot);
+            rec.setPaidAmount(paid);
+            rec.setBalanceAmount(tot.subtract(paid).max(BigDecimal.ZERO));
+            rec.setPaymentStatus(p.getPaymentStatus() != null ? p.getPaymentStatus() : "PAID");
+            rec.setPaymentMethod(p.getPaymentMethod() != null ? p.getPaymentMethod() : "CASH");
+            records.add(rec);
+        }
+
+        section.setTotalSales(totalSales);
+        section.setTotalCollections(totalCollected);
+        section.setTotalOutstanding(totalSales.subtract(totalCollected).max(BigDecimal.ZERO));
+        section.setTotalDiscounts(totalDiscounts);
+        section.setTotalGst(totalGst);
+        section.setRecords(records);
+        return section;
+    }
+
+    private DoctorFinancialSectionDto buildDoctorFinancialSection(List<DoctorRevenueDto> docList, BigDecimal totalRevBilled, BigDecimal totalRevCollected) {
+        DoctorFinancialSectionDto section = new DoctorFinancialSectionDto();
+        section.setTotalDoctors(docList.size());
+
+        long totalConsultations = 0;
+        long totalAdmissions = 0;
+        BigDecimal totalBilled = BigDecimal.ZERO;
+        BigDecimal totalCollected = BigDecimal.ZERO;
+
+        for (DoctorRevenueDto d : docList) {
+            totalConsultations += d.getOpCount();
+            totalAdmissions += d.getIpCount();
+            totalBilled = totalBilled.add(d.getTotalRevenueBilled());
+            totalCollected = totalCollected.add(d.getTotalRevenueCollected());
+        }
+
+        section.setTotalConsultations(totalConsultations);
+        section.setTotalAdmissions(totalAdmissions);
+        section.setTotalBilledAmount(totalBilled);
+        section.setTotalCollections(totalCollected);
+        section.setTotalOutstanding(totalBilled.subtract(totalCollected).max(BigDecimal.ZERO));
+        section.setDoctors(docList);
+        return section;
+    }
+
+    public OpFinancialSectionDto getOpFinancials(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd).getOpFinancials();
+    }
+
+    public IpFinancialSectionDto getIpFinancials(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd).getIpFinancials();
+    }
+
+    public LabFinancialSectionDto getLabFinancials(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd).getLabFinancials();
+    }
+
+    public PharmacyFinancialSectionDto getPharmacyFinancials(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd).getPharmacyFinancials();
+    }
+
+    public DoctorFinancialSectionDto getDoctorFinancials(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd).getDoctorFinancials();
     }
 }

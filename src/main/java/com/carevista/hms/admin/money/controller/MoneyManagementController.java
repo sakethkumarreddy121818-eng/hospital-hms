@@ -1,7 +1,6 @@
 package com.carevista.hms.admin.money.controller;
 
-import com.carevista.hms.admin.money.dto.CreateExpenseRequest;
-import com.carevista.hms.admin.money.dto.MoneyDashboardSummaryDto;
+import com.carevista.hms.admin.money.dto.*;
 import com.carevista.hms.admin.money.entity.HospitalExpense;
 import com.carevista.hms.admin.money.service.MoneyManagementService;
 import com.carevista.hms.common.dto.ApiResponse;
@@ -44,6 +43,86 @@ public class MoneyManagementController {
 
         MoneyDashboardSummaryDto summary = moneyManagementService.getMoneyDashboard(tenantId, period, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(summary));
+    }
+
+    @GetMapping("/sections/op")
+    public ResponseEntity<ApiResponse<OpFinancialSectionDto>> getOpFinancials(
+            @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request) {
+
+        Long tenantId = getAuthenticatedTenantId(request);
+        if (tenantId == null) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+        }
+
+        OpFinancialSectionDto section = moneyManagementService.getOpFinancials(tenantId, period, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(section));
+    }
+
+    @GetMapping("/sections/ip")
+    public ResponseEntity<ApiResponse<IpFinancialSectionDto>> getIpFinancials(
+            @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request) {
+
+        Long tenantId = getAuthenticatedTenantId(request);
+        if (tenantId == null) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+        }
+
+        IpFinancialSectionDto section = moneyManagementService.getIpFinancials(tenantId, period, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(section));
+    }
+
+    @GetMapping("/sections/laboratory")
+    public ResponseEntity<ApiResponse<LabFinancialSectionDto>> getLabFinancials(
+            @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request) {
+
+        Long tenantId = getAuthenticatedTenantId(request);
+        if (tenantId == null) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+        }
+
+        LabFinancialSectionDto section = moneyManagementService.getLabFinancials(tenantId, period, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(section));
+    }
+
+    @GetMapping("/sections/pharmacy")
+    public ResponseEntity<ApiResponse<PharmacyFinancialSectionDto>> getPharmacyFinancials(
+            @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request) {
+
+        Long tenantId = getAuthenticatedTenantId(request);
+        if (tenantId == null) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+        }
+
+        PharmacyFinancialSectionDto section = moneyManagementService.getPharmacyFinancials(tenantId, period, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(section));
+    }
+
+    @GetMapping("/sections/doctors")
+    public ResponseEntity<ApiResponse<DoctorFinancialSectionDto>> getDoctorFinancials(
+            @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request) {
+
+        Long tenantId = getAuthenticatedTenantId(request);
+        if (tenantId == null) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+        }
+
+        DoctorFinancialSectionDto section = moneyManagementService.getDoctorFinancials(tenantId, period, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(section));
     }
 
     @PostMapping("/expenses")

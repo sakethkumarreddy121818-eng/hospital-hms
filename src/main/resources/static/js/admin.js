@@ -17707,6 +17707,19 @@ const Admin = (function () {
   let currentDoctorSort = 'HIGHEST';
   let currentExpenseTab = 'PURCHASES';
   let currentIpViewMode = 'WARDS';
+  let currentMoneySectionTab = 'OVERVIEW'; // 'OVERVIEW', 'OP', 'IP', 'LAB', 'PHARMACY', 'DOCTOR'
+  let currentMoneyOpSearch = '';
+  let currentMoneyOpStatus = 'ALL';
+  let currentMoneyIpSearch = '';
+  let currentMoneyIpWard = 'ALL';
+  let currentMoneyIpStatus = 'ALL';
+  let currentMoneyLabSearch = '';
+  let currentMoneyLabCategory = 'ALL';
+  let currentMoneyLabStatus = 'ALL';
+  let currentMoneyPharSearch = '';
+  let currentMoneyPharStatus = 'ALL';
+  let currentMoneyDocSearch = '';
+  let currentMoneyDocSort = 'HIGHEST';
 
   function renderMoneyManagementSkeleton(container, period = 'ONE_MONTH') {
     container.innerHTML = `
@@ -17977,6 +17990,47 @@ const Admin = (function () {
           </div>
           <button type="button" class="cv-btn-primary" onclick="Admin.applyCustomMoneyDateRange()" style="height:36px; padding:0 1rem; font-size:0.82rem;">Apply Filter</button>
         </div>
+
+        <!-- FINANCIAL SECTIONS AREA (Separate Tabs / Navigation Buttons) -->
+        <div class="cv-card" style="padding:0.75rem 1rem; margin-bottom:1.25rem; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0; border-radius:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:0.4rem;">
+                <svg style="width:16px; height:16px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                FINANCIAL SECTIONS:
+              </span>
+            </div>
+            <div class="cv-money-period-pills" style="padding:0.25rem; background:#f1f5f9; border-radius:8px;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'OVERVIEW' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('OVERVIEW')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                OVERVIEW DASHBOARD
+              </button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'OP' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('OP')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                OP FINANCIALS (${data.opFinancials?.totalBills || data.revenueSources?.op?.count || 0})
+              </button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'IP' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('IP')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                IP FINANCIALS (${data.ipFinancials?.totalAdmissions || data.revenueSources?.ip?.count || 0})
+              </button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'LAB' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('LAB')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                LABORATORY FINANCIALS (${data.labFinancials?.totalOrders || data.revenueSources?.laboratory?.count || 0})
+              </button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'PHARMACY' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('PHARMACY')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                PHARMACY FINANCIALS (${data.pharmacyFinancials?.totalBills || data.revenueSources?.pharmacy?.count || 0})
+              </button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneySectionTab === 'DOCTOR' ? 'active' : ''}" onclick="Admin.switchMoneySectionTab('DOCTOR')">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                DOCTOR FINANCIALS (${data.doctorFinancials?.totalDoctors || data.doctorRevenueList?.length || 0})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WRAPPER FOR OVERVIEW SECTION (Visible when OVERVIEW tab is active) -->
+        <div id="moneyOverviewSectionMount" style="${currentMoneySectionTab === 'OVERVIEW' ? '' : 'display:none;'}">
 
         <!-- SECTION D: OVERALL FINANCIAL SUMMARY (Phase 4) -->
         <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem;">
@@ -18265,6 +18319,9 @@ const Admin = (function () {
                   <span>Transaction Count:</span>
                   <strong>${data.revenueSources?.op?.count || 0} visits</strong>
                 </div>
+                <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OP')" style="margin-top:0.5rem; width:100%; font-size:0.75rem; padding:0.35rem 0.5rem; color:#2563eb; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+                  <span>Open OP Financials</span> &rarr;
+                </button>
               </div>
             </div>
 
@@ -18295,6 +18352,9 @@ const Admin = (function () {
                   <span>Transaction Count:</span>
                   <strong>${data.revenueSources?.ip?.count || 0} admissions</strong>
                 </div>
+                <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('IP')" style="margin-top:0.5rem; width:100%; font-size:0.75rem; padding:0.35rem 0.5rem; color:#059669; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+                  <span>Open IP Financials</span> &rarr;
+                </button>
               </div>
             </div>
 
@@ -18325,6 +18385,9 @@ const Admin = (function () {
                   <span>Transaction Count:</span>
                   <strong>${data.revenueSources?.pharmacy?.count || 0} sales bills</strong>
                 </div>
+                <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('PHARMACY')" style="margin-top:0.5rem; width:100%; font-size:0.75rem; padding:0.35rem 0.5rem; color:#7c3aed; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+                  <span>Open Pharmacy Financials</span> &rarr;
+                </button>
               </div>
             </div>
 
@@ -18355,6 +18418,9 @@ const Admin = (function () {
                   <span>Transaction Count:</span>
                   <strong>${data.revenueSources?.laboratory?.count || 0} lab tests</strong>
                 </div>
+                <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('LAB')" style="margin-top:0.5rem; width:100%; font-size:0.75rem; padding:0.35rem 0.5rem; color:#d97706; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.3rem;">
+                  <span>Open Lab Financials</span> &rarr;
+                </button>
               </div>
             </div>
 
@@ -18514,11 +18580,16 @@ const Admin = (function () {
               <h2 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">Doctor-Wise Revenue Generated</h2>
               <p style="font-size:0.78rem; color:var(--cv-text-muted); margin:0.2rem 0 0 0;">Actual billing &amp; collections linked to each physician's consultations and inpatient admissions</p>
             </div>
-            <div style="display:flex; align-items:center; gap:0.35rem; background:#f1f5f9; padding:0.25rem; border-radius:6px;">
-              <span style="font-size:0.72rem; font-weight:700; color:#64748b; padding:0 0.4rem;">SORT:</span>
-              <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'HIGHEST' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('HIGHEST')">Highest Revenue</button>
-              <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'LOWEST' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('LOWEST')">Lowest Revenue</button>
-              <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'NAME' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('NAME')">Doctor Name</button>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:0.35rem; background:#f1f5f9; padding:0.25rem; border-radius:6px;">
+                <span style="font-size:0.72rem; font-weight:700; color:#64748b; padding:0 0.4rem;">SORT:</span>
+                <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'HIGHEST' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('HIGHEST')">Highest Revenue</button>
+                <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'LOWEST' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('LOWEST')">Lowest Revenue</button>
+                <button type="button" class="cv-money-pill-btn ${currentDoctorSort === 'NAME' ? 'active' : ''}" onclick="Admin.sortDoctorRevenue('NAME')">Doctor Name</button>
+              </div>
+              <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('DOCTOR')" style="font-size:0.75rem; padding:0.35rem 0.65rem; color:#2563eb; font-weight:700;">
+                Open Full Doctor Financials &rarr;
+              </button>
             </div>
           </div>
 
@@ -18727,6 +18798,13 @@ const Admin = (function () {
               </tbody>
             </table>
           </div>
+        </div>
+
+        </div> <!-- End #moneyOverviewSectionMount -->
+
+        <!-- Dedicated Financial Section Area -->
+        <div id="moneyDedicatedSectionMount" style="${currentMoneySectionTab !== 'OVERVIEW' ? '' : 'display:none;'}">
+          ${renderDedicatedMoneySectionHtml(data)}
         </div>
 
       </div>
@@ -19095,6 +19173,1146 @@ const Admin = (function () {
     }
   }
 
+  // ====================================================================
+  // FINANCIAL SECTIONS CONTROLLER & DEDICATED MODULES
+  // ====================================================================
+  function switchMoneySectionTab(tab) {
+    currentMoneySectionTab = tab;
+    if (currentMoneyData) {
+      renderMoneyDashboardHtml(document.getElementById('dashboardMain'), currentMoneyData);
+    }
+  }
+
+  function getPaymentStatusBadgeHtml(status) {
+    const s = (status || 'PAID').toUpperCase();
+    if (s === 'PAID') {
+      return '<span class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.7rem; padding:0.15rem 0.45rem; font-weight:700;">PAID</span>';
+    } else if (s === 'PARTIAL' || s === 'PARTIALLY_PAID') {
+      return '<span style="font-size:0.7rem; padding:0.15rem 0.45rem; font-weight:700; border-radius:4px; background:#fffbeb; color:#b45309; border:1px solid #fde68a;">PARTIAL</span>';
+    } else {
+      return '<span class="cv-payment-balance-badge cv-badge-unpaid" style="font-size:0.7rem; padding:0.15rem 0.45rem; font-weight:700;">UNPAID</span>';
+    }
+  }
+
+  function renderDedicatedMoneySectionHtml(data) {
+    if (!data) return '';
+    switch (currentMoneySectionTab) {
+      case 'OP': return renderOpFinancialSectionHtml(data);
+      case 'IP': return renderIpFinancialSectionHtml(data);
+      case 'LAB': return renderLabFinancialSectionHtml(data);
+      case 'PHARMACY': return renderPharmacyFinancialSectionHtml(data);
+      case 'DOCTOR': return renderDoctorFinancialSectionHtml(data);
+      default: return '';
+    }
+  }
+
+  // --------------------------------------------------------------------
+  // 1. OP FINANCIALS (OUTPATIENT)
+  // --------------------------------------------------------------------
+  function filterOpFinancialRecords(records) {
+    if (!records) return [];
+    const query = (currentMoneyOpSearch || '').trim().toLowerCase();
+    const status = currentMoneyOpStatus || 'ALL';
+    return records.filter(r => {
+      if (status !== 'ALL') {
+        const ps = (r.paymentStatus || '').toUpperCase();
+        if (status === 'PAID' && ps !== 'PAID') return false;
+        if (status === 'PARTIAL' && ps !== 'PARTIAL' && ps !== 'PARTIALLY_PAID') return false;
+        if (status === 'UNPAID' && ps !== 'UNPAID' && ps !== 'PENDING') return false;
+      }
+      if (query) {
+        const match = (r.patientName || '').toLowerCase().includes(query)
+          || (r.uhid || '').toLowerCase().includes(query)
+          || (r.opId || '').toLowerCase().includes(query)
+          || (r.invoiceNumber || '').toLowerCase().includes(query)
+          || (r.doctorName || '').toLowerCase().includes(query)
+          || (r.department || '').toLowerCase().includes(query)
+          || (r.paymentMethod || '').toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }
+
+  function searchOpFinancials(val) {
+    currentMoneyOpSearch = val;
+    updateOpFinancialTable();
+  }
+
+  function filterOpFinancialsStatus(status) {
+    currentMoneyOpStatus = status;
+    updateOpFinancialTable();
+  }
+
+  function updateOpFinancialTable() {
+    if (!currentMoneyData?.opFinancials) return;
+    const records = filterOpFinancialRecords(currentMoneyData.opFinancials.records || []);
+    const tbody = document.getElementById('opFinancialTableBody');
+    if (tbody) tbody.innerHTML = renderOpFinancialRows(records);
+    const badge = document.getElementById('opRecordCountBadge');
+    if (badge) {
+      badge.textContent = `Showing ${records.length} of ${currentMoneyData.opFinancials.records?.length || 0} Outpatient records`;
+    }
+    document.querySelectorAll('#opStatusPills button').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-status') === currentMoneyOpStatus);
+    });
+  }
+
+  function renderOpFinancialRows(records) {
+    if (!records || records.length === 0) {
+      return '<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No Outpatient financial records match the current filter.</td></tr>';
+    }
+    return records.map((r, idx) => `
+      <tr>
+        <td style="font-family:monospace; font-size:0.78rem;">
+          <div>${escapeHtml(r.date)}</div>
+          ${r.time ? `<div style="color:#94a3b8; font-size:0.72rem;">${escapeHtml(r.time)}</div>` : ''}
+        </td>
+        <td style="font-family:monospace; font-weight:700; color:var(--cv-primary);">${escapeHtml(r.opId || '-')}</td>
+        <td style="font-family:monospace; font-weight:600; color:#334155;">${escapeHtml(r.invoiceNumber || '-')}</td>
+        <td>
+          <div style="font-weight:700; color:var(--cv-deep-blue);">${escapeHtml(r.patientName || 'Unknown')}</div>
+          ${r.uhid ? `<div style="font-size:0.72rem; color:#64748b; font-family:monospace;">UHID: ${escapeHtml(r.uhid)}</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight:600;">${escapeHtml(r.doctorName || 'Attending Physician')}</div>
+          <div style="font-size:0.72rem; color:#64748b;">${escapeHtml(r.department || 'Outpatient')}</div>
+        </td>
+        <td style="text-align:right;">₹${formatCurrency(r.consultationFee)}</td>
+        <td style="text-align:right; font-weight:800; color:var(--cv-deep-blue);">₹${formatCurrency(r.totalBill)}</td>
+        <td style="text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(r.paidAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:${(r.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b'};">
+          ₹${formatCurrency(r.balanceAmount)}
+        </td>
+        <td style="text-align:center;">
+          ${getPaymentStatusBadgeHtml(r.paymentStatus)}
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="cv-btn-secondary" onclick="Admin.showFinancialRecordDetailsModal('OP', ${idx})" style="padding:0.25rem 0.55rem; font-size:0.75rem;" title="View Record Details">
+            View
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderOpFinancialSectionHtml(data) {
+    const op = data.opFinancials || {};
+    const records = filterOpFinancialRecords(op.records || []);
+    return `
+      <!-- OP Financials Header Bar -->
+      <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem; border-left:4px solid #3b82f6;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:#1d4ed8; text-transform:uppercase; letter-spacing:0.04em;">OP CLINICAL REVENUE &bull; OUTPATIENT DEPARTMENT</div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Outpatient Financial Ledger &amp; Invoices</h2>
+            <p style="font-size:0.8rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Live Outpatient database records: consultations, invoices, payment collections &amp; remaining patient dues</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OVERVIEW')" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+              &larr; Back to Overview
+            </button>
+          </div>
+        </div>
+
+        <!-- OP KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.85rem; margin-top:1.25rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL OP BILLS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e293b; margin:0.25rem 0;">${op.totalBills || 0}</div>
+            <div style="font-size:0.72rem; color:#64748b;">Consultation visits</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">TOTAL OP BILLED</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">₹${formatCurrency(op.totalBilledAmount)}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Gross invoiced amount</div>
+          </div>
+          <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL OP COLLECTIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin:0.25rem 0;">₹${formatCurrency(op.totalCollections)}</div>
+            <div style="font-size:0.72rem; color:#065f46;">Realized cash &amp; digital</div>
+          </div>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#991b1b; text-transform:uppercase;">OUTSTANDING BALANCE</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#b91c1c; margin:0.25rem 0;">₹${formatCurrency(op.totalOutstanding)}</div>
+            <div style="font-size:0.72rem; color:#991b1b;">Pending patient balance</div>
+          </div>
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#92400e; text-transform:uppercase;">DISCOUNTS &amp; GST</div>
+            <div style="font-size:1.15rem; font-weight:800; color:#b45309; margin:0.25rem 0;">
+              -${formatCurrency(op.totalDiscounts)} / +${formatCurrency(op.totalGst)}
+            </div>
+            <div style="font-size:0.72rem; color:#92400e;">Applicable deductions &amp; tax</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OP Table Card with Search & Filters -->
+      <div class="cv-card" style="padding:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">OP Invoices &amp; Payment Transactions</h3>
+            <span id="opRecordCountBadge" style="font-size:0.78rem; color:var(--cv-text-muted);">
+              Showing ${records.length} of ${op.records?.length || 0} Outpatient records
+            </span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <div class="cv-money-period-pills" id="opStatusPills" style="padding:0.2rem;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneyOpStatus === 'ALL' ? 'active' : ''}" data-status="ALL" onclick="Admin.filterOpFinancialsStatus('ALL')">All (${op.records?.length || 0})</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyOpStatus === 'PAID' ? 'active' : ''}" data-status="PAID" onclick="Admin.filterOpFinancialsStatus('PAID')">Paid</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyOpStatus === 'PARTIAL' ? 'active' : ''}" data-status="PARTIAL" onclick="Admin.filterOpFinancialsStatus('PARTIAL')">Partial</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyOpStatus === 'UNPAID' ? 'active' : ''}" data-status="UNPAID" onclick="Admin.filterOpFinancialsStatus('UNPAID')">Unpaid</button>
+            </div>
+
+            <div style="position:relative;">
+              <input type="text" id="opFinancialSearchInput" class="cv-form-input" placeholder="Search OP ID, Patient, Doctor, Invoice #..." value="${escapeHtml(currentMoneyOpSearch)}" style="height:36px; width:260px; font-size:0.8rem; padding-left:2rem;" oninput="Admin.searchOpFinancials(this.value)">
+              <svg style="width:14px; height:14px; color:#94a3b8; position:absolute; left:0.65rem; top:50%; transform:translateY(-50%);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="cv-money-table" id="opFinancialTable">
+            <thead>
+              <tr>
+                <th>Date &amp; Time</th>
+                <th>OP ID</th>
+                <th>Bill / Invoice #</th>
+                <th>Patient Name</th>
+                <th>Attending Doctor</th>
+                <th style="text-align:right;">Consultation Fee</th>
+                <th style="text-align:right;">Total Bill</th>
+                <th style="text-align:right;">Amount Paid</th>
+                <th style="text-align:right;">Remaining Balance</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="opFinancialTableBody">
+              ${renderOpFinancialRows(records)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --------------------------------------------------------------------
+  // 2. IP FINANCIALS (INPATIENT)
+  // --------------------------------------------------------------------
+  function filterIpFinancialRecords(records) {
+    if (!records) return [];
+    const query = (currentMoneyIpSearch || '').trim().toLowerCase();
+    const ward = currentMoneyIpWard || 'ALL';
+    const status = currentMoneyIpStatus || 'ALL';
+    return records.filter(r => {
+      if (ward !== 'ALL') {
+        if ((r.wardType || '').toLowerCase() !== ward.toLowerCase()) return false;
+      }
+      if (status !== 'ALL') {
+        const ps = (r.paymentStatus || '').toUpperCase();
+        if (status === 'PAID' && ps !== 'PAID') return false;
+        if (status === 'PARTIAL' && ps !== 'PARTIAL' && ps !== 'PARTIALLY_PAID') return false;
+        if (status === 'UNPAID' && ps !== 'UNPAID' && ps !== 'PENDING') return false;
+      }
+      if (query) {
+        const match = (r.patientName || '').toLowerCase().includes(query)
+          || (r.uhid || '').toLowerCase().includes(query)
+          || (r.ipId || '').toLowerCase().includes(query)
+          || (r.invoiceNumber || '').toLowerCase().includes(query)
+          || (r.roomNumber || '').toLowerCase().includes(query)
+          || (r.bedNumber || '').toLowerCase().includes(query)
+          || (r.wardType || '').toLowerCase().includes(query)
+          || (r.doctorName || '').toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }
+
+  function searchIpFinancials(val) {
+    currentMoneyIpSearch = val;
+    updateIpFinancialTable();
+  }
+
+  function filterIpFinancialsWard(ward) {
+    currentMoneyIpWard = ward;
+    updateIpFinancialTable();
+  }
+
+  function filterIpFinancialsStatus(status) {
+    currentMoneyIpStatus = status;
+    updateIpFinancialTable();
+  }
+
+  function updateIpFinancialTable() {
+    if (!currentMoneyData?.ipFinancials) return;
+    const records = filterIpFinancialRecords(currentMoneyData.ipFinancials.records || []);
+    const tbody = document.getElementById('ipFinancialTableBody');
+    if (tbody) tbody.innerHTML = renderIpFinancialRows(records);
+    const badge = document.getElementById('ipRecordCountBadge');
+    if (badge) {
+      badge.textContent = `Showing ${records.length} of ${currentMoneyData.ipFinancials.records?.length || 0} Inpatient records`;
+    }
+    document.querySelectorAll('#ipStatusPills button').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-status') === currentMoneyIpStatus);
+    });
+  }
+
+  function renderIpFinancialRows(records) {
+    if (!records || records.length === 0) {
+      return '<tr><td colspan="12" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No Inpatient financial records match the current filter.</td></tr>';
+    }
+    return records.map((r, idx) => `
+      <tr>
+        <td style="font-family:monospace; font-weight:700; color:var(--cv-primary);">${escapeHtml(r.ipId || '-')}</td>
+        <td style="font-family:monospace; font-weight:600; color:#334155;">${escapeHtml(r.invoiceNumber || '-')}</td>
+        <td>
+          <div style="font-weight:700; color:var(--cv-deep-blue);">${escapeHtml(r.patientName || 'Unknown')}</div>
+          ${r.uhid ? `<div style="font-size:0.72rem; color:#64748b; font-family:monospace;">UHID: ${escapeHtml(r.uhid)}</div>` : ''}
+        </td>
+        <td style="font-family:monospace; font-size:0.78rem;">
+          <div>${escapeHtml(r.admissionDate)}</div>
+          ${r.admissionTime ? `<div style="color:#94a3b8; font-size:0.72rem;">${escapeHtml(r.admissionTime)}</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight:600; font-size:0.82rem;">Room: ${escapeHtml(r.roomNumber || '-')} &bull; Bed: ${escapeHtml(r.bedNumber || '-')}</div>
+          <span style="font-size:0.7rem; padding:0.15rem 0.4rem; background:#eff6ff; color:#1d4ed8; border-radius:4px; font-weight:600;">${escapeHtml(r.wardType || 'General')}</span>
+        </td>
+        <td style="text-align:right;">
+          <div style="font-weight:600;">₹${formatCurrency(r.roomCharges)}</div>
+          <div style="font-size:0.7rem; color:#64748b;">Bed: ₹${formatCurrency(r.bedCharges)}</div>
+        </td>
+        <td style="text-align:right; font-weight:800; color:var(--cv-deep-blue);">₹${formatCurrency(r.totalBill)}</td>
+        <td style="text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(r.paidAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:${(r.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b'};">
+          ₹${formatCurrency(r.balanceAmount)}
+        </td>
+        <td style="text-align:center;">
+          ${getPaymentStatusBadgeHtml(r.paymentStatus)}
+        </td>
+        <td>
+          <div style="font-weight:600; font-size:0.82rem;">${escapeHtml(r.doctorName || 'Attending Physician')}</div>
+          <div style="font-size:0.72rem; color:#64748b;">${escapeHtml(r.department || 'Inpatient')}</div>
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="cv-btn-secondary" onclick="Admin.showFinancialRecordDetailsModal('IP', ${idx})" style="padding:0.25rem 0.55rem; font-size:0.75rem;" title="View Record Details">
+            View
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderIpFinancialSectionHtml(data) {
+    const ip = data.ipFinancials || {};
+    const records = filterIpFinancialRecords(ip.records || []);
+    const wardOptions = Array.from(new Set((ip.records || []).map(r => r.wardType).filter(Boolean)));
+    return `
+      <!-- IP Financials Header Bar -->
+      <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem; border-left:4px solid #10b981;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:#059669; text-transform:uppercase; letter-spacing:0.04em;">IP INPATIENT REVENUE &bull; ADMISSIONS &amp; BED LEDGER</div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Inpatient Financial Ledger &amp; Admissions</h2>
+            <p style="font-size:0.8rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Live Inpatient admissions from MySQL: room &amp; bed fees, nursing charges, collections &amp; outstanding patient dues</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OVERVIEW')" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+              &larr; Back to Overview
+            </button>
+          </div>
+        </div>
+
+        <!-- IP KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.85rem; margin-top:1.25rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL IP ADMISSIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e293b; margin:0.25rem 0;">${ip.totalAdmissions || 0}</div>
+            <div style="font-size:0.72rem; color:#64748b;">Financial admissions</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">TOTAL IP BILLED</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">₹${formatCurrency(ip.totalBilledAmount)}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Gross IP invoiced</div>
+          </div>
+          <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL IP COLLECTIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin:0.25rem 0;">₹${formatCurrency(ip.totalCollections)}</div>
+            <div style="font-size:0.72rem; color:#065f46;">Realized collections</div>
+          </div>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#991b1b; text-transform:uppercase;">OUTSTANDING BALANCE</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#b91c1c; margin:0.25rem 0;">₹${formatCurrency(ip.totalOutstanding)}</div>
+            <div style="font-size:0.72rem; color:#991b1b;">Pending patient balance</div>
+          </div>
+          <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#166534; text-transform:uppercase;">ROOM CHARGES</div>
+            <div style="font-size:1.3rem; font-weight:800; color:#15803d; margin:0.25rem 0;">₹${formatCurrency(ip.totalRoomCharges)}</div>
+            <div style="font-size:0.72rem; color:#166534;">Daily room tariffs</div>
+          </div>
+          <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#0f766e; text-transform:uppercase;">BED CHARGES</div>
+            <div style="font-size:1.3rem; font-weight:800; color:#0d9488; margin:0.25rem 0;">₹${formatCurrency(ip.totalBedCharges)}</div>
+            <div style="font-size:0.72rem; color:#0f766e;">Daily bed tariffs</div>
+          </div>
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#92400e; text-transform:uppercase;">DISCOUNTS &amp; GST</div>
+            <div style="font-size:1.15rem; font-weight:800; color:#b45309; margin:0.25rem 0;">
+              -${formatCurrency(ip.totalDiscounts)} / +${formatCurrency(ip.totalGst)}
+            </div>
+            <div style="font-size:0.72rem; color:#92400e;">Applicable deductions &amp; tax</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IP Table Card with Search & Filters -->
+      <div class="cv-card" style="padding:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">IP Admissions &amp; Billing History</h3>
+            <span id="ipRecordCountBadge" style="font-size:0.78rem; color:var(--cv-text-muted);">
+              Showing ${records.length} of ${ip.records?.length || 0} Inpatient records
+            </span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <select class="cv-form-select" id="ipWardFilterSelect" onchange="Admin.filterIpFinancialsWard(this.value)" style="height:36px; font-size:0.8rem; width:140px;">
+              <option value="ALL">All Wards</option>
+              ${wardOptions.map(w => `<option value="${escapeHtml(w)}" ${currentMoneyIpWard === w ? 'selected' : ''}>${escapeHtml(w)}</option>`).join('')}
+            </select>
+
+            <div class="cv-money-period-pills" id="ipStatusPills" style="padding:0.2rem;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneyIpStatus === 'ALL' ? 'active' : ''}" data-status="ALL" onclick="Admin.filterIpFinancialsStatus('ALL')">All (${ip.records?.length || 0})</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyIpStatus === 'PAID' ? 'active' : ''}" data-status="PAID" onclick="Admin.filterIpFinancialsStatus('PAID')">Paid</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyIpStatus === 'PARTIAL' ? 'active' : ''}" data-status="PARTIAL" onclick="Admin.filterIpFinancialsStatus('PARTIAL')">Partial</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyIpStatus === 'UNPAID' ? 'active' : ''}" data-status="UNPAID" onclick="Admin.filterIpFinancialsStatus('UNPAID')">Unpaid</button>
+            </div>
+
+            <div style="position:relative;">
+              <input type="text" id="ipFinancialSearchInput" class="cv-form-input" placeholder="Search IP ID, Patient, Room, Doctor..." value="${escapeHtml(currentMoneyIpSearch)}" style="height:36px; width:240px; font-size:0.8rem; padding-left:2rem;" oninput="Admin.searchIpFinancials(this.value)">
+              <svg style="width:14px; height:14px; color:#94a3b8; position:absolute; left:0.65rem; top:50%; transform:translateY(-50%);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="cv-money-table" id="ipFinancialTable">
+            <thead>
+              <tr>
+                <th>Admission ID</th>
+                <th>Invoice #</th>
+                <th>Patient Name</th>
+                <th>Admission Date</th>
+                <th>Room &amp; Bed Details</th>
+                <th style="text-align:right;">Room / Bed Fees</th>
+                <th style="text-align:right;">Total Bill</th>
+                <th style="text-align:right;">Amount Paid</th>
+                <th style="text-align:right;">Balance Due</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th>Attending Doctor</th>
+                <th style="text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="ipFinancialTableBody">
+              ${renderIpFinancialRows(records)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --------------------------------------------------------------------
+  // 3. LABORATORY FINANCIALS
+  // --------------------------------------------------------------------
+  function filterLabFinancialRecords(records) {
+    if (!records) return [];
+    const query = (currentMoneyLabSearch || '').trim().toLowerCase();
+    const cat = currentMoneyLabCategory || 'ALL';
+    const status = currentMoneyLabStatus || 'ALL';
+    return records.filter(r => {
+      if (cat !== 'ALL') {
+        if ((r.category || '').toLowerCase() !== cat.toLowerCase()) return false;
+      }
+      if (status !== 'ALL') {
+        const ps = (r.paymentStatus || '').toUpperCase();
+        if (status === 'PAID' && ps !== 'PAID') return false;
+        if (status === 'PARTIAL' && ps !== 'PARTIAL' && ps !== 'PARTIALLY_PAID') return false;
+        if (status === 'UNPAID' && ps !== 'UNPAID' && ps !== 'PENDING') return false;
+      }
+      if (query) {
+        const match = (r.patientName || '').toLowerCase().includes(query)
+          || (r.uhid || '').toLowerCase().includes(query)
+          || (r.orderNumber || '').toLowerCase().includes(query)
+          || (r.invoiceNumber || '').toLowerCase().includes(query)
+          || (r.testNames || '').toLowerCase().includes(query)
+          || (r.doctorName || '').toLowerCase().includes(query)
+          || (r.category || '').toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }
+
+  function searchLabFinancials(val) {
+    currentMoneyLabSearch = val;
+    updateLabFinancialTable();
+  }
+
+  function filterLabFinancialsCategory(cat) {
+    currentMoneyLabCategory = cat;
+    updateLabFinancialTable();
+  }
+
+  function filterLabFinancialsStatus(status) {
+    currentMoneyLabStatus = status;
+    updateLabFinancialTable();
+  }
+
+  function updateLabFinancialTable() {
+    if (!currentMoneyData?.labFinancials) return;
+    const records = filterLabFinancialRecords(currentMoneyData.labFinancials.records || []);
+    const tbody = document.getElementById('labFinancialTableBody');
+    if (tbody) tbody.innerHTML = renderLabFinancialRows(records);
+    const badge = document.getElementById('labRecordCountBadge');
+    if (badge) {
+      badge.textContent = `Showing ${records.length} of ${currentMoneyData.labFinancials.records?.length || 0} Laboratory records`;
+    }
+    document.querySelectorAll('#labStatusPills button').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-status') === currentMoneyLabStatus);
+    });
+  }
+
+  function renderLabFinancialRows(records) {
+    if (!records || records.length === 0) {
+      return '<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No Laboratory financial records match the current filter.</td></tr>';
+    }
+    return records.map((r, idx) => `
+      <tr>
+        <td style="font-family:monospace; font-weight:700; color:var(--cv-primary);">${escapeHtml(r.orderNumber || '-')}</td>
+        <td style="font-family:monospace; font-weight:600; color:#334155;">${escapeHtml(r.invoiceNumber || '-')}</td>
+        <td style="font-family:monospace; font-size:0.78rem;">
+          <div>${escapeHtml(r.orderDate)}</div>
+          ${r.orderTime ? `<div style="color:#94a3b8; font-size:0.72rem;">${escapeHtml(r.orderTime)}</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight:700; color:var(--cv-deep-blue);">${escapeHtml(r.patientName || 'Unknown')}</div>
+          ${r.uhid ? `<div style="font-size:0.72rem; color:#64748b; font-family:monospace;">UHID: ${escapeHtml(r.uhid)}</div>` : ''}
+        </td>
+        <td style="max-width:220px;">
+          <div style="font-weight:600; font-size:0.83rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.testNames || '')}">${escapeHtml(r.testNames || '-')}</div>
+          <span style="font-size:0.7rem; padding:0.12rem 0.4rem; background:#fef3c7; color:#92400e; border-radius:4px; font-weight:600;">${escapeHtml(r.category || 'General')}</span>
+        </td>
+        <td>
+          <div style="font-weight:600; font-size:0.82rem;">${escapeHtml(r.doctorName || 'Referring Doctor')}</div>
+        </td>
+        <td style="text-align:right; font-weight:800; color:var(--cv-deep-blue);">₹${formatCurrency(r.totalAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(r.paidAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:${(r.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b'};">
+          ₹${formatCurrency(r.balanceAmount)}
+        </td>
+        <td style="text-align:center;">
+          ${getPaymentStatusBadgeHtml(r.paymentStatus)}
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="cv-btn-secondary" onclick="Admin.showFinancialRecordDetailsModal('LAB', ${idx})" style="padding:0.25rem 0.55rem; font-size:0.75rem;" title="View Record Details">
+            View
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderLabFinancialSectionHtml(data) {
+    const lab = data.labFinancials || {};
+    const records = filterLabFinancialRecords(lab.records || []);
+    const catOptions = Array.from(new Set((lab.records || []).map(r => r.category).filter(Boolean)));
+    return `
+      <!-- Laboratory Financials Header Bar -->
+      <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem; border-left:4px solid #f59e0b;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:#b45309; text-transform:uppercase; letter-spacing:0.04em;">LABORATORY DIAGNOSTICS REVENUE &bull; LAB TEST BILLING</div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Laboratory Financial Ledger &amp; Test Invoices</h2>
+            <p style="font-size:0.8rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Live Diagnostic test orders from MySQL: lab billed amounts, collections realized &amp; outstanding balances</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OVERVIEW')" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+              &larr; Back to Overview
+            </button>
+          </div>
+        </div>
+
+        <!-- Lab KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.85rem; margin-top:1.25rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL LAB ORDERS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e293b; margin:0.25rem 0;">${lab.totalOrders || 0}</div>
+            <div style="font-size:0.72rem; color:#64748b;">Diagnostic orders</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">TOTAL LAB BILLED</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">₹${formatCurrency(lab.totalBilledAmount)}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Gross tests invoiced</div>
+          </div>
+          <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL COLLECTIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin:0.25rem 0;">₹${formatCurrency(lab.totalCollections)}</div>
+            <div style="font-size:0.72rem; color:#065f46;">Actual realized cash</div>
+          </div>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#991b1b; text-transform:uppercase;">OUTSTANDING BALANCE</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#b91c1c; margin:0.25rem 0;">₹${formatCurrency(lab.totalOutstanding)}</div>
+            <div style="font-size:0.72rem; color:#991b1b;">Pending patient balance</div>
+          </div>
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#92400e; text-transform:uppercase;">DISCOUNTS &amp; GST</div>
+            <div style="font-size:1.15rem; font-weight:800; color:#b45309; margin:0.25rem 0;">
+              -${formatCurrency(lab.totalDiscounts)} / +${formatCurrency(lab.totalGst)}
+            </div>
+            <div style="font-size:0.72rem; color:#92400e;">Applicable deductions &amp; tax</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lab Table Card with Search & Filters -->
+      <div class="cv-card" style="padding:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">Laboratory Orders &amp; Billing History</h3>
+            <span id="labRecordCountBadge" style="font-size:0.78rem; color:var(--cv-text-muted);">
+              Showing ${records.length} of ${lab.records?.length || 0} Laboratory records
+            </span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <select class="cv-form-select" id="labCategoryFilterSelect" onchange="Admin.filterLabFinancialsCategory(this.value)" style="height:36px; font-size:0.8rem; width:150px;">
+              <option value="ALL">All Categories</option>
+              ${catOptions.map(c => `<option value="${escapeHtml(c)}" ${currentMoneyLabCategory === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+            </select>
+
+            <div class="cv-money-period-pills" id="labStatusPills" style="padding:0.2rem;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneyLabStatus === 'ALL' ? 'active' : ''}" data-status="ALL" onclick="Admin.filterLabFinancialsStatus('ALL')">All (${lab.records?.length || 0})</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyLabStatus === 'PAID' ? 'active' : ''}" data-status="PAID" onclick="Admin.filterLabFinancialsStatus('PAID')">Paid</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyLabStatus === 'PARTIAL' ? 'active' : ''}" data-status="PARTIAL" onclick="Admin.filterLabFinancialsStatus('PARTIAL')">Partial</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyLabStatus === 'UNPAID' ? 'active' : ''}" data-status="UNPAID" onclick="Admin.filterLabFinancialsStatus('UNPAID')">Unpaid</button>
+            </div>
+
+            <div style="position:relative;">
+              <input type="text" id="labFinancialSearchInput" class="cv-form-input" placeholder="Search Order #, Patient, Test, Doctor..." value="${escapeHtml(currentMoneyLabSearch)}" style="height:36px; width:240px; font-size:0.8rem; padding-left:2rem;" oninput="Admin.searchLabFinancials(this.value)">
+              <svg style="width:14px; height:14px; color:#94a3b8; position:absolute; left:0.65rem; top:50%; transform:translateY(-50%);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="cv-money-table" id="labFinancialTable">
+            <thead>
+              <tr>
+                <th>Lab Order ID</th>
+                <th>Invoice #</th>
+                <th>Order Date &amp; Time</th>
+                <th>Patient Name</th>
+                <th>Diagnostic Tests</th>
+                <th>Referring Doctor</th>
+                <th style="text-align:right;">Total Amount</th>
+                <th style="text-align:right;">Amount Paid</th>
+                <th style="text-align:right;">Balance Due</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="labFinancialTableBody">
+              ${renderLabFinancialRows(records)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --------------------------------------------------------------------
+  // 4. PHARMACY FINANCIALS
+  // --------------------------------------------------------------------
+  function filterPharmacyFinancialRecords(records) {
+    if (!records) return [];
+    const query = (currentMoneyPharSearch || '').trim().toLowerCase();
+    const status = currentMoneyPharStatus || 'ALL';
+    return records.filter(r => {
+      if (status !== 'ALL') {
+        const ps = (r.paymentStatus || '').toUpperCase();
+        if (status === 'PAID' && ps !== 'PAID') return false;
+        if (status === 'PARTIAL' && ps !== 'PARTIAL' && ps !== 'PARTIALLY_PAID') return false;
+        if (status === 'UNPAID' && ps !== 'UNPAID' && ps !== 'PENDING') return false;
+      }
+      if (query) {
+        const match = (r.customerName || '').toLowerCase().includes(query)
+          || (r.uhid || '').toLowerCase().includes(query)
+          || (r.billNumber || '').toLowerCase().includes(query)
+          || (r.invoiceNumber || '').toLowerCase().includes(query)
+          || (r.medicinesSold || '').toLowerCase().includes(query)
+          || (r.doctorName || '').toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }
+
+  function searchPharmacyFinancials(val) {
+    currentMoneyPharSearch = val;
+    updatePharmacyFinancialTable();
+  }
+
+  function filterPharmacyFinancialsStatus(status) {
+    currentMoneyPharStatus = status;
+    updatePharmacyFinancialTable();
+  }
+
+  function updatePharmacyFinancialTable() {
+    if (!currentMoneyData?.pharmacyFinancials) return;
+    const records = filterPharmacyFinancialRecords(currentMoneyData.pharmacyFinancials.records || []);
+    const tbody = document.getElementById('pharFinancialTableBody');
+    if (tbody) tbody.innerHTML = renderPharmacyFinancialRows(records);
+    const badge = document.getElementById('pharRecordCountBadge');
+    if (badge) {
+      badge.textContent = `Showing ${records.length} of ${currentMoneyData.pharmacyFinancials.records?.length || 0} Pharmacy records`;
+    }
+    document.querySelectorAll('#pharStatusPills button').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-status') === currentMoneyPharStatus);
+    });
+  }
+
+  function renderPharmacyFinancialRows(records) {
+    if (!records || records.length === 0) {
+      return '<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No Pharmacy financial records match the current filter.</td></tr>';
+    }
+    return records.map((r, idx) => `
+      <tr>
+        <td style="font-family:monospace; font-weight:700; color:var(--cv-primary);">${escapeHtml(r.billNumber || '-')}</td>
+        <td style="font-family:monospace; font-weight:600; color:#334155;">${escapeHtml(r.invoiceNumber || '-')}</td>
+        <td style="font-family:monospace; font-size:0.78rem;">
+          <div>${escapeHtml(r.billDate)}</div>
+          ${r.billTime ? `<div style="color:#94a3b8; font-size:0.72rem;">${escapeHtml(r.billTime)}</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight:700; color:var(--cv-deep-blue);">${escapeHtml(r.customerName || 'Walk-in Customer')}</div>
+          ${r.uhid ? `<div style="font-size:0.72rem; color:#64748b; font-family:monospace;">UHID: ${escapeHtml(r.uhid)}</div>` : ''}
+        </td>
+        <td style="max-width:220px;">
+          <div style="font-weight:600; font-size:0.83rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(r.medicinesSold || '')}">${escapeHtml(r.medicinesSold || '-')}</div>
+          <span style="font-size:0.7rem; color:#64748b;">Qty: ${r.totalQuantity || 1} units</span>
+        </td>
+        <td>
+          <div style="font-weight:600; font-size:0.82rem;">${escapeHtml(r.doctorName || 'Prescribing Doctor')}</div>
+        </td>
+        <td style="text-align:right; font-weight:800; color:var(--cv-deep-blue);">₹${formatCurrency(r.totalAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(r.paidAmount)}</td>
+        <td style="text-align:right; font-weight:700; color:${(r.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b'};">
+          ₹${formatCurrency(r.balanceAmount)}
+        </td>
+        <td style="text-align:center;">
+          ${getPaymentStatusBadgeHtml(r.paymentStatus)}
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="cv-btn-secondary" onclick="Admin.showFinancialRecordDetailsModal('PHARMACY', ${idx})" style="padding:0.25rem 0.55rem; font-size:0.75rem;" title="View Record Details">
+            View
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderPharmacyFinancialSectionHtml(data) {
+    const phar = data.pharmacyFinancials || {};
+    const records = filterPharmacyFinancialRecords(phar.records || []);
+    return `
+      <!-- Pharmacy Financials Header Bar -->
+      <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem; border-left:4px solid #8b5cf6;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:#7c3aed; text-transform:uppercase; letter-spacing:0.04em;">PHARMACY DISPENSARY REVENUE &bull; MEDICINE SALES</div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Pharmacy Financial Ledger &amp; Medicine Sales</h2>
+            <p style="font-size:0.8rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Live Pharmacy dispensary sales: medicine bills, retail revenue, actual cash/digital collections &amp; customer balances</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OVERVIEW')" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+              &larr; Back to Overview
+            </button>
+          </div>
+        </div>
+
+        <!-- Pharmacy KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.85rem; margin-top:1.25rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL PHARMACY BILLS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e293b; margin:0.25rem 0;">${phar.totalBills || 0}</div>
+            <div style="font-size:0.72rem; color:#64748b;">Dispensary invoices</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">TOTAL MEDICINE SALES</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">₹${formatCurrency(phar.totalSales)}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Gross retail billed</div>
+          </div>
+          <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#065f46; text-transform:uppercase;">TOTAL COLLECTIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin:0.25rem 0;">₹${formatCurrency(phar.totalCollections)}</div>
+            <div style="font-size:0.72rem; color:#065f46;">Realized collections</div>
+          </div>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#991b1b; text-transform:uppercase;">OUTSTANDING BALANCE</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#b91c1c; margin:0.25rem 0;">₹${formatCurrency(phar.totalOutstanding)}</div>
+            <div style="font-size:0.72rem; color:#991b1b;">Pending customer balance</div>
+          </div>
+          <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#92400e; text-transform:uppercase;">DISCOUNTS &amp; GST</div>
+            <div style="font-size:1.15rem; font-weight:800; color:#b45309; margin:0.25rem 0;">
+              -${formatCurrency(phar.totalDiscounts)} / +${formatCurrency(phar.totalGst)}
+            </div>
+            <div style="font-size:0.72rem; color:#92400e;">Applicable deductions &amp; tax</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pharmacy Table Card with Search & Filters -->
+      <div class="cv-card" style="padding:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">Pharmacy Bills &amp; Medicine Sales Ledger</h3>
+            <span id="pharRecordCountBadge" style="font-size:0.78rem; color:var(--cv-text-muted);">
+              Showing ${records.length} of ${phar.records?.length || 0} Pharmacy records
+            </span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <div class="cv-money-period-pills" id="pharStatusPills" style="padding:0.2rem;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneyPharStatus === 'ALL' ? 'active' : ''}" data-status="ALL" onclick="Admin.filterPharmacyFinancialsStatus('ALL')">All (${phar.records?.length || 0})</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyPharStatus === 'PAID' ? 'active' : ''}" data-status="PAID" onclick="Admin.filterPharmacyFinancialsStatus('PAID')">Paid</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyPharStatus === 'PARTIAL' ? 'active' : ''}" data-status="PARTIAL" onclick="Admin.filterPharmacyFinancialsStatus('PARTIAL')">Partial</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyPharStatus === 'UNPAID' ? 'active' : ''}" data-status="UNPAID" onclick="Admin.filterPharmacyFinancialsStatus('UNPAID')">Unpaid</button>
+            </div>
+
+            <div style="position:relative;">
+              <input type="text" id="pharFinancialSearchInput" class="cv-form-input" placeholder="Search Bill #, Patient, Medicine, Doctor..." value="${escapeHtml(currentMoneyPharSearch)}" style="height:36px; width:260px; font-size:0.8rem; padding-left:2rem;" oninput="Admin.searchPharmacyFinancials(this.value)">
+              <svg style="width:14px; height:14px; color:#94a3b8; position:absolute; left:0.65rem; top:50%; transform:translateY(-50%);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="cv-money-table" id="pharFinancialTable">
+            <thead>
+              <tr>
+                <th>Bill #</th>
+                <th>Invoice #</th>
+                <th>Date &amp; Time</th>
+                <th>Patient / Customer</th>
+                <th>Medicines Sold</th>
+                <th>Prescribing Doctor</th>
+                <th style="text-align:right;">Total Amount</th>
+                <th style="text-align:right;">Amount Paid</th>
+                <th style="text-align:right;">Remaining Balance</th>
+                <th style="text-align:center;">Payment Status</th>
+                <th style="text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="pharFinancialTableBody">
+              ${renderPharmacyFinancialRows(records)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --------------------------------------------------------------------
+  // 5. DOCTOR FINANCIALS
+  // --------------------------------------------------------------------
+  function filterDoctorFinancialRecords(doctors) {
+    if (!doctors) return [];
+    const query = (currentMoneyDocSearch || '').trim().toLowerCase();
+    let list = doctors.filter(d => {
+      if (query) {
+        const match = (d.doctorName || '').toLowerCase().includes(query)
+          || (d.department || '').toLowerCase().includes(query)
+          || (d.specialization || '').toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      return true;
+    });
+
+    const sortType = currentMoneyDocSort || 'HIGHEST';
+    if (sortType === 'HIGHEST') {
+      list.sort((a, b) => (b.totalRevenueBilled || 0) - (a.totalRevenueBilled || 0));
+    } else if (sortType === 'LOWEST') {
+      list.sort((a, b) => (a.totalRevenueBilled || 0) - (b.totalRevenueBilled || 0));
+    } else if (sortType === 'NAME') {
+      list.sort((a, b) => (a.doctorName || '').localeCompare(b.doctorName || ''));
+    } else if (sortType === 'OP') {
+      list.sort((a, b) => (b.opRevenue || 0) - (a.opRevenue || 0));
+    } else if (sortType === 'IP') {
+      list.sort((a, b) => (b.ipRevenue || 0) - (a.ipRevenue || 0));
+    }
+    return list;
+  }
+
+  function searchDoctorFinancials(val) {
+    currentMoneyDocSearch = val;
+    updateDoctorFinancialTable();
+  }
+
+  function sortDoctorFinancials(sortType) {
+    currentMoneyDocSort = sortType;
+    updateDoctorFinancialTable();
+  }
+
+  function updateDoctorFinancialTable() {
+    const list = currentMoneyData?.doctorFinancials?.doctors || currentMoneyData?.doctorRevenueList || [];
+    const filtered = filterDoctorFinancialRecords(list);
+    const tbody = document.getElementById('docFinancialTableBody');
+    if (tbody) tbody.innerHTML = renderDoctorFinancialSectionRows(filtered);
+    const badge = document.getElementById('docRecordCountBadge');
+    if (badge) {
+      badge.textContent = `Showing ${filtered.length} of ${list.length} Doctors`;
+    }
+    document.querySelectorAll('#docSortPills button').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-sort') === currentMoneyDocSort);
+    });
+  }
+
+  function renderDoctorFinancialSectionRows(doctors) {
+    if (!doctors || doctors.length === 0) {
+      return '<tr><td colspan="11" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">No doctor revenue records match the current filter.</td></tr>';
+    }
+    return doctors.map((d, idx) => `
+      <tr>
+        <td style="font-weight:700; color:var(--cv-deep-blue);">${escapeHtml(d.doctorName)}</td>
+        <td>
+          <div style="font-weight:600;">${escapeHtml(d.department || 'General')}</div>
+          <div style="font-size:0.72rem; color:var(--cv-text-muted);">${escapeHtml(d.specialization || '')}</div>
+        </td>
+        <td style="text-align:right;">${d.opVisits || d.opCount || 0}</td>
+        <td style="text-align:right; font-weight:600;">₹${formatCurrency(d.opRevenue)}</td>
+        <td style="text-align:right;">${d.ipAdmissions || d.ipCount || 0}</td>
+        <td style="text-align:right; font-weight:600;">₹${formatCurrency(d.ipRevenue)}</td>
+        <td style="text-align:right; font-weight:800; color:#0f172a;">₹${formatCurrency(d.totalBilled || d.totalRevenueBilled)}</td>
+        <td style="text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(d.collected || d.totalRevenueCollected)}</td>
+        <td style="text-align:right; font-weight:700; color:${(d.outstanding || 0) > 0 ? '#dc2626' : '#64748b'};">
+          ₹${formatCurrency(d.outstanding)}
+        </td>
+        <td style="text-align:right;">
+          <div style="display:flex; align-items:center; justify-content:flex-end; gap:0.4rem;">
+            <div style="width:50px; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+              <div style="width:${Math.min(100, d.percentage || 0)}%; height:100%; background:#2563eb;"></div>
+            </div>
+            <span style="font-weight:700; color:#2563eb; font-size:0.8rem;">${d.percentage || 0}%</span>
+          </div>
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="cv-btn-secondary" onclick="Admin.showFinancialRecordDetailsModal('DOCTOR', ${idx})" style="padding:0.25rem 0.55rem; font-size:0.75rem;" title="View Doctor Profile">
+            View
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderDoctorFinancialSectionHtml(data) {
+    const docSec = data.doctorFinancials || {};
+    const doctors = docSec.doctors || data.doctorRevenueList || [];
+    const filtered = filterDoctorFinancialRecords(doctors);
+    return `
+      <!-- Doctor Financials Header Bar -->
+      <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem; border-left:4px solid #6366f1;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <div style="font-size:0.75rem; font-weight:800; color:#4f46e5; text-transform:uppercase; letter-spacing:0.04em;">DOCTOR CLINICAL REVENUE &bull; PRACTITIONER SHARE</div>
+            <h2 style="font-size:1.2rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Doctor Financial Ledger &amp; Revenue Analytics</h2>
+            <p style="font-size:0.8rem; color:var(--cv-text-muted); margin:0.15rem 0 0 0;">Live doctor billing &amp; collections linked to each physician's Outpatient consultations and Inpatient admissions</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.switchMoneySectionTab('OVERVIEW')" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+              &larr; Back to Overview
+            </button>
+          </div>
+        </div>
+
+        <!-- Doctor KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.85rem; margin-top:1.25rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">TOTAL DOCTORS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e293b; margin:0.25rem 0;">${docSec.totalDoctors || doctors.length || 0}</div>
+            <div style="font-size:0.72rem; color:#64748b;">Active medical practitioners</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">OP CONSULTATIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">${docSec.totalConsultations || 0}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Outpatient visits</div>
+          </div>
+          <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#166534; text-transform:uppercase;">IP ADMISSIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#15803d; margin:0.25rem 0;">${docSec.totalAdmissions || 0}</div>
+            <div style="font-size:0.72rem; color:#166534;">Inpatient cases handled</div>
+          </div>
+          <div style="background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#1d4ed8; text-transform:uppercase;">TOTAL BILLED</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#1e40af; margin:0.25rem 0;">₹${formatCurrency(docSec.totalBilledAmount)}</div>
+            <div style="font-size:0.72rem; color:#1d4ed8;">Gross practitioner revenue</div>
+          </div>
+          <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#065f46; text-transform:uppercase;">COLLECTIONS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#059669; margin:0.25rem 0;">₹${formatCurrency(docSec.totalCollections)}</div>
+            <div style="font-size:0.72rem; color:#065f46;">Realized cash collection</div>
+          </div>
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:0.85rem 1rem;">
+            <div style="font-size:0.72rem; font-weight:700; color:#991b1b; text-transform:uppercase;">OUTSTANDING</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#b91c1c; margin:0.25rem 0;">₹${formatCurrency(docSec.totalOutstanding)}</div>
+            <div style="font-size:0.72rem; color:#991b1b;">Pending dues</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Doctor Table Card with Search & Sort -->
+      <div class="cv-card" style="padding:1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div>
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--cv-deep-blue); margin:0;">Physician Revenue Recovery &amp; Financial Ledger</h3>
+            <span id="docRecordCountBadge" style="font-size:0.78rem; color:var(--cv-text-muted);">
+              Showing ${filtered.length} of ${doctors.length} Doctors
+            </span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <div class="cv-money-period-pills" id="docSortPills" style="padding:0.2rem;">
+              <button type="button" class="cv-money-pill-btn ${currentMoneyDocSort === 'HIGHEST' ? 'active' : ''}" data-sort="HIGHEST" onclick="Admin.sortDoctorFinancials('HIGHEST')">Highest Rev</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyDocSort === 'LOWEST' ? 'active' : ''}" data-sort="LOWEST" onclick="Admin.sortDoctorFinancials('LOWEST')">Lowest Rev</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyDocSort === 'NAME' ? 'active' : ''}" data-sort="NAME" onclick="Admin.sortDoctorFinancials('NAME')">Name</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyDocSort === 'OP' ? 'active' : ''}" data-sort="OP" onclick="Admin.sortDoctorFinancials('OP')">Top OP</button>
+              <button type="button" class="cv-money-pill-btn ${currentMoneyDocSort === 'IP' ? 'active' : ''}" data-sort="IP" onclick="Admin.sortDoctorFinancials('IP')">Top IP</button>
+            </div>
+
+            <div style="position:relative;">
+              <input type="text" id="docFinancialSearchInput" class="cv-form-input" placeholder="Search Doctor, Department..." value="${escapeHtml(currentMoneyDocSearch)}" style="height:36px; width:220px; font-size:0.8rem; padding-left:2rem;" oninput="Admin.searchDoctorFinancials(this.value)">
+              <svg style="width:14px; height:14px; color:#94a3b8; position:absolute; left:0.65rem; top:50%; transform:translateY(-50%);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="cv-money-table" id="docFinancialTable">
+            <thead>
+              <tr>
+                <th>Doctor Name</th>
+                <th>Department &amp; Specialization</th>
+                <th style="text-align:right;">OP Visits</th>
+                <th style="text-align:right;">OP Revenue</th>
+                <th style="text-align:right;">IP Admissions</th>
+                <th style="text-align:right;">IP Revenue</th>
+                <th style="text-align:right;">Total Billed</th>
+                <th style="text-align:right;">Cash Collected</th>
+                <th style="text-align:right;">Outstanding</th>
+                <th style="text-align:right;">Share %</th>
+                <th style="text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="docFinancialTableBody">
+              ${renderDoctorFinancialSectionRows(filtered)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // --------------------------------------------------------------------
+  // RECORD DETAILS POPUP MODAL
+  // --------------------------------------------------------------------
+  function showFinancialRecordDetailsModal(sectionType, recordIndex) {
+    const existing = document.getElementById('financialRecordDetailsModal');
+    if (existing) existing.remove();
+
+    let title = 'Financial Record Details';
+    let record = null;
+
+    if (sectionType === 'OP') {
+      record = currentMoneyData?.opFinancials?.records?.[recordIndex];
+      title = `OP Financial Record &bull; ${record?.opId || 'OP'}`;
+    } else if (sectionType === 'IP') {
+      record = currentMoneyData?.ipFinancials?.records?.[recordIndex];
+      title = `IP Financial Record &bull; ${record?.ipId || 'IP'}`;
+    } else if (sectionType === 'LAB') {
+      record = currentMoneyData?.labFinancials?.records?.[recordIndex];
+      title = `Laboratory Order Record &bull; ${record?.orderNumber || 'LAB'}`;
+    } else if (sectionType === 'PHARMACY') {
+      record = currentMoneyData?.pharmacyFinancials?.records?.[recordIndex];
+      title = `Pharmacy Bill Record &bull; ${record?.billNumber || 'PHARMACY'}`;
+    } else if (sectionType === 'DOCTOR') {
+      record = currentMoneyData?.doctorFinancials?.doctors?.[recordIndex] || currentMoneyData?.doctorRevenueList?.[recordIndex];
+      title = `Doctor Financial Profile &bull; ${record?.doctorName || 'Doctor'}`;
+    }
+
+    if (!record) {
+      alert('Could not locate the requested financial record.');
+      return;
+    }
+
+    const fields = Object.keys(record).filter(k => typeof record[k] !== 'object' && record[k] !== null && record[k] !== undefined && k !== 'id');
+
+    const modalHtml = `
+      <div id="financialRecordDetailsModal" class="cv-invoice-modal-overlay">
+        <div style="background:#fff; width:100%; max-width:620px; border-radius:10px; box-shadow:var(--cv-shadow-lg); overflow:hidden; margin:auto;">
+          <div style="padding:1rem 1.25rem; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:#eff6ff; color:#1d4ed8;">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              </span>
+              <h3 style="margin:0; font-size:1rem; font-weight:800; color:var(--cv-deep-blue);">${title}</h3>
+            </div>
+            <button type="button" class="cv-btn-secondary" onclick="document.getElementById('financialRecordDetailsModal').remove()" style="padding:0.3rem 0.6rem;">&times;</button>
+          </div>
+
+          <div style="padding:1.25rem; max-height:450px; overflow-y:auto;">
+            <table class="cv-money-table" style="font-size:0.83rem;">
+              <tbody>
+                ${fields.map(k => {
+                  let val = record[k];
+                  const label = k.replace(/([A-Z])/g, ' $1').toUpperCase();
+                  let displayVal = escapeHtml(String(val));
+                  if (typeof val === 'number' || (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val) && (k.toLowerCase().includes('fee') || k.toLowerCase().includes('bill') || k.toLowerCase().includes('amount') || k.toLowerCase().includes('revenue') || k.toLowerCase().includes('charge') || k.toLowerCase().includes('collected') || k.toLowerCase().includes('paid') || k.toLowerCase().includes('balance') || k.toLowerCase().includes('outstanding') || k.toLowerCase().includes('discount') || k.toLowerCase().includes('gst')))) {
+                    displayVal = `<strong>₹${formatCurrency(val)}</strong>`;
+                  } else if (k === 'paymentStatus') {
+                    displayVal = getPaymentStatusBadgeHtml(val);
+                  }
+                  return `
+                    <tr>
+                      <td style="font-weight:700; color:#64748b; width:40%; padding:0.5rem 0.75rem; border-bottom:1px solid #f1f5f9;">${label}</td>
+                      <td style="color:#0f172a; padding:0.5rem 0.75rem; border-bottom:1px solid #f1f5f9;">${displayVal}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="padding:0.85rem 1.25rem; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem; color:#64748b;">CareVista Financial Audit Ledger Record</span>
+            <div style="display:flex; gap:0.5rem;">
+              <button type="button" class="cv-btn-secondary" onclick="window.print()" style="font-size:0.82rem; padding:0.4rem 0.85rem;">
+                Print Receipt
+              </button>
+              <button type="button" class="cv-btn-primary" onclick="document.getElementById('financialRecordDetailsModal').remove()" style="font-size:0.82rem; padding:0.4rem 1rem;">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  }
+
   return {
     init: init,
     renderDashboardLayout: renderDashboardLayout,
@@ -19167,6 +20385,20 @@ const Admin = (function () {
     showRecordExpenseModal: showRecordExpenseModal,
     submitRecordExpense: submitRecordExpense,
     deleteOperationalExpense: deleteOperationalExpense,
+    switchMoneySectionTab: switchMoneySectionTab,
+    searchOpFinancials: searchOpFinancials,
+    filterOpFinancialsStatus: filterOpFinancialsStatus,
+    searchIpFinancials: searchIpFinancials,
+    filterIpFinancialsWard: filterIpFinancialsWard,
+    filterIpFinancialsStatus: filterIpFinancialsStatus,
+    searchLabFinancials: searchLabFinancials,
+    filterLabFinancialsCategory: filterLabFinancialsCategory,
+    filterLabFinancialsStatus: filterLabFinancialsStatus,
+    searchPharmacyFinancials: searchPharmacyFinancials,
+    filterPharmacyFinancialsStatus: filterPharmacyFinancialsStatus,
+    searchDoctorFinancials: searchDoctorFinancials,
+    sortDoctorFinancials: sortDoctorFinancials,
+    showFinancialRecordDetailsModal: showFinancialRecordDetailsModal,
     openPaymentDoneModal: openPaymentDoneModal,
     executeBillPayment: executeBillPayment,
     refreshCurrentBillingCategory: refreshCurrentBillingCategory,
