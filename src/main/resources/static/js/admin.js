@@ -2714,8 +2714,11 @@ const Admin = (function () {
                 <label class="cv-form-label" for="opAmountPaid">Amount Paid / Collect (&#8377;) *</label>
                 <div style="display:flex; gap:0.4rem; align-items:center;">
                   <input type="number" id="opAmountPaid" class="cv-input" value="0.00" min="0" step="any" required style="flex:1;">
-                  <button type="button" id="btnOpDirectPaid" class="cv-btn-paid" style="height:42px; padding:0 1.25rem;">
+                  <button type="button" id="btnOpDirectPaid" class="cv-btn-paid" style="height:42px; padding:0 1rem;" title="Record payment">
                     PAID
+                  </button>
+                  <button type="button" id="btnOpDirectUnpaid" class="cv-btn-unpaid" style="height:42px; padding:0 1rem;" title="Record as unpaid bill with ₹0.00 collected">
+                    UNPAID
                   </button>
                 </div>
                 <span class="cv-feedback-error" id="errAmount">Please enter a valid consultation amount.</span>
@@ -2932,6 +2935,12 @@ const Admin = (function () {
       btnPaid.innerHTML = 'PAID';
       delete btnPaid.dataset.processing;
     }
+    const btnUnpaid = document.getElementById('btnOpDirectUnpaid');
+    if (btnUnpaid) {
+      btnUnpaid.disabled = false;
+      btnUnpaid.innerHTML = 'UNPAID';
+      delete btnUnpaid.dataset.processing;
+    }
     updateOpSummaryDisplay();
   }
 
@@ -2999,7 +3008,7 @@ const Admin = (function () {
     feeInput?.addEventListener('input', updateOpSummaryDisplay);
     amountPaidInput?.addEventListener('input', updateOpSummaryDisplay);
 
-    async function processOpPaidAction(triggerBtn) {
+    async function processOpPaidAction(triggerBtn, explicitUnpaid = false) {
       const alertBox = document.getElementById('opFormAlert');
       if (alertBox) {
         alertBox.style.display = 'none';
@@ -3012,15 +3021,15 @@ const Admin = (function () {
       }
 
       const amountPaidStr = document.getElementById('opAmountPaid')?.value;
-      if (amountPaidStr === undefined || amountPaidStr === null || String(amountPaidStr).trim() === '') {
-        showToast('Please enter an amount to pay.', 'danger');
-        return;
-      }
+      let numAmt = (amountPaidStr !== undefined && amountPaidStr !== null && String(amountPaidStr).trim() !== '')
+        ? parseFloat(amountPaidStr)
+        : 0;
+      if (isNaN(numAmt) || numAmt < 0) numAmt = 0;
 
-      const numAmt = parseFloat(amountPaidStr);
-      if (isNaN(numAmt) || numAmt <= 0) {
-        showToast('Payment amount must be greater than zero.', 'danger');
-        return;
+      if (explicitUnpaid) {
+        numAmt = 0;
+        const amtInput = document.getElementById('opAmountPaid');
+        if (amtInput) amtInput.value = '0.00';
       }
 
       const paymentMethod = document.getElementById('opPaymentMethod')?.value || 'CASH';
@@ -3032,6 +3041,19 @@ const Admin = (function () {
         const curBal = (activeRegisteredOp.balanceAmount != null)
           ? parseFloat(activeRegisteredOp.balanceAmount)
           : Math.max(0, (activeRegisteredOp.consultationFee || 0) - (activeRegisteredOp.paidAmount || 0));
+
+        if (explicitUnpaid || numAmt <= 0) {
+          const prevPaid = activeRegisteredOp.paidAmount || 0;
+          if (prevPaid > 0) {
+            showToast(`Previous payments of ₹${formatCurrency(prevPaid)} preserved. Outstanding balance remains ₹${formatCurrency(curBal)} (Status: ${activeRegisteredOp.paymentStatus || 'PARTIALLY PAID'}).`, 'info');
+          } else {
+            showToast(`Bill remains UNPAID with ₹${formatCurrency(curBal)} outstanding balance due.`, 'info');
+          }
+          const amtInput = document.getElementById('opAmountPaid');
+          if (amtInput) amtInput.value = '0.00';
+          updateOpSummaryDisplay();
+          return;
+        }
 
         if (curBal <= 0) {
           showToast('This OP bill is already fully paid.', 'info');
@@ -3183,6 +3205,11 @@ const Admin = (function () {
         isValid = false;
       }
 
+      if (!explicitUnpaid && triggerBtn?.id === 'btnOpDirectPaid' && numAmt <= 0) {
+        showToast('Payment amount must be greater than zero to record PAID collection.', 'danger');
+        isValid = false;
+      }
+
       if (numAmt > totalFee + 0.001) {
         showToast(`Payment amount cannot exceed consultation fee of ₹${formatCurrency(totalFee)}.`, 'danger');
         isValid = false;
@@ -3191,7 +3218,7 @@ const Admin = (function () {
       if (!isValid) {
         if (alertBox) {
           alertBox.className = 'cv-alert cv-alert-danger show';
-          alertBox.textContent = 'Please correct the highlighted validation errors before submitting payment.';
+          alertBox.textContent = 'Please correct the highlighted validation errors before submitting.';
         }
         return;
       }
@@ -3241,7 +3268,8 @@ const Admin = (function () {
           if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(registeredOp.paidAmount);
           if (dispBal) dispBal.textContent = '₹' + formatCurrency(registeredOp.balanceAmount);
           if (dispBadge) {
-            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${registeredOp.paymentStatus}</span>`;
+            const badgeCls = isNowPaid ? 'cv-badge-paid' : (registeredOp.paidAmount > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${badgeCls}">${registeredOp.paymentStatus}</span>`;
           }
           if (statusInput) statusInput.value = registeredOp.paymentStatus;
 
@@ -3257,18 +3285,22 @@ const Admin = (function () {
           if (alertBox) {
             alertBox.className = 'cv-alert cv-alert-success show';
             alertBox.innerHTML = `
-              <strong>OP Registration & Payment Recorded!</strong><br>
+              <strong>OP Registration &amp; Billing Recorded!</strong><br>
               OP ID: <strong>${registeredOp.opId}</strong> &bull; UHID: <strong>${registeredOp.uhid}</strong> &bull; Patient: <strong>${registeredOp.patientName}</strong><br>
               Paid: <strong>₹${formatCurrency(registeredOp.paidAmount)}</strong> &bull; Remaining: <strong>₹${formatCurrency(registeredOp.balanceAmount)}</strong> &bull; Status: <strong>${registeredOp.paymentStatus}</strong>
             `;
           }
 
-          showToast(`OP registered and payment of ₹${formatCurrency(numAmt)} saved to database.`, 'success');
+          if (numAmt > 0) {
+            showToast(`OP registered and payment of ₹${formatCurrency(numAmt)} saved to database.`, 'success');
+          } else {
+            showToast(`OP registered as UNPAID. Full consultation fee of ₹${formatCurrency(registeredOp.consultationFee)} is outstanding.`, 'info');
+          }
 
           if (triggerBtn) {
-            triggerBtn.disabled = isNowPaid;
+            triggerBtn.disabled = (triggerBtn.id === 'btnOpDirectPaid' && isNowPaid);
             delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = 'PAID';
+            triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
           }
 
           // Refresh history without full browser reload
@@ -3283,7 +3315,7 @@ const Admin = (function () {
           if (triggerBtn) {
             triggerBtn.disabled = false;
             delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = 'PAID';
+            triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
           }
         }
       } catch (networkErr) {
@@ -3294,21 +3326,38 @@ const Admin = (function () {
         if (triggerBtn) {
           triggerBtn.disabled = false;
           delete triggerBtn.dataset.processing;
-          triggerBtn.innerHTML = 'PAID';
+          triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
         }
       }
     }
 
     btnDirectPaid?.addEventListener('click', (e) => {
       e.preventDefault();
-      processOpPaidAction(btnDirectPaid);
+      const feeInput = document.getElementById('opFeeInput');
+      const paidInput = document.getElementById('opAmountPaid');
+      if (paidInput && (!paidInput.value || parseFloat(paidInput.value) <= 0) && feeInput) {
+        paidInput.value = feeInput.value;
+        updateOpSummaryDisplay();
+      }
+      processOpPaidAction(btnDirectPaid, false);
+    });
+
+    document.getElementById('btnOpDirectUnpaid')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const btnUnpaid = document.getElementById('btnOpDirectUnpaid');
+      const paidInput = document.getElementById('opAmountPaid');
+      if (paidInput) paidInput.value = '0.00';
+      updateOpSummaryDisplay();
+      processOpPaidAction(btnUnpaid, true);
     });
 
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = document.getElementById('btnRegisterOpSubmit');
-        processOpPaidAction(submitBtn);
+        const paidInput = document.getElementById('opAmountPaid');
+        const isUnpaid = (parseFloat(paidInput?.value) || 0) <= 0;
+        processOpPaidAction(submitBtn, isUnpaid);
       });
     }
   }
@@ -4128,7 +4177,15 @@ const Admin = (function () {
             <div class="cv-op-fields-row" style="margin-top:0.85rem; margin-bottom:0;">
               <div class="cv-form-group" style="margin-bottom:0;">
                 <label class="cv-form-label" for="ipDepositAmount">Initial Deposit (&#8377;)</label>
-                <input type="number" id="ipDepositAmount" class="cv-input" placeholder="0.00" min="0" step="100" value="0.00">
+                <div style="display:flex; gap:0.4rem; align-items:center;">
+                  <input type="number" id="ipDepositAmount" class="cv-input" placeholder="0.00" min="0" step="100" value="0.00" style="flex:1;">
+                  <button type="button" id="btnIpDepositPaid" class="cv-btn-paid" style="height:42px; padding:0 0.9rem;" title="Set initial deposit to daily rate">
+                    PAID
+                  </button>
+                  <button type="button" id="btnIpDepositUnpaid" class="cv-btn-unpaid" style="height:42px; padding:0 0.9rem;" title="Admit patient with ₹0.00 deposit as UNPAID">
+                    UNPAID
+                  </button>
+                </div>
               </div>
               <div class="cv-form-group" style="margin-bottom:0;">
                 <label class="cv-form-label" for="ipPaymentMethod">Deposit Mode</label>
@@ -4489,6 +4546,26 @@ const Admin = (function () {
   function setupIpFormSubmission() {
     const form = document.getElementById('ipAdmissionForm');
     if (!form) return;
+
+    document.getElementById('btnIpDepositPaid')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const depInput = document.getElementById('ipDepositAmount');
+      if (depInput) {
+        const rPrice = parseFloat(document.getElementById('ipRoomSelect')?.selectedOptions[0]?.getAttribute('data-price')) || 1200;
+        const bPrice = parseFloat(document.getElementById('ipBedSelect')?.selectedOptions[0]?.getAttribute('data-price')) || 600;
+        depInput.value = (rPrice + bPrice).toFixed(2);
+        showToast(`Initial deposit set to ₹${formatCurrency(rPrice + bPrice)} (Daily Rate).`, 'info');
+      }
+    });
+
+    document.getElementById('btnIpDepositUnpaid')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const depInput = document.getElementById('ipDepositAmount');
+      if (depInput) {
+        depInput.value = '0.00';
+        showToast('Initial deposit set to ₹0.00 (UNPAID admission). Bed will be occupied with full balance due.', 'info');
+      }
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -5433,7 +5510,7 @@ const Admin = (function () {
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.35rem;">
                 <span style="color:#64748b; font-size:0.78rem;">Payment Status:</span>
-                <span id="bedPayDisplayStatus"><span class="cv-payment-balance-badge ${balanceAmount <= 0 ? 'cv-badge-paid' : 'cv-badge-part'}">${adm.paymentStatus || (balanceAmount <= 0 ? 'PAID' : 'PARTIALLY PAID')}</span></span>
+                <span id="bedPayDisplayStatus"><span class="cv-payment-balance-badge ${balanceAmount <= 0 ? 'cv-badge-paid' : ((adm.paidAmount || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">${adm.paymentStatus || (balanceAmount <= 0 ? 'PAID' : ((adm.paidAmount || 0) > 0 ? 'PARTIALLY PAID' : 'UNPAID'))}</span></span>
               </div>
             </div>
 
@@ -5447,7 +5524,10 @@ const Admin = (function () {
                   <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
                   <input type="number" id="bedPayAmountInput" class="cv-form-input" style="padding-left:1.8rem; height:42px; font-size:1.05rem; font-weight:700;" placeholder="0.00" value="${balanceAmount}" min="0.01" max="${balanceAmount}" step="any">
                 </div>
-                <button type="button" class="cv-btn-paid" id="btnBedPayDirect" style="height:42px; padding:0 1.25rem;">
+                <button type="button" class="cv-btn-unpaid" id="btnBedPayDirectUnpaid" style="height:42px; padding:0 1.1rem;">
+                  UNPAID
+                </button>
+                <button type="button" class="cv-btn-paid" id="btnBedPayDirect" style="height:42px; padding:0 1.1rem;">
                   PAID
                 </button>
               </div>
@@ -5475,7 +5555,10 @@ const Admin = (function () {
               <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
                 Close
               </button>
-              <button type="button" class="cv-btn-paid" id="btnBedPaySubmit" style="padding:0.5rem 1.4rem; font-size:0.88rem; font-weight:700;">
+              <button type="button" class="cv-btn-unpaid" id="btnBedPaySubmitUnpaid" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700;">
+                UNPAID
+              </button>
+              <button type="button" class="cv-btn-paid" id="btnBedPaySubmit" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700;">
                 PAID
               </button>
             </div>
@@ -5606,8 +5689,22 @@ const Admin = (function () {
         }
       }
 
+      function handleBedPaymentUnpaid() {
+        const amtInput = document.getElementById('bedPayAmountInput');
+        if (amtInput) amtInput.value = '0.00';
+        const curPaid = (adm.paidAmount != null) ? parseFloat(adm.paidAmount) : 0;
+        const curBal = (adm.balanceAmount != null) ? parseFloat(adm.balanceAmount) : balanceAmount;
+        if (curPaid > 0) {
+          showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} and bed assignment are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+        } else {
+          showToast(`Admission recorded as UNPAID (₹0.00 collected). Bed assignment is active and preserved. Balance due: ₹${formatCurrency(curBal)}.`, 'info');
+        }
+      }
+
       document.getElementById('btnBedPayDirect')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPayDirect')));
       document.getElementById('btnBedPaySubmit')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPaySubmit')));
+      document.getElementById('btnBedPayDirectUnpaid')?.addEventListener('click', handleBedPaymentUnpaid);
+      document.getElementById('btnBedPaySubmitUnpaid')?.addEventListener('click', handleBedPaymentUnpaid);
 
     } catch (e) {
       console.error(e);
@@ -7003,8 +7100,11 @@ const Admin = (function () {
                   <button type="button" id="btnPharPayFull" class="cv-link-btn" title="Set paid amount equal to total">Pay Full</button>
                 </div>
                 <div style="display:flex; gap:0.35rem; align-items:center;">
-                  <input type="number" id="pharPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:30px; width:100px; font-weight:700; font-size:0.9rem; text-align:right; color:#0f172a;">
-                  <button type="button" id="btnPharDirectPaid" class="cv-btn-paid" style="height:30px; padding:0 0.9rem; font-size:0.8rem;">
+                  <input type="number" id="pharPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:30px; width:95px; font-weight:700; font-size:0.9rem; text-align:right; color:#0f172a;">
+                  <button type="button" id="btnPharDirectUnpaid" class="cv-btn-unpaid" style="height:30px; padding:0 0.75rem; font-size:0.8rem;">
+                    UNPAID
+                  </button>
+                  <button type="button" id="btnPharDirectPaid" class="cv-btn-paid" style="height:30px; padding:0 0.75rem; font-size:0.8rem;">
                     PAID
                   </button>
                 </div>
@@ -7411,8 +7511,9 @@ const Admin = (function () {
       }
     });
 
-    document.getElementById('btnPharGenerateBill')?.addEventListener('click', () => checkoutPharmacyBill(false));
-    document.getElementById('btnPharDirectPaid')?.addEventListener('click', () => checkoutPharmacyBill(true));
+    document.getElementById('btnPharGenerateBill')?.addEventListener('click', () => checkoutPharmacyBill('DEFAULT'));
+    document.getElementById('btnPharDirectPaid')?.addEventListener('click', () => checkoutPharmacyBill('PAID'));
+    document.getElementById('btnPharDirectUnpaid')?.addEventListener('click', () => checkoutPharmacyBill('UNPAID'));
   }
 
   async function selectMedicineForPOS(medicineId) {
@@ -7921,7 +8022,7 @@ const Admin = (function () {
   // ------------------------------------------------------------------
   // CHECKOUT WORKFLOW: PRESCRIPTION CONFIRMATION & BILL CREATION
   // ------------------------------------------------------------------
-  async function checkoutPharmacyBill(isDirectPaid = false) {
+  async function checkoutPharmacyBill(actionType = 'DEFAULT') {
     if (!pharBillItems || pharBillItems.length === 0) {
       alert('Please add at least one medicine to the bill.');
       return;
@@ -8007,8 +8108,14 @@ const Admin = (function () {
     const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
 
     let paidAmount = parseFloat(document.getElementById('pharPaidAmount')?.value) || 0;
-    if (isDirectPaid) {
+    if (actionType === true || actionType === 'PAID') {
       paidAmount = finalTotal;
+      const pInput = document.getElementById('pharPaidAmount');
+      if (pInput) pInput.value = finalTotal.toFixed(2);
+    } else if (actionType === 'UNPAID') {
+      paidAmount = 0.00;
+      const pInput = document.getElementById('pharPaidAmount');
+      if (pInput) pInput.value = '0.00';
     }
 
     const payload = {
@@ -8031,7 +8138,9 @@ const Admin = (function () {
       items: requestItems
     };
 
-    const submitBtn = document.getElementById(isDirectPaid ? 'btnPharDirectPaid' : 'btnPharGenerateBill');
+    const submitBtn = (actionType === 'UNPAID')
+      ? document.getElementById('btnPharDirectUnpaid')
+      : (actionType === true || actionType === 'PAID' ? document.getElementById('btnPharDirectPaid') : document.getElementById('btnPharGenerateBill'));
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; margin-right:4px;"></span> Dispensing...';
@@ -8067,7 +8176,13 @@ const Admin = (function () {
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = isDirectPaid ? 'PAID' : 'Generate & Save Bill';
+        if (actionType === 'UNPAID') {
+          submitBtn.innerHTML = 'UNPAID';
+        } else if (actionType === true || actionType === 'PAID') {
+          submitBtn.innerHTML = 'PAID';
+        } else {
+          submitBtn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Generate &amp; Save Bill';
+        }
       }
     }
   }
@@ -10481,7 +10596,10 @@ const Admin = (function () {
                   </div>
                   <div style="display:flex; gap:0.4rem; align-items:center;">
                     <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
-                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1.15rem;">
+                    <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:38px; padding:0 1rem;">
+                      UNPAID
+                    </button>
+                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1rem;">
                       PAID
                     </button>
                   </div>
@@ -10981,6 +11099,160 @@ const Admin = (function () {
         btn.innerHTML = 'PAID';
       }
     });
+
+    // 10. Direct UNPAID Button Handler
+    async function processLabUnpaidAction(btn) {
+      if (btn && (btn.disabled || btn.dataset.processing === 'true')) return;
+      const amtInput = document.getElementById('labPaidAmount');
+      if (amtInput) amtInput.value = '0.00';
+      recalculateLabBill();
+
+      // Case A: Subsequent payment on already created lab order
+      if (labActiveSavedOrder) {
+        const curPaid = (labActiveSavedOrder.paidAmount != null) ? parseFloat(labActiveSavedOrder.paidAmount) : 0;
+        const curBal = (labActiveSavedOrder.balanceAmount != null)
+          ? parseFloat(labActiveSavedOrder.balanceAmount)
+          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - curPaid);
+
+        if (curPaid > 0) {
+          showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+        } else {
+          showToast(`Laboratory order remains UNPAID (₹0.00 collected). Full balance of ₹${formatCurrency(curBal)} remains due.`, 'info');
+        }
+        return;
+      }
+
+      // Case B: Initial Lab Order Creation with UNPAID status
+      let patientName = '';
+      let uhid = '';
+      let phone = '';
+      let opId = '';
+      let ipId = '';
+      let doctorName = '';
+      let department = '';
+      let patientId = null;
+
+      if (labSelectedPatient) {
+        patientId = labSelectedPatient.id;
+        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
+        uhid = labSelectedPatient.uhid || '';
+        phone = labSelectedPatient.phone || '';
+        opId = labSelectedPatient.opId || '';
+        ipId = labSelectedPatient.ipId || '';
+        doctorName = labSelectedPatient.doctorName || '';
+        department = labSelectedPatient.department || '';
+      } else {
+        const walkinName = document.getElementById('labWalkinName')?.value?.trim();
+        const walkinPhone = document.getElementById('labWalkinPhone')?.value?.trim();
+        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
+        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
+
+        if (!walkinName) {
+          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
+          document.getElementById('labPatientSearchInput')?.focus();
+          return;
+        }
+        patientName = walkinName;
+        phone = walkinPhone || '';
+        doctorName = walkinDoctor || 'Dr. On Duty';
+        department = walkinDept || 'Diagnostics';
+        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
+      }
+
+      if (!labOrderItems || labOrderItems.length === 0) {
+        showToast('Please add at least one laboratory test to the order.', 'danger');
+        return;
+      }
+
+      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
+      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
+      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
+      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
+      const notes = document.getElementById('labNotes')?.value?.trim() || '';
+
+      const payload = {
+        patientId: patientId,
+        patientName: patientName,
+        uhid: uhid,
+        phone: phone,
+        opId: opId,
+        ipId: ipId,
+        doctorName: doctorName,
+        department: department,
+        discountPercentage: discountPercentage,
+        gstPercentage: gstPercentage,
+        gstin: gstin,
+        paidAmount: 0.00,
+        paymentMethod: paymentMethod,
+        notes: notes,
+        items: labOrderItems.map(item => ({
+          testId: item.testId,
+          testCode: item.testCode,
+          testName: item.testName,
+          category: item.category,
+          sampleType: item.sampleType,
+          price: item.price,
+          referenceRange: item.referenceRange,
+          unit: item.unit
+        }))
+      };
+
+      if (btn) {
+        btn.disabled = true;
+        btn.dataset.processing = 'true';
+        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
+      }
+
+      try {
+        const res = await Api.post('/api/laboratory/orders', payload);
+        if (res && res.success && res.data) {
+          const createdOrder = res.data;
+          labActiveSavedOrder = createdOrder;
+
+          labOrderItems = [];
+          const tbody = document.getElementById('labOrderTableBody');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved as UNPAID to MySQL.</td></tr>`;
+
+          const balElem = document.getElementById('labBalanceAmount');
+          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
+
+          const statusBadge = document.getElementById('labPaymentStatusBadge');
+          if (statusBadge) {
+            statusBadge.textContent = createdOrder.paymentStatus || 'UNPAID';
+            statusBadge.className = 'cv-payment-balance-badge cv-badge-unpaid';
+          }
+
+          if (amtInput) {
+            amtInput.value = createdOrder.balanceAmount.toFixed(2);
+            amtInput.disabled = false;
+          }
+
+          if (btn) {
+            btn.disabled = false;
+            delete btn.dataset.processing;
+            btn.innerHTML = 'UNPAID';
+          }
+
+          showToast(`Laboratory order ${createdOrder.orderNumber} recorded as UNPAID. Balance due: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'info');
+        } else {
+          showToast((res && res.message) ? res.message : 'Failed to save laboratory order.', 'danger');
+          if (btn) {
+            btn.disabled = false;
+            delete btn.dataset.processing;
+            btn.innerHTML = 'UNPAID';
+          }
+        }
+      } catch (err) {
+        showToast('Error recording laboratory order: ' + (err.message || err), 'danger');
+        if (btn) {
+          btn.disabled = false;
+          delete btn.dataset.processing;
+          btn.innerHTML = 'UNPAID';
+        }
+      }
+    }
+
+    document.getElementById('btnLabDirectUnpaid')?.addEventListener('click', (e) => processLabUnpaidAction(e.currentTarget));
 
     // Bind table events
     bindLabTableEvents();
@@ -13622,7 +13894,10 @@ const Admin = (function () {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                 </select>
                 <input type="text" id="modalHistoryPayNotes" class="cv-form-input" style="height:38px; flex:1; min-width:140px; font-size:0.82rem;" placeholder="Payment installment notes...">
-                <button type="button" id="btnModalHistoryDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1.25rem;">
+                <button type="button" id="btnModalHistoryDirectUnpaid" class="cv-btn-unpaid" style="height:38px; padding:0 1.1rem;">
+                  UNPAID
+                </button>
+                <button type="button" id="btnModalHistoryDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1.1rem;">
                   PAID
                 </button>
               </div>
@@ -13631,6 +13906,16 @@ const Admin = (function () {
         `;
 
         if (!isPaid) {
+          document.getElementById('btnModalHistoryDirectUnpaid')?.addEventListener('click', () => {
+            const amtInput = document.getElementById('modalHistoryPayAmount');
+            if (amtInput) amtInput.value = '0.00';
+            if (totalPaid > 0) {
+              showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(totalPaid)} are preserved. Remaining balance: ₹${formatCurrency(remainingBal)}.`, 'warning');
+            } else {
+              showToast(`Bill remains UNPAID (₹0.00 collected). Full balance of ₹${formatCurrency(remainingBal)} remains due.`, 'info');
+            }
+          });
+
           document.getElementById('btnModalHistoryDirectPaid')?.addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             if (btn.disabled || btn.dataset.processing === 'true') return;
@@ -14299,7 +14584,10 @@ const Admin = (function () {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-paid" id="btnOpSubmitPayment_${o.id}" style="height:36px; padding:0 1.25rem;">
+                <button type="button" class="cv-btn-unpaid" id="btnOpSubmitPaymentUnpaid_${o.id}" style="height:36px; padding:0 1.1rem;">
+                  UNPAID
+                </button>
+                <button type="button" class="cv-btn-paid" id="btnOpSubmitPayment_${o.id}" style="height:36px; padding:0 1.1rem;">
                   PAID
                 </button>
               </div>
@@ -14319,6 +14607,17 @@ const Admin = (function () {
       });
 
       if (balAmt > 0) {
+        document.getElementById(`btnOpSubmitPaymentUnpaid_${o.id}`)?.addEventListener('click', () => {
+          const amtInput = document.getElementById(`opAmountPaid_${o.id}`);
+          if (amtInput) amtInput.value = '0.00';
+          const curBal = (o.balanceAmount != null ? o.balanceAmount : Math.max(0, totalAmt - paidAmt));
+          if (paidAmt > 0) {
+            showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(paidAmt)} are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+          } else {
+            showToast(`OP Bill remains UNPAID (₹0.00 collected). Full balance of ₹${formatCurrency(curBal)} remains due.`, 'info');
+          }
+        });
+
         document.getElementById(`btnOpSubmitPayment_${o.id}`)?.addEventListener('click', async () => {
           const amtInput = document.getElementById(`opAmountPaid_${o.id}`);
           const amtVal = amtInput?.value;
@@ -14974,7 +15273,10 @@ const Admin = (function () {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-paid" id="btnIpSubmitPayment_${ip.id}" style="height:36px; padding:0 1.25rem;">
+                <button type="button" class="cv-btn-unpaid" id="btnIpSubmitPaymentUnpaid_${ip.id}" style="height:36px; padding:0 1.1rem;">
+                  UNPAID
+                </button>
+                <button type="button" class="cv-btn-paid" id="btnIpSubmitPayment_${ip.id}" style="height:36px; padding:0 1.1rem;">
                   PAID
                 </button>
               </div>
@@ -14994,6 +15296,17 @@ const Admin = (function () {
       });
 
       if (balAmt > 0) {
+        document.getElementById(`btnIpSubmitPaymentUnpaid_${ip.id}`)?.addEventListener('click', () => {
+          const amtInput = document.getElementById(`ipAmountPaid_${ip.id}`);
+          if (amtInput) amtInput.value = '0.00';
+          const curBal = (ip.balanceAmount != null ? ip.balanceAmount : Math.max(0, totalAmt - paidAmt));
+          if (paidAmt > 0) {
+            showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(paidAmt)} and bed allocation are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+          } else {
+            showToast(`IP Admission remains UNPAID (₹0.00 collected). Bed allocation is active and preserved. Balance due: ₹${formatCurrency(curBal)}.`, 'info');
+          }
+        });
+
         document.getElementById(`btnIpSubmitPayment_${ip.id}`)?.addEventListener('click', async () => {
           const amtInput = document.getElementById(`ipAmountPaid_${ip.id}`);
           const amtVal = amtInput?.value;
@@ -15656,7 +15969,10 @@ const Admin = (function () {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-paid" id="btnPhSubmitPayment_${b.id}" style="height:36px; padding:0 1.25rem;">
+                <button type="button" class="cv-btn-unpaid" id="btnPhSubmitPaymentUnpaid_${b.id}" style="height:36px; padding:0 1.1rem;">
+                  UNPAID
+                </button>
+                <button type="button" class="cv-btn-paid" id="btnPhSubmitPayment_${b.id}" style="height:36px; padding:0 1.1rem;">
                   PAID
                 </button>
               </div>
@@ -15676,6 +15992,18 @@ const Admin = (function () {
       });
 
       if ((b.balanceAmount || 0) > 0) {
+        document.getElementById(`btnPhSubmitPaymentUnpaid_${b.id}`)?.addEventListener('click', () => {
+          const amtInput = document.getElementById(`phAmountPaid_${b.id}`);
+          if (amtInput) amtInput.value = '0.00';
+          const curBal = (b.balanceAmount != null ? b.balanceAmount : 0);
+          const curPaid = (b.paidAmount != null ? b.paidAmount : 0);
+          if (curPaid > 0) {
+            showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} and dispensed medicine stock are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+          } else {
+            showToast(`Pharmacy Bill remains UNPAID (₹0.00 collected). Dispensed stock is preserved. Balance due: ₹${formatCurrency(curBal)}.`, 'info');
+          }
+        });
+
         document.getElementById(`btnPhSubmitPayment_${b.id}`)?.addEventListener('click', async () => {
           const amtInput = document.getElementById(`phAmountPaid_${b.id}`);
           const amtVal = amtInput?.value;
@@ -16330,7 +16658,10 @@ const Admin = (function () {
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="OTHER">Other</option>
                 </select>
-                <button type="button" class="cv-btn-paid" id="btnLabSubmitPayment_${l.id}" style="height:36px; padding:0 1.25rem; font-size:0.85rem; font-weight:700;">
+                <button type="button" class="cv-btn-unpaid" id="btnLabSubmitPaymentUnpaid_${l.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700;">
+                  UNPAID
+                </button>
+                <button type="button" class="cv-btn-paid" id="btnLabSubmitPayment_${l.id}" style="height:36px; padding:0 1.1rem; font-size:0.85rem; font-weight:700;">
                   PAID
                 </button>
               </div>
@@ -16350,6 +16681,18 @@ const Admin = (function () {
       });
 
       if (bal > 0) {
+        document.getElementById(`btnLabSubmitPaymentUnpaid_${l.id}`)?.addEventListener('click', () => {
+          const amtInput = document.getElementById(`labAmountPaid_${l.id}`);
+          if (amtInput) amtInput.value = '0.00';
+          const curBal = (l.balanceAmount != null ? l.balanceAmount : (l.finalTotal || l.totalAmount || 0) - (l.paidAmount || 0));
+          const curPaid = (l.paidAmount != null ? l.paidAmount : 0);
+          if (curPaid > 0) {
+            showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} and lab test orders are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
+          } else {
+            showToast(`Laboratory Order remains UNPAID (₹0.00 collected). Lab test order processing is active and preserved. Balance due: ₹${formatCurrency(curBal)}.`, 'info');
+          }
+        });
+
         document.getElementById(`btnLabSubmitPayment_${l.id}`)?.addEventListener('click', async () => {
           const amtInput = document.getElementById(`labAmountPaid_${l.id}`);
           const amtVal = amtInput?.value;

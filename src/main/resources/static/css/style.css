@@ -4358,5 +4358,46 @@ body.cv-dashboard-active #app {
   box-shadow: none !important;
 }
 
+/* ====================================================================
+   DIRECT UNPAID BUTTON
+   ==================================================================== */
+.cv-btn-unpaid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: #f8fafc;
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 1.15rem;
+  border-radius: var(--cv-radius-md, 6px);
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  white-space: nowrap;
+  user-select: none;
+}
+.cv-btn-unpaid:hover:not(:disabled) {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+}
+.cv-btn-unpaid:active:not(:disabled) {
+  transform: translateY(0);
+}
+.cv-btn-unpaid:disabled {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed !important;
+  opacity: 0.75;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 
 

@@ -284,9 +284,19 @@ public class IpService {
         admission.setDepositAmount(deposit);
         admission.setTotalCharges(tot);
         admission.setPaidAmount(deposit);
-        admission.setBalanceAmount(tot.subtract(deposit).max(BigDecimal.ZERO));
+        BigDecimal bal = tot.subtract(deposit).max(BigDecimal.ZERO);
+        admission.setBalanceAmount(bal);
         admission.setPaymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod().toUpperCase() : "CASH");
-        admission.setPaymentStatus(req.getPaymentStatus() != null ? req.getPaymentStatus().toUpperCase() : "PAID");
+
+        String computedStatus;
+        if (bal.compareTo(BigDecimal.ZERO) == 0 && tot.compareTo(BigDecimal.ZERO) > 0) {
+            computedStatus = "PAID";
+        } else if (deposit.compareTo(BigDecimal.ZERO) > 0) {
+            computedStatus = "PARTIALLY PAID";
+        } else {
+            computedStatus = "UNPAID";
+        }
+        admission.setPaymentStatus(computedStatus);
 
         admission = ipAdmissionRepository.save(admission);
 
