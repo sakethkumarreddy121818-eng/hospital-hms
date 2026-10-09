@@ -55,6 +55,11 @@ public class OpService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hospital/Tenant ID is required");
         }
 
+        // Validate patient demographic input strictly
+        String validName = com.carevista.hms.common.util.PatientValidationUtil.validatePatientName(request.getPatientName(), true);
+        Integer validAge = com.carevista.hms.common.util.PatientValidationUtil.validatePatientAge(request.getAge(), true);
+        String validPhone = com.carevista.hms.common.util.PatientValidationUtil.validatePatientPhone(request.getPhone(), true);
+
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hospital not found"));
 

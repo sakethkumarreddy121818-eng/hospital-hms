@@ -4,15 +4,19 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import java.util.List;
 
 public class CreatePharmacyBillRequest {
 
     @NotBlank(message = "Patient name is required.")
+    @Pattern(regexp = "^[a-zA-Z]+(\\s+[a-zA-Z]+)*$", message = "Patient name must contain alphabetic characters and spaces only.")
     private String patientName;
 
     private String uhid;
+
+    @Pattern(regexp = "^$|^\\d{10}$", message = "Patient phone number must be exactly 10 digits.")
     private String phone;
     private String opId;
     private String ipId;

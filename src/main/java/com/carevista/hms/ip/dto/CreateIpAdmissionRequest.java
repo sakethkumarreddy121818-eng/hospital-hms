@@ -1,23 +1,28 @@
 package com.carevista.hms.ip.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 
 public class CreateIpAdmissionRequest {
 
     @NotBlank(message = "Patient name is required.")
+    @Pattern(regexp = "^[a-zA-Z]+(\\s+[a-zA-Z]+)*$", message = "Patient name must contain alphabetic characters and spaces only.")
     private String patientName;
 
     @NotNull(message = "Age is required.")
     @Min(value = 0, message = "Age cannot be negative.")
+    @Max(value = 150, message = "Age cannot exceed 3 digits (maximum 150).")
     private Integer age;
 
     @NotBlank(message = "Gender is required.")
     private String gender;
 
     @NotBlank(message = "Phone number is required.")
+    @Pattern(regexp = "^\\d{10}$", message = "Patient phone number must be exactly 10 digits.")
     private String phone;
 
     private String email;

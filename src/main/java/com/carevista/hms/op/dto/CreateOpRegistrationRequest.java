@@ -1,5 +1,6 @@
 package com.carevista.hms.op.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,16 +10,19 @@ import java.math.BigDecimal;
 public class CreateOpRegistrationRequest {
 
     @NotBlank(message = "Patient name is required.")
+    @Pattern(regexp = "^[a-zA-Z]+(\\s+[a-zA-Z]+)*$", message = "Patient name must contain alphabetic characters and spaces only.")
     private String patientName;
 
     @NotNull(message = "Patient age is required.")
     @Min(value = 0, message = "Age cannot be negative.")
+    @Max(value = 150, message = "Age cannot exceed 3 digits (maximum 150).")
     private Integer age;
 
     @NotBlank(message = "Patient gender is required.")
     private String gender;
 
     @NotBlank(message = "Patient phone number is required.")
+    @Pattern(regexp = "^\\d{10}$", message = "Patient phone number must be exactly 10 digits.")
     private String phone;
 
     private String email;

@@ -836,6 +836,10 @@ public class PharmacyService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found."));
 
+        // Validate patient demographic input strictly
+        String validName = com.carevista.hms.common.util.PatientValidationUtil.validatePatientName(req.getPatientName(), true);
+        String validPhone = com.carevista.hms.common.util.PatientValidationUtil.validatePatientPhone(req.getPhone(), false);
+
         if (req.getItems() == null || req.getItems().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one medicine is required to generate a bill.");
         }
@@ -845,14 +849,14 @@ public class PharmacyService {
         if (req.getUhid() != null && !req.getUhid().trim().isEmpty()) {
             patient = patientRepository.findByTenantIdAndUhid(tenantId, req.getUhid().trim()).orElse(null);
         }
-        if (patient == null && req.getPhone() != null && !req.getPhone().trim().isEmpty()) {
-            patient = patientRepository.findFirstByTenantIdAndPhone(tenantId, req.getPhone().trim()).orElse(null);
+        if (patient == null && validPhone != null && !validPhone.isEmpty()) {
+            patient = patientRepository.findFirstByTenantIdAndPhone(tenantId, validPhone).orElse(null);
         }
         if (patient == null) {
             String uhid = generateUniqueUhid(tenantId);
             patient = new Patient(
-                    tenant, uhid, req.getPatientName().trim(),
-                    req.getPhone() != null && !req.getPhone().trim().isEmpty() ? req.getPhone().trim() : "N/A",
+                    tenant, uhid, validName,
+                    validPhone != null && !validPhone.isEmpty() ? validPhone : "N/A",
                     30, "Not Specified", "Outpatient Pharmacy Client"
             );
             patient = patientRepository.save(patient);

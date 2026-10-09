@@ -143,6 +143,146 @@ const Admin = (function () {
     };
   }
 
+  // ====================================================================
+  // SHARED STRICT PATIENT INPUT RESTRICTIONS & VALIDATORS
+  // Enforces:
+  // - Patient Name: alphabetic characters and spaces only, no digits/symbols/punctuation
+  // - Patient Age: digits only, max 3 digits
+  // - Patient Phone: digits only, max 10 digits
+  // Blocks invalid input immediately during typing and pasting.
+  // ====================================================================
+  function bindStrictNameInput(inputEl) {
+    if (!inputEl) return;
+    inputEl.setAttribute('autocomplete', 'off');
+
+    const sanitize = (val) => (val || '').replace(/[^a-zA-Z\s]/g, '');
+
+    inputEl.addEventListener('input', (e) => {
+      const orig = e.target.value;
+      const clean = sanitize(orig);
+      if (orig !== clean) {
+        e.target.value = clean;
+      }
+    });
+
+    inputEl.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      const cleanPaste = sanitize(pasteText);
+      const start = inputEl.selectionStart || 0;
+      const end = inputEl.selectionEnd || 0;
+      const current = inputEl.value;
+      const nextVal = current.slice(0, start) + cleanPaste + current.slice(end);
+      inputEl.value = sanitize(nextVal);
+      const newPos = start + cleanPaste.length;
+      inputEl.setSelectionRange(newPos, newPos);
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  function bindStrictAgeInput(inputEl) {
+    if (!inputEl) return;
+    inputEl.setAttribute('type', 'text');
+    inputEl.setAttribute('inputmode', 'numeric');
+    inputEl.setAttribute('maxlength', '3');
+    inputEl.setAttribute('autocomplete', 'off');
+
+    const sanitize = (val) => (val || '').replace(/\D/g, '').slice(0, 3);
+
+    inputEl.addEventListener('input', (e) => {
+      const orig = e.target.value;
+      const clean = sanitize(orig);
+      if (orig !== clean) {
+        e.target.value = clean;
+      }
+    });
+
+    inputEl.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      const cleanPaste = pasteText.replace(/\D/g, '');
+      const start = inputEl.selectionStart || 0;
+      const end = inputEl.selectionEnd || 0;
+      const current = inputEl.value;
+      const nextVal = (current.slice(0, start) + cleanPaste + current.slice(end)).replace(/\D/g, '').slice(0, 3);
+      inputEl.value = nextVal;
+      inputEl.setSelectionRange(nextVal.length, nextVal.length);
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  function bindStrictPhoneInput(inputEl) {
+    if (!inputEl) return;
+    inputEl.setAttribute('type', 'tel');
+    inputEl.setAttribute('inputmode', 'numeric');
+    inputEl.setAttribute('maxlength', '10');
+    inputEl.setAttribute('autocomplete', 'off');
+
+    const sanitize = (val) => (val || '').replace(/\D/g, '').slice(0, 10);
+
+    inputEl.addEventListener('input', (e) => {
+      const orig = e.target.value;
+      const clean = sanitize(orig);
+      if (orig !== clean) {
+        e.target.value = clean;
+      }
+    });
+
+    inputEl.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteText = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      const cleanPaste = pasteText.replace(/\D/g, '');
+      const start = inputEl.selectionStart || 0;
+      const end = inputEl.selectionEnd || 0;
+      const current = inputEl.value;
+      const nextVal = (current.slice(0, start) + cleanPaste + current.slice(end)).replace(/\D/g, '').slice(0, 10);
+      inputEl.value = nextVal;
+      inputEl.setSelectionRange(nextVal.length, nextVal.length);
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  function validatePatientName(name, isMandatory = true) {
+    if (!name || typeof name !== 'string') {
+      return isMandatory ? { valid: false, message: 'Patient name is required.' } : { valid: true, value: '' };
+    }
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      return isMandatory ? { valid: false, message: 'Patient name cannot be empty or whitespace only.' } : { valid: true, value: '' };
+    }
+    if (!/^[a-zA-Z]+(?:\s+[a-zA-Z]+)*$/.test(trimmed)) {
+      return { valid: false, message: 'Patient name must contain alphabetic characters and spaces only (no numbers or special characters).' };
+    }
+    return { valid: true, value: trimmed };
+  }
+
+  function validatePatientAge(ageStr, isMandatory = true) {
+    const trimmed = ageStr != null ? String(ageStr).trim() : '';
+    if (!trimmed) {
+      return isMandatory ? { valid: false, message: 'Patient age is required.' } : { valid: true, value: null };
+    }
+    if (!/^\d{1,3}$/.test(trimmed)) {
+      return { valid: false, message: 'Patient age must contain numeric digits only (maximum 3 digits).' };
+    }
+    const ageNum = parseInt(trimmed, 10);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 130) {
+      return { valid: false, message: 'Please enter a valid age between 0 and 130.' };
+    }
+    return { valid: true, value: ageNum };
+  }
+
+  function validatePatientPhone(phoneStr, isMandatory = true) {
+    const trimmed = phoneStr ? String(phoneStr).trim() : '';
+    if (!trimmed) {
+      if (isMandatory) return { valid: false, message: 'Patient phone number is required (must be exactly 10 digits).' };
+      return { valid: true, value: '' };
+    }
+    if (!/^\d{10}$/.test(trimmed)) {
+      return { valid: false, message: 'Patient phone number must be exactly 10 digits (no letters, spaces, or symbols).' };
+    }
+    return { valid: true, value: trimmed };
+  }
+
   function init(user) {
     currentUser = user || Auth.getCurrentUser();
     if (currentUser && currentUser.role === 'ADMIN') {
@@ -2541,14 +2681,14 @@ const Admin = (function () {
 
             <div class="cv-form-group">
               <label class="cv-form-label" for="opPatientName">Patient Full Name *</label>
-              <input type="text" id="opPatientName" class="cv-input" placeholder="" required>
+              <input type="text" id="opPatientName" class="cv-input" placeholder="" maxlength="100" autocomplete="off" required>
               <span class="cv-feedback-error" id="errPatientName">Patient name is required.</span>
             </div>
 
             <div class="cv-op-fields-row">
               <div class="cv-form-group">
                 <label class="cv-form-label" for="opPatientAge">Patient Age (Years) *</label>
-                <input type="number" id="opPatientAge" class="cv-input" placeholder="" min="0" max="130" required>
+                <input type="text" inputmode="numeric" id="opPatientAge" class="cv-input" placeholder="" maxlength="3" autocomplete="off" required>
                 <span class="cv-feedback-error" id="errPatientAge">Please enter a valid age (0-130).</span>
               </div>
               <div class="cv-form-group">
@@ -2566,7 +2706,7 @@ const Admin = (function () {
             <div class="cv-op-fields-row">
               <div class="cv-form-group">
                 <label class="cv-form-label" for="opPatientPhone">Patient Phone Number *</label>
-                <input type="tel" id="opPatientPhone" class="cv-input" placeholder="" required>
+                <input type="tel" inputmode="numeric" id="opPatientPhone" class="cv-input" placeholder="" maxlength="10" autocomplete="off" required>
                 <span class="cv-feedback-error" id="errPatientPhone">Please enter a valid phone number.</span>
               </div>
               <div class="cv-form-group">
@@ -2749,6 +2889,10 @@ const Admin = (function () {
     loadDoctorDropdown();
     setupOpFormSubmission();
 
+    bindStrictNameInput(document.getElementById('opPatientName'));
+    bindStrictAgeInput(document.getElementById('opPatientAge'));
+    bindStrictPhoneInput(document.getElementById('opPatientPhone'));
+
     document.getElementById('btnResetOpForm')?.addEventListener('click', () => {
       resetOpForm();
     });
@@ -2849,7 +2993,8 @@ const Admin = (function () {
     document.getElementById('opPatientName').value = p.fullName || '';
     document.getElementById('opPatientAge').value = p.age || '';
     document.getElementById('opPatientGender').value = p.gender || '';
-    document.getElementById('opPatientPhone').value = p.phone || '';
+    const cleanPhone = (p.phone || '').replace(/\D/g, '').slice(-10);
+    document.getElementById('opPatientPhone').value = cleanPhone;
     document.getElementById('opPatientEmail').value = p.email || '';
     document.getElementById('opPatientUhid').value = p.uhid || '';
     document.getElementById('opAddressInput').value = p.address || '';
@@ -3146,32 +3291,37 @@ const Admin = (function () {
       // ====================================================================
       // INITIAL OP REGISTRATION + INITIAL PAYMENT
       // ====================================================================
-      const patientName = document.getElementById('opPatientName')?.value.trim();
-      const ageStr = document.getElementById('opPatientAge')?.value.trim();
-      const gender = document.getElementById('opPatientGender')?.value.trim();
-      const phone = document.getElementById('opPatientPhone')?.value.trim();
-      const email = document.getElementById('opPatientEmail')?.value.trim();
-      const doctorName = document.getElementById('opDoctorSelect')?.value.trim();
-      const department = document.getElementById('opDepartmentInput')?.value.trim();
-      const address = document.getElementById('opAddressInput')?.value.trim();
-      const notes = document.getElementById('opNotesInput')?.value.trim();
-      const feeStr = document.getElementById('opFeeInput')?.value.trim() || '0';
-      const existingUhid = opLoadedPatient ? opLoadedPatient.uhid : document.getElementById('opPatientUhid')?.value.trim();
+      const rawPatientName = document.getElementById('opPatientName')?.value;
+      const rawAgeStr = document.getElementById('opPatientAge')?.value;
+      const gender = document.getElementById('opPatientGender')?.value?.trim();
+      const rawPhone = document.getElementById('opPatientPhone')?.value;
+      const email = document.getElementById('opPatientEmail')?.value?.trim();
+      const doctorName = document.getElementById('opDoctorSelect')?.value?.trim();
+      const department = document.getElementById('opDepartmentInput')?.value?.trim();
+      const address = document.getElementById('opAddressInput')?.value?.trim();
+      const notes = document.getElementById('opNotesInput')?.value?.trim();
+      const feeStr = document.getElementById('opFeeInput')?.value?.trim() || '0';
+      const existingUhid = opLoadedPatient ? opLoadedPatient.uhid : document.getElementById('opPatientUhid')?.value?.trim();
+
+      const vName = validatePatientName(rawPatientName, true);
+      const vAge = validatePatientAge(rawAgeStr, true);
+      const vPhone = validatePatientPhone(rawPhone, true);
 
       let isValid = true;
       document.querySelectorAll('.cv-feedback-error').forEach(el => el.classList.remove('show'));
       document.querySelectorAll('.cv-input').forEach(el => el.classList.remove('is-invalid'));
 
-      if (!patientName) {
+      if (!vName.valid) {
         document.getElementById('opPatientName')?.classList.add('is-invalid');
-        document.getElementById('errPatientName')?.classList.add('show');
+        const err = document.getElementById('errPatientName');
+        if (err) { err.textContent = vName.message; err.classList.add('show'); }
         isValid = false;
       }
 
-      const ageNum = parseInt(ageStr, 10);
-      if (isNaN(ageNum) || ageNum < 0 || ageNum > 130) {
+      if (!vAge.valid) {
         document.getElementById('opPatientAge')?.classList.add('is-invalid');
-        document.getElementById('errPatientAge')?.classList.add('show');
+        const err = document.getElementById('errPatientAge');
+        if (err) { err.textContent = vAge.message; err.classList.add('show'); }
         isValid = false;
       }
 
@@ -3181,9 +3331,10 @@ const Admin = (function () {
         isValid = false;
       }
 
-      if (!phone || phone.length < 7) {
+      if (!vPhone.valid) {
         document.getElementById('opPatientPhone')?.classList.add('is-invalid');
-        document.getElementById('errPatientPhone')?.classList.add('show');
+        const err = document.getElementById('errPatientPhone');
+        if (err) { err.textContent = vPhone.message; err.classList.add('show'); }
         isValid = false;
       }
 
@@ -3232,10 +3383,10 @@ const Admin = (function () {
       const statusVal = (numAmt >= totalFee && totalFee > 0) ? 'PAID' : (numAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID');
 
       const payload = {
-        patientName: patientName,
-        age: ageNum,
+        patientName: vName.value,
+        age: vAge.value,
         gender: gender,
-        phone: phone,
+        phone: vPhone.value,
         email: email || null,
         address: address || null,
         existingUhid: existingUhid || null,
@@ -4007,14 +4158,14 @@ const Admin = (function () {
 
             <div class="cv-form-group">
               <label class="cv-form-label" for="ipPatientName">Patient Full Name *</label>
-              <input type="text" id="ipPatientName" class="cv-input" placeholder="" required>
+              <input type="text" id="ipPatientName" class="cv-input" placeholder="" maxlength="100" autocomplete="off" required>
               <span class="cv-feedback-error" id="errIpPatientName">Patient name is required.</span>
             </div>
 
             <div class="cv-op-fields-row">
               <div class="cv-form-group">
                 <label class="cv-form-label" for="ipPatientAge">Age (Years) *</label>
-                <input type="number" id="ipPatientAge" class="cv-input" placeholder="" min="0" max="130" required>
+                <input type="text" inputmode="numeric" id="ipPatientAge" class="cv-input" placeholder="" maxlength="3" autocomplete="off" required>
                 <span class="cv-feedback-error" id="errIpPatientAge">Please enter a valid age.</span>
               </div>
               <div class="cv-form-group">
@@ -4032,7 +4183,7 @@ const Admin = (function () {
             <div class="cv-op-fields-row">
               <div class="cv-form-group">
                 <label class="cv-form-label" for="ipPatientPhone">Phone Number *</label>
-                <input type="tel" id="ipPatientPhone" class="cv-input" placeholder="" required>
+                <input type="tel" inputmode="numeric" id="ipPatientPhone" class="cv-input" placeholder="" maxlength="10" autocomplete="off" required>
                 <span class="cv-feedback-error" id="errIpPatientPhone">Valid phone number is required.</span>
               </div>
               <div class="cv-form-group">
@@ -4221,6 +4372,10 @@ const Admin = (function () {
     setupIpFormSubmission();
     startIpClock();
 
+    bindStrictNameInput(document.getElementById('ipPatientName'));
+    bindStrictAgeInput(document.getElementById('ipPatientAge'));
+    bindStrictPhoneInput(document.getElementById('ipPatientPhone'));
+
     document.getElementById('btnResetIpForm')?.addEventListener('click', () => {
       resetIpForm();
     });
@@ -4346,7 +4501,8 @@ const Admin = (function () {
     document.getElementById('ipPatientName').value = p.fullName || '';
     document.getElementById('ipPatientAge').value = p.age || '';
     document.getElementById('ipPatientGender').value = p.gender || '';
-    document.getElementById('ipPatientPhone').value = p.phone || '';
+    const cleanPhone = (p.phone || '').replace(/\D/g, '').slice(-10);
+    document.getElementById('ipPatientPhone').value = cleanPhone;
     document.getElementById('ipPatientEmail').value = p.email || '';
     document.getElementById('ipPatientUhid').value = p.uhid || '';
     document.getElementById('ipOpId').value = p.lastOpId || '';
@@ -4581,37 +4737,40 @@ const Admin = (function () {
 
       let hasError = false;
 
-      const patientName = document.getElementById('ipPatientName')?.value.trim();
-      const ageStr = document.getElementById('ipPatientAge')?.value.trim();
+      const rawPatientName = document.getElementById('ipPatientName')?.value;
+      const rawAgeStr = document.getElementById('ipPatientAge')?.value;
       const gender = document.getElementById('ipPatientGender')?.value;
-      const phone = document.getElementById('ipPatientPhone')?.value.trim();
-      const email = document.getElementById('ipPatientEmail')?.value.trim();
-      const address = document.getElementById('ipAddressInput')?.value.trim();
-      const existingUhid = document.getElementById('ipPatientUhid')?.value.trim();
-      const opId = document.getElementById('ipOpId')?.value.trim();
+      const rawPhone = document.getElementById('ipPatientPhone')?.value;
+      const email = document.getElementById('ipPatientEmail')?.value?.trim();
+      const address = document.getElementById('ipAddressInput')?.value?.trim();
+      const existingUhid = document.getElementById('ipPatientUhid')?.value?.trim();
+      const opId = document.getElementById('ipOpId')?.value?.trim();
 
       const doctorName = document.getElementById('ipDoctorSelect')?.value;
-      const department = document.getElementById('ipDepartmentInput')?.value.trim();
-      const reasonForAdmission = document.getElementById('ipReasonInput')?.value.trim();
-      const diagnosis = document.getElementById('ipDiagnosisInput')?.value.trim();
-      const admissionNotes = document.getElementById('ipAdmissionNotesInput')?.value.trim();
+      const department = document.getElementById('ipDepartmentInput')?.value?.trim();
+      const reasonForAdmission = document.getElementById('ipReasonInput')?.value?.trim();
+      const diagnosis = document.getElementById('ipDiagnosisInput')?.value?.trim();
+      const admissionNotes = document.getElementById('ipAdmissionNotesInput')?.value?.trim();
 
       const roomId = document.getElementById('ipRoomSelect')?.value;
       const bedId = document.getElementById('ipBedSelect')?.value;
 
-      const depositAmountStr = document.getElementById('ipDepositAmount')?.value.trim();
+      const depositAmountStr = document.getElementById('ipDepositAmount')?.value?.trim();
       const depositAmount = depositAmountStr ? parseFloat(depositAmountStr) : 0.0;
       const paymentMethod = document.getElementById('ipPaymentMethod')?.value || 'CASH';
 
+      const vName = validatePatientName(rawPatientName, true);
+      const vAge = validatePatientAge(rawAgeStr, true);
+      const vPhone = validatePatientPhone(rawPhone, true);
+
       // Validation
-      if (!patientName) {
-        showIpFieldError('errIpPatientName', 'ipPatientName');
+      if (!vName.valid) {
+        showIpFieldError('errIpPatientName', 'ipPatientName', vName.message);
         hasError = true;
       }
 
-      const age = parseInt(ageStr, 10);
-      if (isNaN(age) || age < 0 || age > 130) {
-        showIpFieldError('errIpPatientAge', 'ipPatientAge');
+      if (!vAge.valid) {
+        showIpFieldError('errIpPatientAge', 'ipPatientAge', vAge.message);
         hasError = true;
       }
 
@@ -4620,8 +4779,8 @@ const Admin = (function () {
         hasError = true;
       }
 
-      if (!phone || phone.length < 5) {
-        showIpFieldError('errIpPatientPhone', 'ipPatientPhone');
+      if (!vPhone.valid) {
+        showIpFieldError('errIpPatientPhone', 'ipPatientPhone', vPhone.message);
         hasError = true;
       }
 
@@ -4649,7 +4808,7 @@ const Admin = (function () {
         if (alertBox) {
           alertBox.className = 'cv-alert cv-alert-danger';
           alertBox.style.display = 'block';
-          alertBox.textContent = 'Please fill all mandatory fields marked with an asterisk (*).';
+          alertBox.textContent = 'Please fill all mandatory fields correctly marked with an asterisk (*).';
         }
         return;
       }
@@ -4664,10 +4823,10 @@ const Admin = (function () {
       if (submitBtn) submitBtn.disabled = true;
 
       const payload = {
-        patientName,
-        age,
+        patientName: vName.value,
+        age: vAge.value,
         gender,
-        phone,
+        phone: vPhone.value,
         email: email || null,
         address: address || null,
         existingUhid: existingUhid || null,
@@ -4720,10 +4879,13 @@ const Admin = (function () {
     });
   }
 
-  function showIpFieldError(errorElId, inputElId) {
+  function showIpFieldError(errorElId, inputElId, customMsg) {
     const err = document.getElementById(errorElId);
     const inp = document.getElementById(inputElId);
-    if (err) err.classList.add('show');
+    if (err) {
+      if (customMsg) err.textContent = customMsg;
+      err.classList.add('show');
+    }
     if (inp) inp.classList.add('is-invalid');
   }
 
@@ -7168,8 +7330,8 @@ const Admin = (function () {
             <span>Or Walk-in Patient:</span>
           </div>
           <div class="cv-walkin-inputs">
-            <input type="text" id="pharWalkinName" class="cv-form-input" placeholder="Walk-in Patient Name">
-            <input type="text" id="pharWalkinPhone" class="cv-form-input" placeholder="Phone Number">
+            <input type="text" id="pharWalkinName" class="cv-form-input" placeholder="Walk-in Patient Name" maxlength="100" autocomplete="off">
+            <input type="tel" inputmode="numeric" id="pharWalkinPhone" class="cv-form-input" placeholder="Phone Number" maxlength="10" autocomplete="off">
           </div>
         </div>
       `;
@@ -7258,6 +7420,9 @@ const Admin = (function () {
   }
 
   function setupPharmacyBillingEvents() {
+    bindStrictNameInput(document.getElementById('pharWalkinName'));
+    bindStrictPhoneInput(document.getElementById('pharWalkinPhone'));
+
     // 1. Patient search autocomplete
     const searchInput = document.getElementById('pharPatientSearchInput');
     const dropdown = document.getElementById('pharPatientDropdown');
@@ -7815,7 +7980,11 @@ const Admin = (function () {
     const searchInput = document.getElementById('pharPatientSearchInput');
     const container = document.getElementById('pharPatientAutofillContainer');
     if (searchInput) searchInput.value = '';
-    if (container) container.innerHTML = renderPatientAutofillHtml(null);
+    if (container) {
+      container.innerHTML = renderPatientAutofillHtml(null);
+      bindStrictNameInput(document.getElementById('pharWalkinName'));
+      bindStrictPhoneInput(document.getElementById('pharWalkinPhone'));
+    }
   }
 
   async function showPatientHistoryModal(query) {
@@ -8042,21 +8211,31 @@ const Admin = (function () {
       patientId = pharSelectedPatient.id;
       patientName = pharSelectedPatient.fullName || pharSelectedPatient.name || '';
       uhid = pharSelectedPatient.uhid || '';
-      phone = pharSelectedPatient.phone || '';
+      phone = (pharSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
       opId = pharSelectedPatient.opId || '';
       ipId = pharSelectedPatient.ipId || '';
       if (!doctorName) doctorName = pharSelectedPatient.doctorName || '';
       if (!department) department = pharSelectedPatient.department || '';
     } else {
-      const walkinName = document.getElementById('pharWalkinName')?.value?.trim();
-      const walkinPhone = document.getElementById('pharWalkinPhone')?.value?.trim();
-      if (!walkinName) {
-        alert('Please search and select a patient, or enter a Walk-in patient name.');
-        document.getElementById('pharPatientSearchInput')?.focus();
+      const rawWalkinName = document.getElementById('pharWalkinName')?.value;
+      const rawWalkinPhone = document.getElementById('pharWalkinPhone')?.value;
+
+      const vName = validatePatientName(rawWalkinName, true);
+      if (!vName.valid) {
+        showToast(vName.message, 'danger');
+        document.getElementById('pharWalkinName')?.focus();
         return;
       }
-      patientName = walkinName;
-      phone = walkinPhone || '';
+
+      const vPhone = validatePatientPhone(rawWalkinPhone, false);
+      if (!vPhone.valid) {
+        showToast(vPhone.message, 'danger');
+        document.getElementById('pharWalkinPhone')?.focus();
+        return;
+      }
+
+      patientName = vName.value;
+      phone = vPhone.value || '';
       uhid = 'WALKIN-' + Date.now().toString().slice(-6);
     }
 
@@ -10665,8 +10844,8 @@ const Admin = (function () {
             <span>Or Walk-in / Direct Patient:</span>
           </div>
           <div class="cv-walkin-inputs" style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:0.5rem;">
-            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="Patient Name *">
-            <input type="text" id="labWalkinPhone" class="cv-form-input" placeholder="Phone Number">
+            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="Patient Name *" maxlength="100" autocomplete="off">
+            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input" placeholder="Phone Number" maxlength="10" autocomplete="off">
             <input type="text" id="labWalkinDoctor" class="cv-form-input" placeholder="Doctor / Ref">
             <input type="text" id="labWalkinDept" class="cv-form-input" placeholder="Department">
           </div>
@@ -10751,6 +10930,9 @@ const Admin = (function () {
   }
 
   function setupLabOrderEvents() {
+    bindStrictNameInput(document.getElementById('labWalkinName'));
+    bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
+
     // 1. Patient search autocomplete
     const searchInput = document.getElementById('labPatientSearchInput');
     const dropdown = document.getElementById('labPatientDropdown');
@@ -10977,24 +11159,33 @@ const Admin = (function () {
         patientId = labSelectedPatient.id;
         patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
         uhid = labSelectedPatient.uhid || '';
-        phone = labSelectedPatient.phone || '';
+        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
         opId = labSelectedPatient.opId || '';
         ipId = labSelectedPatient.ipId || '';
         doctorName = labSelectedPatient.doctorName || '';
         department = labSelectedPatient.department || '';
       } else {
-        const walkinName = document.getElementById('labWalkinName')?.value?.trim();
-        const walkinPhone = document.getElementById('labWalkinPhone')?.value?.trim();
+        const rawName = document.getElementById('labWalkinName')?.value;
+        const rawPhone = document.getElementById('labWalkinPhone')?.value;
         const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
         const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
 
-        if (!walkinName) {
-          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
-          document.getElementById('labPatientSearchInput')?.focus();
+        const vName = validatePatientName(rawName, true);
+        if (!vName.valid) {
+          showToast(vName.message, 'danger');
+          document.getElementById('labWalkinName')?.focus();
           return;
         }
-        patientName = walkinName;
-        phone = walkinPhone || '';
+
+        const vPhone = validatePatientPhone(rawPhone, false);
+        if (!vPhone.valid) {
+          showToast(vPhone.message, 'danger');
+          document.getElementById('labWalkinPhone')?.focus();
+          return;
+        }
+
+        patientName = vName.value;
+        phone = vPhone.value || '';
         doctorName = walkinDoctor || 'Dr. On Duty';
         department = walkinDept || 'Diagnostics';
         uhid = 'WALKIN-' + Date.now().toString().slice(-6);
@@ -11136,24 +11327,33 @@ const Admin = (function () {
         patientId = labSelectedPatient.id;
         patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
         uhid = labSelectedPatient.uhid || '';
-        phone = labSelectedPatient.phone || '';
+        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
         opId = labSelectedPatient.opId || '';
         ipId = labSelectedPatient.ipId || '';
         doctorName = labSelectedPatient.doctorName || '';
         department = labSelectedPatient.department || '';
       } else {
-        const walkinName = document.getElementById('labWalkinName')?.value?.trim();
-        const walkinPhone = document.getElementById('labWalkinPhone')?.value?.trim();
+        const rawName = document.getElementById('labWalkinName')?.value;
+        const rawPhone = document.getElementById('labWalkinPhone')?.value;
         const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
         const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
 
-        if (!walkinName) {
-          showToast('Please search and select a patient, or enter Walk-in patient name.', 'danger');
-          document.getElementById('labPatientSearchInput')?.focus();
+        const vName = validatePatientName(rawName, true);
+        if (!vName.valid) {
+          showToast(vName.message, 'danger');
+          document.getElementById('labWalkinName')?.focus();
           return;
         }
-        patientName = walkinName;
-        phone = walkinPhone || '';
+
+        const vPhone = validatePatientPhone(rawPhone, false);
+        if (!vPhone.valid) {
+          showToast(vPhone.message, 'danger');
+          document.getElementById('labWalkinPhone')?.focus();
+          return;
+        }
+
+        patientName = vName.value;
+        phone = vPhone.value || '';
         doctorName = walkinDoctor || 'Dr. On Duty';
         department = walkinDept || 'Diagnostics';
         uhid = 'WALKIN-' + Date.now().toString().slice(-6);
@@ -11308,6 +11508,8 @@ const Admin = (function () {
     if (searchInput) searchInput.value = '';
     if (container) {
       container.innerHTML = renderLabPatientAutofillHtml(null);
+      bindStrictNameInput(document.getElementById('labWalkinName'));
+      bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
     }
   }
 
@@ -11445,24 +11647,33 @@ const Admin = (function () {
       patientId = labSelectedPatient.id;
       patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
       uhid = labSelectedPatient.uhid || '';
-      phone = labSelectedPatient.phone || '';
+      phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
       opId = labSelectedPatient.opId || '';
       ipId = labSelectedPatient.ipId || '';
       doctorName = labSelectedPatient.doctorName || '';
       department = labSelectedPatient.department || '';
     } else {
-      const walkinName = document.getElementById('labWalkinName')?.value?.trim();
-      const walkinPhone = document.getElementById('labWalkinPhone')?.value?.trim();
+      const rawName = document.getElementById('labWalkinName')?.value;
+      const rawPhone = document.getElementById('labWalkinPhone')?.value;
       const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
       const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
 
-      if (!walkinName) {
-        alert('Please search and select an existing patient, or enter a Walk-in patient name.');
-        document.getElementById('labPatientSearchInput')?.focus();
+      const vName = validatePatientName(rawName, true);
+      if (!vName.valid) {
+        alert(vName.message);
+        document.getElementById('labWalkinName')?.focus();
         return;
       }
-      patientName = walkinName;
-      phone = walkinPhone || '';
+
+      const vPhone = validatePatientPhone(rawPhone, false);
+      if (!vPhone.valid) {
+        alert(vPhone.message);
+        document.getElementById('labWalkinPhone')?.focus();
+        return;
+      }
+
+      patientName = vName.value;
+      phone = vPhone.value || '';
       doctorName = walkinDoctor || 'Dr. On Duty';
       department = walkinDept || 'Diagnostics';
       uhid = 'WALKIN-' + Date.now().toString().slice(-6);

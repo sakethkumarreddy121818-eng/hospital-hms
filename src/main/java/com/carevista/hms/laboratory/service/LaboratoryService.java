@@ -257,6 +257,11 @@ public class LaboratoryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please select at least one laboratory test.");
         }
 
+        // Validate patient demographic input strictly
+        String validName = com.carevista.hms.common.util.PatientValidationUtil.validatePatientName(req.getPatientName(), true);
+        String validPhone = com.carevista.hms.common.util.PatientValidationUtil.validatePatientPhone(req.getPhone(), false);
+        Integer validAge = com.carevista.hms.common.util.PatientValidationUtil.validatePatientAge(req.getAge(), false);
+
         // 1. Resolve Patient
         Patient patient = null;
         if (req.getPatientId() != null) {
@@ -266,12 +271,9 @@ public class LaboratoryService {
             patient = patientRepository.findByTenantIdAndUhid(tenantId, req.getUhid().trim()).orElse(null);
         }
 
-        String patientName = req.getPatientName();
+        String patientName = validName;
         if (patient != null && (patientName == null || patientName.trim().isEmpty())) {
             patientName = patient.getFullName();
-        }
-        if (patientName == null || patientName.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Patient name is required.");
         }
 
         String uhid = req.getUhid();

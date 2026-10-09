@@ -190,6 +190,11 @@ public class IpService {
     // =========================================================================
     @Transactional
     public IpAdmissionDto createAdmission(Long tenantId, CreateIpAdmissionRequest req, Long userId, String userEmail, String ipAddress) {
+        // Validate patient demographic input strictly
+        String validName = com.carevista.hms.common.util.PatientValidationUtil.validatePatientName(req.getPatientName(), true);
+        Integer validAge = com.carevista.hms.common.util.PatientValidationUtil.validatePatientAge(req.getAge(), true);
+        String validPhone = com.carevista.hms.common.util.PatientValidationUtil.validatePatientPhone(req.getPhone(), true);
+
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hospital tenant not found"));
 
