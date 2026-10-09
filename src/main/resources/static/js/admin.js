@@ -10482,35 +10482,38 @@ const Admin = (function () {
 
     mainContent.innerHTML = `
       <div class="cv-lab-wrapper">
-        <!-- Topbar -->
+        <!-- Modern CareVista Header -->
         <div class="cv-lab-topbar">
-          <div style="display:flex; align-items:center; gap:0.85rem;">
+          <div class="cv-lab-header-left">
             ${renderBackArrowHtml('Back')}
-            <div>
-              <h1 class="cv-page-title" style="display:flex; align-items:center; gap:0.6rem;">
-                <svg style="width:26px; height:26px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-                Laboratory Management &amp; Diagnostics
+            <div class="cv-lab-title-icon">
+              <svg style="width:24px; height:24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+            </div>
+            <div class="cv-lab-title-text">
+              <h1 class="cv-page-title">
+                Laboratory &amp; Diagnostics Center
               </h1>
-              <p class="cv-page-subtitle">Hospital: ${escapeHtml(currentUser?.hospitalName || 'City Care Super Speciality Hospital')}</p>
+              <p class="cv-page-subtitle">Hospital: ${escapeHtml(currentUser?.hospitalName || 'City Care Super Speciality Hospital')} &bull; Clinical Pathology, Biochemistry &amp; Diagnostics</p>
             </div>
           </div>
 
-          <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <div class="cv-lab-nav-tabs">
               <button type="button" class="cv-lab-tab-btn ${labActiveTab === 'orders' ? 'active' : ''}" id="tabBtnLabOrders">
                 <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                1. Lab Order &amp; Payment
+                1. Lab Order &amp; Billing
               </button>
               <button type="button" class="cv-lab-tab-btn ${labActiveTab === 'processing' ? 'active' : ''}" id="tabBtnLabProcessing">
                 <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                2. Laboratory Processing
+                2. Laboratory Processing Queue
               </button>
             </div>
 
-            <button type="button" class="cv-btn-secondary" id="btnLabBackDashboard" style="padding:0.5rem 0.9rem; font-size:0.85rem;">
-              Back to Dashboard
+            <button type="button" class="cv-btn-secondary" id="btnLabBackDashboard" style="padding:0.45rem 0.85rem; font-size:0.84rem; display:inline-flex; align-items:center; gap:0.4rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              Dashboard
             </button>
           </div>
         </div>
@@ -10590,26 +10593,26 @@ const Admin = (function () {
         <div class="cv-lab-card">
           <div class="cv-lab-card-header">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              1. Patient Details &amp; Search
+              1. Patient Identification &amp; Entry
             </div>
-            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Real MySQL Patient Records</span>
+            <span class="cv-lab-badge-subtitle">Real MySQL Patient Database</span>
           </div>
 
-          <div class="cv-patient-search-row">
-            <div class="cv-patient-search-container">
-              <div class="cv-search-icon-input">
+          <div class="cv-lab-patient-box">
+            <div class="cv-patient-search-container" style="width:100%;">
+              <div class="cv-search-icon-input" style="width:100%;">
                 <i class="fas fa-search">
                   <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </i>
-                <input type="text" id="labPatientSearchInput" placeholder="Search by Patient Name, Phone Number, UHID, OP ID, or IP ID" autocomplete="off">
+                <input type="text" id="labPatientSearchInput" placeholder="Search registered patient by Name, Phone Number, UHID, OP ID, or IP ID..." autocomplete="off">
               </div>
               <div id="labPatientDropdown" class="cv-patient-dropdown" style="display:none;"></div>
             </div>
 
-            <div id="labPatientAutofillContainer" class="cv-patient-autofill-wrapper">
+            <div id="labPatientAutofillContainer">
               ${renderLabPatientAutofillHtml(labSelectedPatient)}
             </div>
           </div>
@@ -10619,22 +10622,22 @@ const Admin = (function () {
         <div class="cv-lab-card">
           <div class="cv-lab-card-header">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
               </svg>
-              2. Lab Test Master / Test Selection
+              2. Diagnostic Test Master Selection
             </div>
             <div id="labTestCategoryPill">
-              <span class="cv-stock-info-pill cv-stock-in">Select a test from catalog</span>
+              <span class="cv-stock-info-pill cv-stock-in" style="font-size:0.75rem; padding:0.2rem 0.6rem;">Select a test from catalog</span>
             </div>
           </div>
 
           <div class="cv-lab-test-grid">
-            <div style="grid-column: span 2;">
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">
-                LAB TEST MASTER <span style="color:var(--cv-danger);">*</span>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">
+                INVESTIGATION TEST <span style="color:var(--cv-danger);">*</span>
               </label>
-              <select id="labTestSelect" class="cv-form-select" style="height:38px; font-size:0.86rem; width:100%;">
+              <select id="labTestSelect" class="cv-form-select" style="height:40px; font-size:0.86rem; width:100%;">
                 <option value="">-- Search &amp; Select Laboratory Test --</option>
                 ${labTestCatalog.map(t => `
                   <option value="${t.id}" data-code="${escapeHtml(t.testCode)}" data-name="${escapeHtml(t.testName)}" data-cat="${escapeHtml(t.category)}" data-price="${t.price}" data-sample="${escapeHtml(t.sampleType || '')}" data-range="${escapeHtml(t.referenceRange || '')}" data-unit="${escapeHtml(t.unit || '')}">
@@ -10645,22 +10648,22 @@ const Admin = (function () {
             </div>
 
             <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">SAMPLE TYPE</label>
-              <input type="text" id="labTestSampleType" class="cv-form-input" style="height:38px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Sample Type">
+              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">SAMPLE TYPE</label>
+              <input type="text" id="labTestSampleType" class="cv-form-input" style="height:40px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Sample Type">
             </div>
 
             <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">NORMAL RANGE</label>
-              <input type="text" id="labTestRefRange" class="cv-form-input" style="height:38px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Ref Range / Unit">
+              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">NORMAL RANGE</label>
+              <input type="text" id="labTestRefRange" class="cv-form-input" style="height:40px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Ref Range / Unit">
             </div>
 
             <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">PRICE (₹) <span style="color:var(--cv-danger);">*</span></label>
-              <input type="number" id="labTestUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; text-align:right;">
+              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">PRICE (₹) <span style="color:var(--cv-danger);">*</span></label>
+              <input type="number" id="labTestUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:40px; font-weight:700; text-align:right;">
             </div>
 
             <div style="display:flex; align-items:flex-end;">
-              <button type="button" class="cv-btn-primary" id="btnLabAddTest" style="height:38px; padding:0 1.25rem; font-size:0.85rem; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:0.4rem; width:100%; justify-content:center;">
+              <button type="button" class="cv-btn-primary" id="btnLabAddTest" style="height:40px; padding:0 1.25rem; font-size:0.86rem; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:0.45rem; width:100%; justify-content:center; box-shadow:0 2px 8px rgba(37, 99, 235, 0.25);">
                 <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 + Add Test to Order
               </button>
@@ -10672,11 +10675,11 @@ const Admin = (function () {
         <div class="cv-lab-card">
           <div class="cv-lab-card-header">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              3. Selected Tests / Order Table
-              <span id="labItemCountBadge" style="font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:0.12rem 0.5rem; border-radius:12px; margin-left:0.5rem; font-weight:700;">
+              3. Selected Investigations Table
+              <span id="labItemCountBadge" class="cv-lab-tag" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd; font-size:0.75rem; border-radius:12px; margin-left:0.5rem; font-weight:700;">
                 ${labOrderItems.length} tests
               </span>
             </div>
@@ -10687,16 +10690,16 @@ const Admin = (function () {
             ` : ''}
           </div>
 
-          <div class="cv-bill-table-wrapper">
-            <table class="cv-bill-table" id="labOrderTable">
+          <div class="cv-bill-table-wrapper" style="overflow-x:auto;">
+            <table class="cv-bill-table cv-lab-table" id="labOrderTable">
               <thead>
                 <tr>
-                  <th style="width:40px;">#</th>
-                  <th>Test Code &amp; Name</th>
+                  <th style="width:45px; text-align:center;">#</th>
+                  <th>Investigation Test Details</th>
                   <th style="width:140px;">Category</th>
-                  <th style="width:120px;">Sample Type</th>
+                  <th style="width:130px;">Sample Type</th>
                   <th style="width:160px;">Reference Interval</th>
-                  <th style="width:120px; text-align:right;">Price (₹)</th>
+                  <th style="width:130px; text-align:right;">Rate (₹)</th>
                   <th style="width:70px; text-align:center;">Action</th>
                 </tr>
               </thead>
@@ -10711,17 +10714,22 @@ const Admin = (function () {
         <div class="cv-lab-card">
           <div class="cv-lab-card-header">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              4. Billing, Discount, GST &amp; Payment Collection
+              4. Diagnostic Billing &amp; Payment Settlement
             </div>
-            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Integrated Central Billing &amp; MySQL Ledger</span>
+            <span class="cv-lab-badge-subtitle">Integrated Central Billing Ledger</span>
           </div>
 
-          <div class="cv-pharmacy-summary-grid">
-            <!-- Left Side: Calculation -->
-            <div class="cv-summary-calc-col">
+          <div class="cv-lab-financial-grid">
+            <!-- Left Side: Financial Ledger -->
+            <div class="cv-lab-ledger-card">
+              <div style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.15rem; display:flex; align-items:center; gap:0.4rem;">
+                <svg style="width:15px; height:15px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                Diagnostic Financial Breakdown
+              </div>
+
               <div class="cv-calc-row">
                 <span class="cv-calc-label">Subtotal</span>
                 <span id="labSummarySubtotal" class="cv-calc-value font-mono">₹0.00</span>
@@ -10729,11 +10737,11 @@ const Admin = (function () {
 
               <!-- Discount Input Row -->
               <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
+                <div style="display:flex; align-items:center; gap:0.45rem;">
                   <span class="cv-calc-label">Discount (%)</span>
-                  <input type="number" id="labDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0">
+                  <input type="number" id="labDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0" style="width:65px; height:30px; font-weight:700;">
                 </div>
-                <span id="labDiscountAmount" class="cv-calc-value font-mono" style="color:var(--cv-danger);">- ₹0.00</span>
+                <span id="labDiscountAmount" class="cv-calc-value font-mono" style="color:var(--cv-danger); font-weight:700;">- ₹0.00</span>
               </div>
 
               <div class="cv-calc-row">
@@ -10742,43 +10750,44 @@ const Admin = (function () {
               </div>
 
               <!-- GSTIN & GST % Row -->
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+              <div class="cv-calc-row" style="flex-wrap:wrap; gap:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
                   <span class="cv-calc-label">GSTIN:</span>
-                  <input type="text" id="labGstinInput" class="cv-form-input" style="width:115px; height:28px; font-size:0.75rem; text-transform:uppercase;" placeholder="29ABCDE1234F">
+                  <input type="text" id="labGstinInput" class="cv-form-input" style="width:125px; height:30px; font-size:0.75rem; text-transform:uppercase;" placeholder="29ABCDE1234F">
                   <span class="cv-calc-label" style="margin-left:0.25rem;">GST (%)</span>
-                  <input type="number" id="labGstPct" class="cv-calc-input" min="0" max="28" step="1" value="0">
+                  <input type="number" id="labGstPct" class="cv-calc-input" min="0" max="28" step="1" value="0" style="width:55px; height:30px; font-weight:700;">
                 </div>
-                <span id="labGstAmount" class="cv-calc-value font-mono" style="color:var(--cv-primary);">+ ₹0.00</span>
+                <span id="labGstAmount" class="cv-calc-value font-mono" style="color:var(--cv-primary); font-weight:700;">+ ₹0.00</span>
               </div>
 
-              <div class="final-total-highlight">
+              <!-- Final Total Card -->
+              <div class="cv-lab-final-card">
                 <div>
-                  <div style="font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--cv-primary); font-weight:800;">Amount Payable</div>
-                  <div style="font-size:1.05rem; font-weight:800; color:#0f172a;">FINAL TOTAL</div>
+                  <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#38bdf8; font-weight:800;">Amount Payable</div>
+                  <div style="font-size:1.05rem; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">FINAL TOTAL</div>
                 </div>
-                <span id="labFinalTotal" class="cv-final-total-amount">₹0.00</span>
+                <span id="labFinalTotal" class="cv-lab-final-total-amount">₹0.00</span>
               </div>
             </div>
 
             <!-- Right Side: Payment & Collection -->
-            <div class="cv-summary-pay-col">
-              <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:0.75rem; align-items:stretch;">
+            <div class="cv-lab-settlement-card">
+              <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:0.85rem; align-items:stretch;">
                 <div>
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
-                    <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); letter-spacing:0.02em;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                    <label style="font-size:0.72rem; font-weight:700; color:#475569; letter-spacing:0.02em; text-transform:uppercase;">
                       AMOUNT PAID (₹) <span style="color:var(--cv-danger);">*</span>
                     </label>
-                    <button type="button" id="btnLabPayFull" class="cv-link-btn" title="Set paid amount equal to final total">
-                      Pay Full Amount
+                    <button type="button" id="btnLabPayFull" class="cv-link-btn" title="Set paid amount equal to final total" style="font-size:0.75rem; font-weight:600; color:var(--cv-primary);">
+                      Pay Full
                     </button>
                   </div>
                   <div style="display:flex; gap:0.4rem; align-items:center;">
-                    <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:38px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
-                    <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:38px; padding:0 1rem;">
+                    <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:40px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
+                    <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:40px; padding:0 0.95rem;">
                       UNPAID
                     </button>
-                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:38px; padding:0 1rem;">
+                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:40px; padding:0 0.95rem;">
                       PAID
                     </button>
                   </div>
@@ -10786,19 +10795,19 @@ const Admin = (function () {
 
                 <div class="cv-balance-card">
                   <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:0.68rem; color:var(--cv-text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Balance Due</span>
-                    <span id="labPaymentStatusBadge" class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.65rem; padding:0.12rem 0.45rem;">PAID</span>
+                    <span style="font-size:0.68rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Balance Due</span>
+                    <span id="labPaymentStatusBadge" class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.65rem; padding:0.12rem 0.5rem;">PAID</span>
                   </div>
-                  <div id="labBalanceAmount" style="font-size:1.25rem; font-weight:800; color:var(--cv-danger); text-align:right; line-height:1.2;">₹0.00</div>
+                  <div id="labBalanceAmount" style="font-size:1.35rem; font-weight:800; color:var(--cv-danger); text-align:right; line-height:1.2; font-family:monospace;">₹0.00</div>
                 </div>
               </div>
 
-              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.75rem;">
+              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.85rem;">
                 <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">
+                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
                     PAYMENT METHOD
                   </label>
-                  <select id="labPaymentMethod" class="cv-form-select" style="height:36px; font-size:0.84rem;">
+                  <select id="labPaymentMethod" class="cv-form-select" style="height:38px; font-size:0.84rem;">
                     <option value="CASH">Cash Payment</option>
                     <option value="UPI">UPI / Digital QR</option>
                     <option value="CARD">Debit / Credit Card</option>
@@ -10808,20 +10817,20 @@ const Admin = (function () {
                   </select>
                 </div>
                 <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem; letter-spacing:0.02em;">
+                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
                     CLINICAL / ORDER NOTES
                   </label>
-                  <input type="text" id="labNotes" class="cv-form-input" style="height:36px; font-size:0.84rem;" placeholder="Clinical indication / fasting notes...">
+                  <input type="text" id="labNotes" class="cv-form-input" style="height:38px; font-size:0.84rem;" placeholder="Clinical indication / fasting notes...">
                 </div>
               </div>
 
               <!-- Action Buttons -->
-              <div style="display:flex; gap:0.75rem; margin-top:0.35rem;">
-                <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="flex:1; height:40px; font-weight:600; font-size:0.86rem;">
+              <div style="display:flex; gap:0.75rem; margin-top:0.45rem;">
+                <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="flex:1; height:42px; font-weight:600; font-size:0.88rem;">
                   Reset
                 </button>
-                <button type="button" class="cv-btn-primary" id="btnLabCreateOrder" style="flex:2; height:40px; font-weight:700; font-size:0.9rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 2px 8px rgba(37, 99, 235, 0.25);">
-                  <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <button type="button" class="cv-btn-primary" id="btnLabCreateOrder" style="flex:2; height:42px; font-weight:700; font-size:0.92rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.3);">
+                  <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   Create Lab Order
                 </button>
               </div>
@@ -10838,58 +10847,71 @@ const Admin = (function () {
   function renderLabPatientAutofillHtml(patient) {
     if (!patient) {
       return `
-        <div class="cv-walkin-box">
-          <div class="cv-walkin-label">
-            <svg style="width:15px; height:15px; color:var(--cv-primary); flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-            <span>Or Walk-in / Direct Patient:</span>
+        <div class="cv-lab-divider"><span>OR DIRECT / WALK-IN PATIENT DETAILS</span></div>
+        <div class="cv-lab-walkin-grid">
+          <div class="cv-lab-field">
+            <label>Patient Full Name <span style="color:var(--cv-danger);">*</span></label>
+            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="e.g. Rajesh Sharma" maxlength="100" autocomplete="off">
           </div>
-          <div class="cv-walkin-inputs" style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:0.5rem;">
-            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="Patient Name *" maxlength="100" autocomplete="off">
-            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input" placeholder="Phone Number" maxlength="10" autocomplete="off">
-            <input type="text" id="labWalkinDoctor" class="cv-form-input" placeholder="Doctor / Ref">
-            <input type="text" id="labWalkinDept" class="cv-form-input" placeholder="Department">
+          <div class="cv-lab-field">
+            <label>Phone Number (10 digits)</label>
+            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input" placeholder="e.g. 9876543210" maxlength="10" autocomplete="off">
+          </div>
+          <div class="cv-lab-field">
+            <label>Consulting Doctor</label>
+            <input type="text" id="labWalkinDoctor" class="cv-form-input" placeholder="e.g. Dr. A. Sharma">
+          </div>
+          <div class="cv-lab-field">
+            <label>Department</label>
+            <input type="text" id="labWalkinDept" class="cv-form-input" placeholder="e.g. Diagnostics / General">
           </div>
         </div>
       `;
     }
 
     return `
-      <div class="cv-autofill-banner">
-        <div class="cv-autofill-grid">
-          <div class="cv-autofill-item">
-            <label>Patient Name</label>
-            <span>${escapeHtml(patient.fullName || patient.name || '')}</span>
+      <div class="cv-lab-patient-banner">
+        <div style="display:flex; align-items:center; gap:0.85rem;">
+          <div class="cv-lab-patient-avatar">
+            ${escapeHtml((patient.fullName || patient.name || 'P').charAt(0).toUpperCase())}
           </div>
-          <div class="cv-autofill-item">
+          <div>
+            <div style="font-weight:800; font-size:1.05rem; color:#0f172a;">${escapeHtml(patient.fullName || patient.name || '')}</div>
+            <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+              ${patient.age ? patient.age + ' yrs' : 'Age N/A'} &bull; ${escapeHtml(patient.gender || 'Gender N/A')}
+            </div>
+          </div>
+        </div>
+
+        <div class="cv-lab-autofill-grid">
+          <div class="cv-lab-autofill-item">
             <label>UHID</label>
-            <span style="font-family:monospace; color:var(--cv-primary);">${escapeHtml(patient.uhid || 'N/A')}</span>
+            <span style="font-family:monospace; color:var(--cv-primary); font-weight:700;">${escapeHtml(patient.uhid || 'N/A')}</span>
           </div>
-          <div class="cv-autofill-item">
+          <div class="cv-lab-autofill-item">
             <label>OP ID</label>
             <span style="font-family:monospace;">${escapeHtml(patient.opId || 'N/A')}</span>
           </div>
-          <div class="cv-autofill-item">
+          <div class="cv-lab-autofill-item">
             <label>IP ID</label>
             <span style="font-family:monospace;">${escapeHtml(patient.ipId || 'N/A')}</span>
           </div>
-          <div class="cv-autofill-item">
+          <div class="cv-lab-autofill-item">
             <label>Phone Number</label>
             <span>${escapeHtml(patient.phone || 'N/A')}</span>
           </div>
-          <div class="cv-autofill-item">
-            <label>Age &bull; Gender</label>
-            <span>${patient.age ? patient.age + ' yrs' : 'N/A'} &bull; ${escapeHtml(patient.gender || 'N/A')}</span>
-          </div>
-          <div class="cv-autofill-item">
+          <div class="cv-lab-autofill-item">
             <label>Consulting Doctor</label>
             <span>${escapeHtml(patient.doctorName || 'Dr. On Duty')}</span>
           </div>
-          <div class="cv-autofill-item">
+          <div class="cv-lab-autofill-item">
             <label>Department</label>
             <span>${escapeHtml(patient.department || 'Diagnostics')}</span>
           </div>
         </div>
-        <button type="button" class="cv-btn-secondary" id="btnLabClearPatient" style="padding:0.3rem 0.6rem; font-size:0.75rem; white-space:nowrap; align-self:center;">
+
+        <button type="button" class="cv-btn-secondary" id="btnLabClearPatient" style="padding:0.4rem 0.85rem; font-size:0.8rem; white-space:nowrap; align-self:center; display:inline-flex; align-items:center; gap:0.35rem;">
+          <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Change Patient
         </button>
       </div>
@@ -10900,8 +10922,14 @@ const Admin = (function () {
     if (!labOrderItems || labOrderItems.length === 0) {
       return `
         <tr>
-          <td colspan="7" style="text-align:center; padding:1.25rem; color:var(--cv-text-muted); font-size:0.85rem;">
-            No laboratory tests added yet. Select a test from above and click <strong>+ Add Test to Order</strong>.
+          <td colspan="7" style="text-align:center; padding:2.5rem 1rem; color:var(--cv-text-muted);">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:0.5rem;">
+              <svg style="width:36px; height:36px; color:#cbd5e1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+              <div style="font-weight:600; color:#475569; font-size:0.9rem;">No laboratory tests added yet</div>
+              <div style="font-size:0.8rem; color:#94a3b8;">Select a test from the master catalog above and click <strong>+ Add Test to Order</strong></div>
+            </div>
           </td>
         </tr>
       `;
@@ -10909,20 +10937,22 @@ const Admin = (function () {
 
     return labOrderItems.map((item, idx) => `
       <tr data-index="${idx}">
-        <td style="color:var(--cv-text-muted); font-weight:600;">${idx + 1}</td>
+        <td style="text-align:center; color:#64748b; font-weight:600; font-size:0.82rem;">${idx + 1}</td>
         <td>
-          <div style="font-weight:700; color:var(--cv-text-main);">${escapeHtml(item.testName)}</div>
-          <div style="font-size:0.72rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(item.testCode)}</div>
+          <div style="font-weight:700; color:#0f172a; font-size:0.9rem;">${escapeHtml(item.testName)}</div>
+          <div style="margin-top:0.15rem;">
+            <span class="cv-lab-tag">${escapeHtml(item.testCode)}</span>
+          </div>
         </td>
-        <td><span style="font-size:0.8rem; background:#f1f5f9; padding:0.15rem 0.4rem; border-radius:4px; font-weight:600;">${escapeHtml(item.category || 'General')}</span></td>
-        <td><span style="font-size:0.8rem; background:#e0f2fe; color:#0369a1; padding:0.15rem 0.45rem; border-radius:4px; font-weight:600;">${escapeHtml(item.sampleType || 'Blood')}</span></td>
-        <td style="font-size:0.78rem; color:var(--cv-text-muted); font-family:monospace;">${escapeHtml(item.referenceRange || 'N/A')} ${escapeHtml(item.unit || '')}</td>
+        <td><span class="cv-lab-cat-pill">${escapeHtml(item.category || 'General')}</span></td>
+        <td><span class="cv-lab-sample-pill">${escapeHtml(item.sampleType || 'Blood')}</span></td>
+        <td style="font-size:0.82rem; color:#475569; font-family:monospace;">${escapeHtml(item.referenceRange || 'N/A')} ${escapeHtml(item.unit || '')}</td>
         <td style="text-align:right;">
-          <input type="number" class="cv-form-input lab-item-rate" data-index="${idx}" min="0" step="0.01" value="${Number(item.price).toFixed(2)}" style="height:32px; width:100px; text-align:right; font-weight:700; display:inline-block;">
+          <input type="number" class="cv-form-input lab-item-rate" data-index="${idx}" min="0" step="0.01" value="${Number(item.price).toFixed(2)}" style="height:34px; width:105px; text-align:right; font-weight:700; display:inline-block; font-size:0.88rem;">
         </td>
         <td style="text-align:center;">
-          <button type="button" class="btn-remove-lab-item" data-index="${idx}" title="Remove test" style="background:none; border:none; cursor:pointer; color:var(--cv-danger); padding:4px;">
-            <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          <button type="button" class="btn-remove-lab-item" data-index="${idx}" title="Remove test" style="background:none; border:none; cursor:pointer; color:#ef4444; padding:5px; border-radius:6px; transition:background 0.15s ease;">
+            <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         </td>
       </tr>
@@ -11789,35 +11819,36 @@ const Admin = (function () {
             </div>
           </div>
 
-          <div style="display:flex; align-items:center; gap:0.5rem;">
-            <div class="cv-search-icon-input" style="width:300px;">
+          <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+            <div class="cv-search-icon-input" style="width:320px;">
               <i class="fas fa-search">
                 <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               </i>
-              <input type="text" id="labProcessingSearchInput" placeholder="Search by Order ID, Patient, UHID, OP, Test..." value="${escapeHtml(labCurrentProcessingSearch)}">
+              <input type="text" id="labProcessingSearchInput" placeholder="Search by Order ID, Patient, UHID, Test..." value="${escapeHtml(labCurrentProcessingSearch)}">
             </div>
-            <button type="button" class="cv-btn-secondary" id="btnLabRefreshOrders" title="Refresh List" style="height:36px; padding:0 0.75rem; display:inline-flex; align-items:center; justify-content:center;">
+            <button type="button" class="cv-btn-secondary" id="btnLabRefreshOrders" title="Refresh List" style="height:38px; padding:0 0.85rem; display:inline-flex; align-items:center; justify-content:center; gap:0.35rem; font-weight:600; font-size:0.84rem;">
               <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
             </button>
           </div>
         </div>
 
         <!-- Processing Queue Table Card -->
-        <div class="cv-lab-card" style="margin-top:0.75rem;">
-          <div class="cv-bill-table-wrapper" style="min-height:380px;">
+        <div class="cv-lab-card" style="margin-top:0.25rem;">
+          <div class="cv-bill-table-wrapper" style="min-height:380px; overflow-x:auto;">
             <div id="labProcessingLoading" style="display:none; text-align:center; padding:2rem;">
               <div class="cv-loading-spinner"></div>
             </div>
-            <table class="cv-bill-table" id="labProcessingTable">
+            <table class="cv-bill-table cv-lab-table" id="labProcessingTable">
               <thead>
                 <tr>
                   <th style="width:140px;">Lab Order ID</th>
                   <th>Patient Details</th>
                   <th>Tests &amp; Category</th>
-                  <th style="width:120px;">Doctor &amp; Dept</th>
+                  <th style="width:130px;">Doctor &amp; Dept</th>
                   <th style="width:160px; text-align:right;">Financial Details</th>
-                  <th style="width:110px; text-align:center;">Lab Status</th>
-                  <th style="width:230px; text-align:center;">Actions</th>
+                  <th style="width:125px; text-align:center;">Lab Status</th>
+                  <th style="width:245px; text-align:center;">Actions</th>
                 </tr>
               </thead>
               <tbody id="labProcessingTableBody">
@@ -12013,21 +12044,24 @@ const Admin = (function () {
           </td>
           <td style="text-align:center;">
             <div style="display:flex; gap:0.35rem; justify-content:center; flex-wrap:wrap;">
-              <button type="button" class="cv-btn-secondary btn-lab-results" data-id="${order.id}" style="padding:0.25rem 0.55rem; font-size:0.75rem; font-weight:600;">
-                Enter Results
+              <button type="button" class="cv-btn-secondary btn-lab-results" data-id="${order.id}" style="padding:0.3rem 0.6rem; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:0.25rem;">
+                <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Results
               </button>
               ${order.orderStatus !== 'COMPLETED' && order.orderStatus !== 'CANCELLED' ? `
-                <button type="button" class="cv-btn-primary btn-lab-complete" data-id="${order.id}" data-num="${escapeHtml(order.orderNumber)}" style="padding:0.25rem 0.55rem; font-size:0.75rem; font-weight:700; background:#059669; border-color:#059669;">
+                <button type="button" class="cv-btn-primary btn-lab-complete" data-id="${order.id}" data-num="${escapeHtml(order.orderNumber)}" style="padding:0.3rem 0.6rem; font-size:0.75rem; font-weight:700; background:#059669; border-color:#059669; display:inline-flex; align-items:center; gap:0.25rem;">
+                  <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                   Complete
                 </button>
               ` : ''}
-              <button type="button" class="cv-btn-secondary btn-lab-print" data-id="${order.id}" style="padding:0.25rem 0.55rem; font-size:0.75rem; font-weight:600;">
+              <button type="button" class="cv-btn-secondary btn-lab-print" data-id="${order.id}" style="padding:0.3rem 0.6rem; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:0.25rem;">
+                <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Report
               </button>
-              <button type="button" class="cv-btn-secondary btn-lab-payments" data-id="${order.id}" data-num="${escapeHtml(order.orderNumber)}" style="padding:0.25rem 0.55rem; font-size:0.75rem; color:#0284c7; font-weight:600;" title="View Payment History">
+              <button type="button" class="cv-btn-secondary btn-lab-payments" data-id="${order.id}" data-num="${escapeHtml(order.orderNumber)}" style="padding:0.3rem 0.6rem; font-size:0.75rem; color:#0284c7; font-weight:600;" title="View Payment History">
                 Payments
               </button>
-              <button type="button" class="cv-btn-secondary btn-lab-details" data-id="${order.id}" style="padding:0.25rem 0.45rem; font-size:0.75rem;" title="View Details">
+              <button type="button" class="cv-btn-secondary btn-lab-details" data-id="${order.id}" style="padding:0.3rem 0.5rem; font-size:0.75rem;" title="View Details">
                 &hellip;
               </button>
             </div>

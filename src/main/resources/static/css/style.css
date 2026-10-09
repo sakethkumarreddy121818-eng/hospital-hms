@@ -3112,15 +3112,17 @@ body.cv-dashboard-active #app {
 }
 
 /* ====================================================================
-   ADMIN — LABORATORY MANAGEMENT MODULE
+   ADMIN — LABORATORY MANAGEMENT MODULE (CareVista Design System)
    ==================================================================== */
 .cv-lab-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.15rem;
   width: 100%;
+  animation: fadeIn 0.2s ease-out;
 }
 
+/* Header & Navigation Bar */
 .cv-lab-topbar {
   display: flex;
   justify-content: space-between;
@@ -3128,97 +3130,434 @@ body.cv-dashboard-active #app {
   background: var(--cv-surface);
   border: 1px solid var(--cv-border);
   border-radius: var(--cv-radius-lg);
-  padding: 0.75rem 1.25rem;
-  box-shadow: var(--cv-shadow-xs);
+  padding: 0.85rem 1.35rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 1rem;
+}
+
+.cv-lab-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.cv-lab-title-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(29, 78, 216, 0.1) 0%, rgba(13, 148, 136, 0.12) 100%);
+  border: 1px solid rgba(29, 78, 216, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cv-primary);
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.06);
+}
+
+.cv-lab-title-text h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cv-lab-title-text p {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0.2rem 0 0 0;
+  font-weight: 500;
 }
 
 .cv-lab-nav-tabs {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   background: #f1f5f9;
-  padding: 0.25rem;
-  border-radius: var(--cv-radius-md);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
 }
 
 .cv-lab-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: var(--cv-radius-sm);
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   border: none;
   background: transparent;
   font-size: 0.84rem;
   font-weight: 600;
-  color: var(--cv-text-muted);
+  color: #475569;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .cv-lab-tab-btn:hover {
-  color: var(--cv-text-main);
-  background: rgba(255, 255, 255, 0.6);
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .cv-lab-tab-btn.active {
   background: #ffffff;
   color: var(--cv-primary);
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
 }
 
 .cv-lab-flow {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.15rem;
 }
 
+/* Modern Laboratory Cards */
 .cv-lab-card {
   background: var(--cv-surface);
   border: 1px solid var(--cv-border);
   border-radius: var(--cv-radius-lg);
-  padding: 0.85rem 1.25rem;
-  box-shadow: var(--cv-shadow-xs);
+  padding: 1.15rem 1.35rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cv-lab-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
 }
 
 .cv-lab-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.95rem;
   border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.65rem;
 }
 
 .cv-lab-card-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   font-size: 0.95rem;
   font-weight: 700;
   color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
+.cv-lab-card-title svg {
+  color: var(--cv-primary);
+}
+
+.cv-lab-badge-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+/* Patient Section */
+.cv-lab-patient-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.cv-lab-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0.35rem 0;
+}
+
+.cv-lab-divider::before,
+.cv-lab-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.cv-lab-divider span {
+  padding: 0 0.85rem;
+  background: var(--cv-surface);
+}
+
+.cv-lab-walkin-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr 1.2fr 1.2fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 1024px) {
+  .cv-lab-walkin-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .cv-lab-walkin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cv-lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cv-lab-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.cv-lab-patient-banner {
+  background: linear-gradient(135deg, #f0fdfa 0%, #f8fafc 100%);
+  border: 1px solid #ccfbf1;
+  border-left: 4px solid #0d9488;
+  border-radius: 12px;
+  padding: 1rem 1.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.cv-lab-patient-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3);
+  flex-shrink: 0;
+}
+
+.cv-lab-autofill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.65rem 1.25rem;
+  flex: 1;
+}
+
+.cv-lab-autofill-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cv-lab-autofill-item label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cv-lab-autofill-item span {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* Test Master Grid */
 .cv-lab-test-grid {
   display: grid;
-  grid-template-columns: 2fr 1.2fr 1.4fr 1fr 1.2fr;
-  gap: 0.75rem;
+  grid-template-columns: 2fr 1.2fr 1.4fr 1fr 1.3fr;
+  gap: 0.85rem;
   align-items: flex-end;
 }
 
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
   .cv-lab-test-grid {
     grid-template-columns: 1fr 1fr;
   }
 }
 
-.cv-lab-processing-wrapper {
+@media (max-width: 600px) {
+  .cv-lab-test-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Table Enhancements */
+.cv-lab-table th {
+  background: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.75rem 0.95rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cv-lab-table td {
+  padding: 0.75rem 0.95rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cv-lab-table tr:hover td {
+  background: #fafbfc;
+}
+
+.cv-lab-tag {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+}
+
+.cv-lab-cat-pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0f766e;
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.cv-lab-sample-pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+/* Financial Ledger & Payment Collection Area */
+.cv-lab-financial-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .cv-lab-financial-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cv-lab-ledger-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.15rem 1.35rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.cv-lab-settlement-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.cv-lab-final-card {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 1.15rem 1.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+  margin-top: 0.4rem;
+}
+
+.cv-lab-final-total-amount {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: monospace;
+  letter-spacing: -0.02em;
+}
+
+/* Quick Settlement Buttons */
+.cv-btn-unpaid {
+  background: #ffffff;
+  color: #dc2626;
+  border: 1.5px solid #fca5a5;
+  border-radius: var(--cv-radius-md);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cv-btn-unpaid:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.cv-btn-paid {
+  background: #10b981;
+  color: #ffffff;
+  border: 1.5px solid #059669;
+  border-radius: var(--cv-radius-md);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.25);
+}
+
+.cv-btn-paid:hover {
+  background: #059669;
+}
+
+.cv-balance-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.65rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Processing Queue */
+.cv-lab-processing-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .cv-lab-processing-toolbar {
@@ -3228,35 +3567,41 @@ body.cv-dashboard-active #app {
   background: var(--cv-surface);
   border: 1px solid var(--cv-border);
   border-radius: var(--cv-radius-lg);
-  padding: 0.65rem 1rem;
+  padding: 0.75rem 1.15rem;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.85rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 /* Status Badges */
 .cv-badge-lab-ordered {
   background: #e0f2fe;
   color: #0369a1;
+  border: 1px solid #bae6fd;
 }
 
 .cv-badge-lab-sample {
   background: #ede9fe;
   color: #6d28d9;
+  border: 1px solid #ddd6fe;
 }
 
 .cv-badge-lab-processing {
   background: #fef3c7;
   color: #b45309;
+  border: 1px solid #fde68a;
 }
 
 .cv-badge-lab-completed {
   background: #dcfce7;
   color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .cv-badge-lab-cancelled {
   background: #fee2e2;
   color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 /* Lab Report Printable Modal & Paper */
