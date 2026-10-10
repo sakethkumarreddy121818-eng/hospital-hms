@@ -82,7 +82,7 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.90) 0%, rgba(240, 248, 250, 0.86) 50%, rgba(245, 249, 252, 0.90) 100%),
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.72) 0%, rgba(240, 248, 250, 0.65) 50%, rgba(245, 249, 252, 0.72) 100%),
               url('/images/carevista-hospital-bg.jpg') no-repeat center center fixed;
   background-size: cover;
   background-color: #f8fafc;
@@ -663,10 +663,12 @@ body:not(.cv-dashboard-active) .cv-nav-profile-pill {
 }
 
 .cv-nav-item.active {
-  background: rgba(13, 148, 136, 0.12) !important;
-  color: #0f766e !important;
-  font-weight: 700;
-  border-left: 3.5px solid #0d9488;
+  background: linear-gradient(90deg, #06b6d4 0%, #0d9488 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  border-left: none !important;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35) !important;
 }
 
 /* CRITICAL FIX: Bound sidebar icon sizes explicitly */
@@ -683,7 +685,39 @@ body:not(.cv-dashboard-active) .cv-nav-profile-pill {
 }
 
 .cv-nav-item.active svg {
-  color: #0d9488 !important;
+  color: #ffffff !important;
+}
+
+/* Sidebar Motto at bottom (Matches Reference Image) */
+.cv-sidebar-motto {
+  margin-top: auto;
+  padding: 0.85rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.cv-sidebar-motto svg {
+  width: 26px !important;
+  height: 26px !important;
+  color: #059669 !important;
+  flex-shrink: 0 !important;
+}
+
+.cv-motto-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.cv-motto-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #059669;
+  line-height: 1.2;
 }
 
 .cv-sidebar-footer {
@@ -5058,24 +5092,58 @@ tr:hover td {
   border-top: 1px solid #e2e8f0 !important;
 }
 
-/* Laboratory Module Support Classes */
+/* Laboratory Module & Premium Healthcare Components */
 .cv-lab-flow {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.cv-lab-card {
-  padding: 1.25rem 1.5rem;
+.cv-lab-card,
+.cv-card,
+.cv-metric-card,
+.cv-settings-section-card {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04) !important;
+  padding: 1.25rem 1.5rem !important;
+  position: relative;
 }
 
-.cv-lab-card-title {
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #0f172a;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+.cv-lab-card-title,
+.cv-card-title,
+.cv-section-title {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+  letter-spacing: -0.01em;
+}
+
+.cv-lab-card-title::before,
+.cv-card-title::before,
+.cv-section-title::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: #0284c7;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cv-lab-card-title svg,
+.cv-card-title svg,
+.cv-section-title svg {
+  color: #0284c7 !important;
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0;
 }
 
 .cv-lab-10-grid {
@@ -5099,7 +5167,7 @@ tr:hover td {
 
 .cv-lab-test-grid-5 {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr;
   gap: 0.85rem;
   align-items: end;
 }
@@ -5122,71 +5190,145 @@ tr:hover td {
   gap: 0.35rem;
 }
 
+.cv-field-label {
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  margin-bottom: 0.2rem !important;
+}
+
 .cv-input-icon-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(203, 213, 225, 0.8) !important;
+  border-radius: 10px !important;
+  height: 42px !important;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.cv-input-icon-wrap:focus-within {
+  background: #ffffff !important;
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18) !important;
 }
 
 .cv-field-icon {
   position: absolute;
   left: 0.75rem;
-  color: #0d9488;
+  color: #0284c7 !important;
   display: flex;
   align-items: center;
   pointer-events: none;
 }
 
+.cv-field-icon svg {
+  width: 16px !important;
+  height: 16px !important;
+  color: #0284c7 !important;
+}
+
 .cv-input-icon-wrap input,
 .cv-input-icon-wrap select {
-  width: 100%;
-  padding-left: 2.25rem !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 0.75rem 0 2.4rem !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.cv-input-icon-wrap input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
+}
+
+.cv-input-icon-wrap input[readonly] {
+  background: rgba(241, 245, 249, 0.5) !important;
+  color: #334155 !important;
+  cursor: default;
 }
 
 .cv-mode-toggle-group {
   display: inline-flex;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 9999px;
   padding: 3px;
-  gap: 3px;
+  gap: 4px;
 }
 
 .cv-mode-btn {
   border: none;
   background: transparent;
-  color: #475569;
+  color: #334155 !important;
   font-size: 0.82rem;
   font-weight: 700;
-  padding: 0.45rem 0.9rem;
-  border-radius: 7px;
+  padding: 0.5rem 1.15rem;
+  border-radius: 9999px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
+.cv-mode-btn:hover {
+  color: #0f172a !important;
+}
+
 .cv-mode-btn.active {
-  background: #ffffff;
-  color: #0f766e;
+  background: #0d9488 !important;
+  color: #ffffff !important;
   font-weight: 800;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
-  border: 1px solid rgba(13, 148, 136, 0.2);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3) !important;
 }
 
 .cv-lab-count-pill {
-  font-size: 0.72rem;
-  background: #ecfeff;
-  color: #0891b2;
-  border: 1px solid #a5f3fc;
-  padding: 0.15rem 0.5rem;
-  border-radius: 12px;
-  font-weight: 700;
+  font-size: 0.72rem !important;
+  background: #06b6d4 !important;
+  color: #ffffff !important;
+  padding: 0.2rem 0.65rem !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+  margin-left: 0.5rem;
+}
+
+/* Investigations Table */
+.cv-table-wrapper {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  overflow: hidden !important;
+}
+
+.cv-lab-table thead tr th {
+  background: rgba(241, 245, 249, 0.85) !important;
+  color: #334155 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+.cv-lab-table tbody tr td {
+  background: transparent !important;
+  color: #0f172a !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6) !important;
 }
 
 .cv-fin-box {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 0.85rem !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -5205,31 +5347,150 @@ tr:hover td {
   color: #0f172a;
 }
 
-/* Quick Settlement Buttons */
+/* Glowing Cyan-Teal Final Total Card (Matches Uploaded Dashboard Exactly) */
+.cv-lab-final-total-pill {
+  background: linear-gradient(135deg, #0891b2 0%, #0d9488 100%) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 0.9rem 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-shadow: 0 4px 16px rgba(8, 145, 178, 0.3) !important;
+  color: #ffffff !important;
+}
+
+.cv-lab-final-total-pill .total-label-area {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.85rem !important;
+}
+
+.cv-lab-final-total-pill .total-label-area svg {
+  width: 28px !important;
+  height: 28px !important;
+  color: #ffffff !important;
+}
+
+.cv-lab-final-total-pill .total-label-area div div:first-child {
+  font-size: 0.74rem !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  font-weight: 700 !important;
+}
+
+.cv-lab-final-total-pill .total-label-area div div:last-child {
+  font-size: 1.1rem !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.01em !important;
+}
+
+.cv-lab-final-total-pill .total-amount {
+  font-size: 1.8rem !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Payment Status & Action Buttons */
 .cv-btn-paid {
-  background: #059669 !important;
+  background: #0d9488 !important;
   color: #ffffff !important;
   border: none !important;
   font-weight: 800 !important;
   border-radius: 8px !important;
-  padding: 0.5rem 1rem !important;
+  padding: 0 1.25rem !important;
+  height: 42px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .cv-btn-paid:hover {
-  background: #047857 !important;
+  background: #0f766e !important;
 }
 
 .cv-btn-unpaid {
-  background: #ffffff !important;
-  color: #dc2626 !important;
-  border: 1.5px solid #dc2626 !important;
+  background: #fb923c !important;
+  color: #ffffff !important;
+  border: none !important;
   font-weight: 800 !important;
   border-radius: 8px !important;
-  padding: 0.5rem 1rem !important;
+  padding: 0 1.25rem !important;
+  height: 42px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .cv-btn-unpaid:hover {
-  background: #fef2f2 !important;
+  background: #f97316 !important;
+}
+
+.cv-lab-balance-pill {
+  background: rgba(254, 242, 242, 0.85) !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 8px !important;
+  padding: 0 0.85rem !important;
+  height: 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.6rem !important;
+}
+
+.cv-lab-balance-pill .balance-label {
+  font-size: 0.78rem !important;
+  color: #334155 !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+.cv-lab-balance-pill .balance-amount {
+  font-size: 1.15rem !important;
+  color: #ef4444 !important;
+  font-weight: 800 !important;
+}
+
+#btnLabAddTest {
+  background: linear-gradient(135deg, #00b4d8 0%, #009688 100%) !important;
+  color: #ffffff !important;
+  border-radius: 10px !important;
+  border: none !important;
+  height: 42px !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#btnLabAddTest:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(6, 182, 212, 0.45) !important;
+}
+
+#btnLabCreateOrder {
+  background: linear-gradient(135deg, #06b6d4 0%, #0d9488 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  height: 46px !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#btnLabCreateOrder:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(6, 182, 212, 0.45) !important;
 }
 
 /* Bed Chips in Rooms & Beds */
@@ -5333,56 +5594,5 @@ tr:hover td {
   max-width: 20px !important;
   max-height: 20px !important;
   margin: 0 !important;
-}
-
-/* Laboratory Final Total & Balance Pill Styles */
-.cv-lab-final-total-pill {
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%) !important;
-  border: 1.5px solid #86efac !important;
-  border-radius: 10px !important;
-  padding: 0.75rem 1rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1) !important;
-}
-
-.cv-lab-final-total-pill .total-label-area {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-}
-
-.cv-lab-final-total-pill .total-amount {
-  font-size: 1.6rem !important;
-  font-weight: 800 !important;
-  color: #065f46 !important;
-  letter-spacing: -0.02em !important;
-}
-
-.cv-lab-balance-pill {
-  background: #fef2f2 !important;
-  border: 1.5px solid #fecaca !important;
-  border-radius: 8px !important;
-  padding: 0.35rem 0.75rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 0.5rem !important;
-}
-
-.cv-lab-balance-pill .balance-label {
-  font-size: 0.76rem !important;
-  color: #991b1b !important;
-  font-weight: 700 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.3rem !important;
-}
-
-.cv-lab-balance-pill .balance-amount {
-  font-size: 0.95rem !important;
-  color: #dc2626 !important;
-  font-weight: 800 !important;
 }
 
