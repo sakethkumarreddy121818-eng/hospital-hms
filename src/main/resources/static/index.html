@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CareVista — Hospital Management SaaS</title>
   <meta name="description" content="Enterprise Multi-Tenant Hospital Management SaaS platform for clinical, outpatient, inpatient, pharmacy, and central billing operations.">
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=2.1.0">
 </head>
 <body>
   <div id="app">
@@ -13,16 +13,51 @@
     <header class="cv-navbar">
       <div class="cv-brand" id="cvBrandNav" role="banner" aria-label="CareVista Hospital Management SaaS">
         <div class="cv-brand-icon">
-          <span>+</span>
+          <svg style="width:24px; height:24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m-2-2h4"/>
+          </svg>
         </div>
         <div class="cv-brand-text">
-          <span class="cv-brand-title">CAREVISTA</span>
-          <span class="cv-brand-subtitle">Hospital Management SaaS</span>
+          <span class="cv-brand-title">CareVista</span>
+          <span class="cv-brand-subtitle">Multispeciality Hospital</span>
+        </div>
+      </div>
+
+      <div class="cv-nav-center" id="cvNavCenterSearch">
+        <div class="cv-nav-search-bar">
+          <svg class="cv-nav-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="11" cy="11" r="7" stroke-width="2"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"/>
+          </svg>
+          <input type="text" id="globalNavSearch" class="cv-nav-search-input" placeholder="Search patient by Name, Phone, UHID, OP ID, or IP ID..." autocomplete="off">
         </div>
       </div>
 
       <div class="cv-nav-right">
-        <div class="cv-badge-status">
+        <div class="cv-nav-actions" id="cvNavActions">
+          <button type="button" class="cv-nav-action-btn" title="Notifications" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:18px; height:18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span class="cv-nav-badge">1</span>
+          </button>
+          <button type="button" class="cv-nav-action-btn" title="Messages" aria-label="Messages">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:18px; height:18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="cv-nav-profile-pill" id="cvNavProfilePill" title="Account Menu">
+          <div class="cv-profile-avatar" id="navAvatarInitial">A</div>
+          <span class="cv-profile-name" id="navTopUserName">Admin</span>
+          <svg style="width:14px; height:14px; opacity:0.7;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+
+        <div class="cv-badge-status" id="cvNavHealthBadgeWrap">
           <span class="cv-status-pulse"></span>
           <span id="navHealthStatus">Connecting...</span>
         </div>

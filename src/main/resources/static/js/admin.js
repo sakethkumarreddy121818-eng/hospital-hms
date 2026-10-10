@@ -645,19 +645,18 @@ const Admin = (function () {
   function applyThemeStyles(settings) {
     if (!settings) return;
     const root = document.documentElement;
-    if (settings.primaryColor) {
+    if (settings.primaryColor && settings.primaryColor !== '#1d4ed8') {
       root.style.setProperty('--cv-primary', settings.primaryColor);
       root.style.setProperty('--cv-primary-hover', adjustColorBrightness(settings.primaryColor, -15));
-      root.style.setProperty('--cv-primary-light', hexToRgba(settings.primaryColor, 0.08));
-      root.style.setProperty('--cv-primary-border', hexToRgba(settings.primaryColor, 0.25));
+      root.style.setProperty('--cv-primary-light', hexToRgba(settings.primaryColor, 0.16));
+      root.style.setProperty('--cv-primary-border', hexToRgba(settings.primaryColor, 0.4));
     }
-    if (settings.secondaryColor) {
-      root.style.setProperty('--cv-deep-blue', settings.secondaryColor);
-      root.style.setProperty('--cv-deep-navy', adjustColorBrightness(settings.secondaryColor, 15));
-    }
+    // In CareVista Light Healthcare Theme, preserve crisp dark slate for crystal-clear readability
+    root.style.setProperty('--cv-deep-blue', '#0f172a');
+    root.style.setProperty('--cv-deep-navy', '#1e293b');
     if (settings.accentColor) {
       root.style.setProperty('--cv-teal', settings.accentColor);
-      root.style.setProperty('--cv-teal-light', hexToRgba(settings.accentColor, 0.08));
+      root.style.setProperty('--cv-teal-light', hexToRgba(settings.accentColor, 0.16));
     }
   }
 
@@ -1781,7 +1780,7 @@ const Admin = (function () {
     return `
       <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.88rem;">
-          <thead style="background:#f8fafc; border-bottom:1px solid var(--cv-border); font-size:0.76rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--cv-text-muted);">
+          <thead style="background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.05em; color:#334155;">
             <tr>
               <th style="padding:0.75rem 1.25rem;">Doctor Name</th>
               <th style="padding:0.75rem 1.25rem;">Specialty &amp; Dept</th>
@@ -2017,7 +2016,7 @@ const Admin = (function () {
     return `
       <div style="overflow-x:auto;">
         <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.88rem;">
-          <thead style="background:#f8fafc; border-bottom:1px solid var(--cv-border); font-size:0.76rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--cv-text-muted);">
+          <thead style="background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.05em; color:#334155;">
             <tr>
               <th style="padding:0.75rem 1.25rem;">Employee Name</th>
               <th style="padding:0.75rem 1.25rem;">Login Email / Phone</th>
@@ -10482,42 +10481,6 @@ const Admin = (function () {
 
     mainContent.innerHTML = `
       <div class="cv-lab-wrapper">
-        <!-- Modern CareVista Header -->
-        <div class="cv-lab-topbar">
-          <div class="cv-lab-header-left">
-            ${renderBackArrowHtml('Back')}
-            <div class="cv-lab-title-icon">
-              <svg style="width:24px; height:24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-              </svg>
-            </div>
-            <div class="cv-lab-title-text">
-              <h1 class="cv-page-title">
-                Laboratory &amp; Diagnostics Center
-              </h1>
-              <p class="cv-page-subtitle">Hospital: ${escapeHtml(currentUser?.hospitalName || 'City Care Super Speciality Hospital')} &bull; Clinical Pathology, Biochemistry &amp; Diagnostics</p>
-            </div>
-          </div>
-
-          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-            <div class="cv-lab-nav-tabs">
-              <button type="button" class="cv-lab-tab-btn ${labActiveTab === 'orders' ? 'active' : ''}" id="tabBtnLabOrders">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                1. Lab Order &amp; Billing
-              </button>
-              <button type="button" class="cv-lab-tab-btn ${labActiveTab === 'processing' ? 'active' : ''}" id="tabBtnLabProcessing">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                2. Laboratory Processing Queue
-              </button>
-            </div>
-
-            <button type="button" class="cv-btn-secondary" id="btnLabBackDashboard" style="padding:0.45rem 0.85rem; font-size:0.84rem; display:inline-flex; align-items:center; gap:0.4rem;">
-              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-              Dashboard
-            </button>
-          </div>
-        </div>
-
         <!-- Main Tab Mount Container -->
         <div id="labTabContent"></div>
 
@@ -10525,14 +10488,6 @@ const Admin = (function () {
         <div id="labModalHost"></div>
       </div>
     `;
-
-    document.getElementById('btnLabBackDashboard')?.addEventListener('click', () => {
-      mainContent.classList.remove('cv-laboratory-mode');
-      navigateTo('dashboard', 'main', () => renderDashboardLayout(false));
-    });
-
-    document.getElementById('tabBtnLabOrders')?.addEventListener('click', () => switchLabTab('orders', true));
-    document.getElementById('tabBtnLabProcessing')?.addEventListener('click', () => switchLabTab('processing', true));
 
     switchLabTab(labActiveTab, false);
   }
@@ -10565,6 +10520,8 @@ const Admin = (function () {
   // ------------------------------------------------------------------
   // TAB 1: LAB ORDER & PAYMENT
   // ------------------------------------------------------------------
+  let labIsWalkinMode = false;
+
   async function renderLabOrdersTab() {
     const container = document.getElementById('labTabContent');
     if (!container) return;
@@ -10589,113 +10546,266 @@ const Admin = (function () {
 
     container.innerHTML = `
       <div class="cv-lab-flow">
-        <!-- 1. Patient Details & Search Card -->
-        <div class="cv-lab-card">
-          <div class="cv-lab-card-header">
-            <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <!-- Top Page Title & Mode Switchers -->
+        <div class="cv-lab-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:1rem;">
+          <div style="display:flex; align-items:center; gap:1rem;">
+            <div style="width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(6, 182, 212, 0.12)); border:1.5px solid rgba(13, 148, 136, 0.3); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(13, 148, 136, 0.15);">
+              <svg style="width:28px; height:28px; color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
               </svg>
-              1. Patient Identification &amp; Entry
             </div>
-            <span class="cv-lab-badge-subtitle">Real MySQL Patient Database</span>
+            <div>
+              <h1 style="font-size:1.6rem; font-weight:800; color:#0f172a; margin:0; letter-spacing:-0.02em;">Laboratory Management</h1>
+              <p style="font-size:0.84rem; color:#475569; margin:0.15rem 0 0 0; font-weight:500;">Accurate Diagnostics &nbsp;|&nbsp; Better Decisions &nbsp;|&nbsp; Healthier Lives</p>
+            </div>
           </div>
 
-          <div class="cv-lab-patient-box">
-            <div class="cv-patient-search-container" style="width:100%;">
-              <div class="cv-search-icon-input" style="width:100%;">
-                <i class="fas fa-search">
-                  <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </i>
-                <input type="text" id="labPatientSearchInput" placeholder="Search registered patient by Name, Phone Number, UHID, OP ID, or IP ID..." autocomplete="off">
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <div class="cv-mode-toggle-group">
+              <button type="button" class="cv-mode-btn ${!labIsWalkinMode ? 'active' : ''}" id="btnLabModeRegistered">Registered Patient</button>
+              <button type="button" class="cv-mode-btn ${labIsWalkinMode ? 'active' : ''}" id="btnLabModeWalkin">Walk-in / Direct Patient</button>
+            </div>
+            <button type="button" class="cv-btn-secondary" id="btnLabBackDashboard" style="padding:0.45rem 0.85rem; font-size:0.84rem; display:inline-flex; align-items:center; gap:0.4rem;">
+              <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              Dashboard
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. Patient Details Card -->
+        <div class="cv-lab-card">
+          <div class="cv-lab-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div class="cv-lab-card-title">
+              <svg style="width:20px; height:20px; color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              Patient Identification &amp; Entry
+            </div>
+            <div id="labPatientSelectedBadge">
+              ${labSelectedPatient ? `<span class="cv-stock-info-pill cv-stock-in" style="cursor:pointer;" id="btnLabClearPatient">Selected: ${escapeHtml(labSelectedPatient.fullName || labSelectedPatient.name)} (Click to Change)</span>` : ''}
+            </div>
+          </div>
+
+          <!-- Patient Search Box for Registered Patients -->
+          <div class="cv-patient-search-container" id="labPatientSearchWrap" style="${labIsWalkinMode ? 'display:none;' : 'margin-bottom:1rem;'}">
+            <div class="cv-search-icon-input" style="width:100%;">
+              <i class="fas fa-search">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </i>
+              <input type="text" id="labPatientSearchInput" placeholder="Search registered patient by Name, Phone Number, UHID, OP ID, or IP ID..." autocomplete="off">
+            </div>
+            <div id="labPatientDropdown" class="cv-patient-dropdown" style="display:none;"></div>
+          </div>
+
+          <!-- 10 Fields Grid (2 rows x 5 columns) -->
+          <div class="cv-lab-10-grid">
+            <!-- Row 1 -->
+            <div class="cv-field-group">
+              <label class="cv-field-label">Patient Full Name <span style="color:var(--cv-danger);">*</span></label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </span>
+                <input type="text" id="labWalkinName" value="${escapeHtml(labSelectedPatient?.fullName || labSelectedPatient?.name || '')}" placeholder="Patient Full Name" autocomplete="off">
               </div>
-              <div id="labPatientDropdown" class="cv-patient-dropdown" style="display:none;"></div>
             </div>
 
-            <div id="labPatientAutofillContainer">
-              ${renderLabPatientAutofillHtml(labSelectedPatient)}
+            <div class="cv-field-group">
+              <label class="cv-field-label">Phone Number (10 Digits)</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                </span>
+                <input type="tel" id="labWalkinPhone" value="${escapeHtml(labSelectedPatient?.phone || '')}" maxlength="10" placeholder="9876543210" autocomplete="off">
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">UHID</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><rect x="3" y="4" width="18" height="16" rx="2" stroke-width="2"/><line x1="7" y1="8" x2="17" y2="8" stroke-width="2"/><line x1="7" y1="12" x2="12" y2="12" stroke-width="2"/></svg>
+                </span>
+                <input type="text" id="labWalkinUhid" value="${escapeHtml(labSelectedPatient?.uhid || '')}" placeholder="UHID" readonly>
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">OP ID</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                <input type="text" id="labWalkinOpId" value="${escapeHtml(labSelectedPatient?.opId || '')}" placeholder="OP ID" readonly>
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">IP ID</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M3 16h18M4 12V8a2 2 0 012-2h12a2 2 0 012 2v4M4 16v4m16-4v4"/></svg>
+                </span>
+                <input type="text" id="labWalkinIpId" value="${escapeHtml(labSelectedPatient?.ipId || '')}" placeholder="IP ID" readonly>
+              </div>
+            </div>
+
+            <!-- Row 2 -->
+            <div class="cv-field-group">
+              <label class="cv-field-label">Age (Years)</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><rect x="3" y="4" width="18" height="18" rx="2" stroke-width="2"/><line x1="16" y1="2" x2="16" y2="6" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke-width="2"/></svg>
+                </span>
+                <input type="number" id="labWalkinAge" value="${labSelectedPatient?.age || ''}" placeholder="Age" min="0" max="150">
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">Gender</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><circle cx="12" cy="8" r="5" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 13v8m-3-3h6"/></svg>
+                </span>
+                <select id="labWalkinGender">
+                  <option value="Male" ${(labSelectedPatient?.gender || '').toLowerCase() === 'male' ? 'selected' : ''}>Male</option>
+                  <option value="Female" ${(labSelectedPatient?.gender || '').toLowerCase() === 'female' ? 'selected' : ''}>Female</option>
+                  <option value="Other" ${(labSelectedPatient?.gender || '').toLowerCase() === 'other' ? 'selected' : ''}>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">Blood Group</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a6 6 0 006-6c0-4-6-11-6-11S6 11 6 15a6 6 0 006 6z"/></svg>
+                </span>
+                <select id="labWalkinBloodGroup">
+                  <option value="O+" ${(labSelectedPatient?.bloodGroup || 'O+') === 'O+' ? 'selected' : ''}>O+</option>
+                  <option value="O-" ${(labSelectedPatient?.bloodGroup || '') === 'O-' ? 'selected' : ''}>O-</option>
+                  <option value="A+" ${(labSelectedPatient?.bloodGroup || '') === 'A+' ? 'selected' : ''}>A+</option>
+                  <option value="A-" ${(labSelectedPatient?.bloodGroup || '') === 'A-' ? 'selected' : ''}>A-</option>
+                  <option value="B+" ${(labSelectedPatient?.bloodGroup || '') === 'B+' ? 'selected' : ''}>B+</option>
+                  <option value="B-" ${(labSelectedPatient?.bloodGroup || '') === 'B-' ? 'selected' : ''}>B-</option>
+                  <option value="AB+" ${(labSelectedPatient?.bloodGroup || '') === 'AB+' ? 'selected' : ''}>AB+</option>
+                  <option value="AB-" ${(labSelectedPatient?.bloodGroup || '') === 'AB-' ? 'selected' : ''}>AB-</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">Consulting Doctor</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11v2m-1-1h2"/></svg>
+                </span>
+                <input type="text" id="labWalkinDoctor" value="${escapeHtml(labSelectedPatient?.doctorName || 'Dr. A. Sharma')}" placeholder="Dr. A. Sharma">
+              </div>
+            </div>
+
+            <div class="cv-field-group">
+              <label class="cv-field-label">Department</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </span>
+                <input type="text" id="labWalkinDept" value="${escapeHtml(labSelectedPatient?.department || 'General Medicine')}" placeholder="General Medicine">
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 2. Lab Test Master Selection Card -->
+        <!-- 2. Diagnostic Test Master Selection Card -->
         <div class="cv-lab-card">
-          <div class="cv-lab-card-header">
+          <div class="cv-lab-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:20px; height:20px; color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
               </svg>
-              2. Diagnostic Test Master Selection
+              Diagnostic Test Master Selection
             </div>
             <div id="labTestCategoryPill">
               <span class="cv-stock-info-pill cv-stock-in" style="font-size:0.75rem; padding:0.2rem 0.6rem;">Select a test from catalog</span>
             </div>
           </div>
 
-          <div class="cv-lab-test-grid">
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">
-                INVESTIGATION TEST <span style="color:var(--cv-danger);">*</span>
-              </label>
-              <select id="labTestSelect" class="cv-form-select" style="height:40px; font-size:0.86rem; width:100%;">
-                <option value="">-- Search &amp; Select Laboratory Test --</option>
-                ${labTestCatalog.map(t => `
-                  <option value="${t.id}" data-code="${escapeHtml(t.testCode)}" data-name="${escapeHtml(t.testName)}" data-cat="${escapeHtml(t.category)}" data-price="${t.price}" data-sample="${escapeHtml(t.sampleType || '')}" data-range="${escapeHtml(t.referenceRange || '')}" data-unit="${escapeHtml(t.unit || '')}">
-                    ${escapeHtml(t.testName)} (${escapeHtml(t.testCode)}) | ${escapeHtml(t.category)} | Sample: ${escapeHtml(t.sampleType || 'Blood')} | ₹${formatCurrency(t.price)}
-                  </option>
-                `).join('')}
-              </select>
+          <div class="cv-lab-test-grid-5">
+            <div class="cv-field-group">
+              <label class="cv-field-label">Investigation Test <span style="color:var(--cv-danger);">*</span></label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><circle cx="11" cy="11" r="7" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2"/></svg>
+                </span>
+                <select id="labTestSelect">
+                  <option value="">Search &amp; Select Laboratory Test...</option>
+                  ${labTestCatalog.map(t => `
+                    <option value="${t.id}" data-code="${escapeHtml(t.testCode)}" data-name="${escapeHtml(t.testName)}" data-cat="${escapeHtml(t.category)}" data-price="${t.price}" data-sample="${escapeHtml(t.sampleType || '')}" data-range="${escapeHtml(t.referenceRange || '')}" data-unit="${escapeHtml(t.unit || '')}">
+                      ${escapeHtml(t.testName)} (${escapeHtml(t.testCode)}) | ${escapeHtml(t.category)} | Sample: ${escapeHtml(t.sampleType || 'Blood')} | ₹${formatCurrency(t.price)}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">SAMPLE TYPE</label>
-              <input type="text" id="labTestSampleType" class="cv-form-input" style="height:40px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Sample Type">
+            <div class="cv-field-group">
+              <label class="cv-field-label">Sample Type</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </span>
+                <input type="text" id="labTestSampleType" readonly placeholder="Sample Type">
+              </div>
             </div>
 
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">NORMAL RANGE</label>
-              <input type="text" id="labTestRefRange" class="cv-form-input" style="height:40px; font-size:0.84rem; background:#f8fafc;" readonly placeholder="Ref Range / Unit">
+            <div class="cv-field-group">
+              <label class="cv-field-label">Normal Range</label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </span>
+                <input type="text" id="labTestRefRange" readonly placeholder="Ref Range / Unit">
+              </div>
             </div>
 
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.3rem; letter-spacing:0.02em;">PRICE (₹) <span style="color:var(--cv-danger);">*</span></label>
-              <input type="number" id="labTestUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:40px; font-weight:700; text-align:right;">
+            <div class="cv-field-group">
+              <label class="cv-field-label">Price (₹) <span style="color:var(--cv-danger);">*</span></label>
+              <div class="cv-input-icon-wrap">
+                <span class="cv-field-icon" style="font-weight:700; font-size:1.05rem;">₹</span>
+                <input type="number" id="labTestUnitPrice" min="0" step="0.01" value="0.00" style="text-align:right; font-weight:700;">
+              </div>
             </div>
 
             <div style="display:flex; align-items:flex-end;">
-              <button type="button" class="cv-btn-primary" id="btnLabAddTest" style="height:40px; padding:0 1.25rem; font-size:0.86rem; font-weight:700; white-space:nowrap; display:inline-flex; align-items:center; gap:0.45rem; width:100%; justify-content:center; box-shadow:0 2px 8px rgba(37, 99, 235, 0.25);">
-                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                + Add Test to Order
+              <button type="button" class="cv-btn-primary" id="btnLabAddTest" style="height:42px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:0.45rem;">
+                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Add Test to List
               </button>
             </div>
           </div>
         </div>
 
-        <!-- 3. Selected Tests / Order Items Table Card -->
+        <!-- 3. Selected Investigations Table Card -->
         <div class="cv-lab-card">
-          <div class="cv-lab-card-header">
+          <div class="cv-lab-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              3. Selected Investigations Table
-              <span id="labItemCountBadge" class="cv-lab-tag" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd; font-size:0.75rem; border-radius:12px; margin-left:0.5rem; font-weight:700;">
+              <svg style="width:20px; height:20px; color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+              Selected Investigations Table
+              <span id="labItemCountBadge" class="cv-lab-count-pill">
                 ${labOrderItems.length} tests
               </span>
             </div>
             ${labOrderItems.length > 0 ? `
-              <button type="button" class="cv-btn-secondary" id="btnLabClearAllTests" style="padding:0.25rem 0.65rem; font-size:0.75rem; color:var(--cv-danger);">
+              <button type="button" class="cv-btn-secondary" id="btnLabClearAllTests" style="padding:0.25rem 0.65rem; font-size:0.75rem; color:#f43f5e;">
                 Clear All
               </button>
             ` : ''}
           </div>
 
-          <div class="cv-bill-table-wrapper" style="overflow-x:auto;">
-            <table class="cv-bill-table cv-lab-table" id="labOrderTable">
+          <div class="cv-table-wrapper" style="overflow-x:auto;">
+            <table class="cv-table cv-lab-table" id="labOrderTable">
               <thead>
                 <tr>
                   <th style="width:45px; text-align:center;">#</th>
-                  <th>Investigation Test Details</th>
+                  <th>Test Name</th>
                   <th style="width:140px;">Category</th>
                   <th style="width:130px;">Sample Type</th>
                   <th style="width:160px;">Reference Interval</th>
@@ -10710,127 +10820,134 @@ const Admin = (function () {
           </div>
         </div>
 
-        <!-- 4. Billing, Discount, GST & Payment Summary Card -->
+        <!-- 4. Financial Details & Payment Card -->
         <div class="cv-lab-card">
-          <div class="cv-lab-card-header">
+          <div class="cv-lab-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
             <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              4. Diagnostic Billing &amp; Payment Settlement
+              <svg style="width:20px; height:20px; color:#0d9488;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+              Financial Details &amp; Payment
             </div>
-            <span class="cv-lab-badge-subtitle">Integrated Central Billing Ledger</span>
           </div>
 
-          <div class="cv-lab-financial-grid">
-            <!-- Left Side: Financial Ledger -->
-            <div class="cv-lab-ledger-card">
-              <div style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.15rem; display:flex; align-items:center; gap:0.4rem;">
-                <svg style="width:15px; height:15px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                Diagnostic Financial Breakdown
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Subtotal</span>
-                <span id="labSummarySubtotal" class="cv-calc-value font-mono">₹0.00</span>
-              </div>
-
-              <!-- Discount Input Row -->
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.45rem;">
-                  <span class="cv-calc-label">Discount (%)</span>
-                  <input type="number" id="labDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0" style="width:65px; height:30px; font-weight:700;">
+          <div class="cv-lab-fin-split" style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; align-items:start;">
+            <!-- Left Section: Breakdown & Final Total -->
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                <div class="cv-fin-box">
+                  <span class="cv-fin-label">Subtotal</span>
+                  <span id="labSummarySubtotal" class="cv-fin-val font-mono">0.00</span>
                 </div>
-                <span id="labDiscountAmount" class="cv-calc-value font-mono" style="color:var(--cv-danger); font-weight:700;">- ₹0.00</span>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Net Amount</span>
-                <span id="labNetAmount" class="cv-calc-value font-mono">₹0.00</span>
-              </div>
-
-              <!-- GSTIN & GST % Row -->
-              <div class="cv-calc-row" style="flex-wrap:wrap; gap:0.5rem;">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <span class="cv-calc-label">GSTIN:</span>
-                  <input type="text" id="labGstinInput" class="cv-form-input" style="width:125px; height:30px; font-size:0.75rem; text-transform:uppercase;" placeholder="29ABCDE1234F">
-                  <span class="cv-calc-label" style="margin-left:0.25rem;">GST (%)</span>
-                  <input type="number" id="labGstPct" class="cv-calc-input" min="0" max="28" step="1" value="0" style="width:55px; height:30px; font-weight:700;">
+                <div class="cv-fin-box" style="display:flex; align-items:center; justify-content:space-between;">
+                  <span class="cv-fin-label">GST (%)</span>
+                  <div style="display:flex; align-items:center; gap:0.35rem;">
+                    <input type="number" id="labGstPct" class="cv-calc-input" min="0" max="28" step="1" value="0" style="width:50px; height:28px; text-align:center;">
+                    <span style="font-size:0.8rem; color:#94a3b8;">%</span>
+                  </div>
                 </div>
-                <span id="labGstAmount" class="cv-calc-value font-mono" style="color:var(--cv-primary); font-weight:700;">+ ₹0.00</span>
               </div>
 
-              <!-- Final Total Card -->
-              <div class="cv-lab-final-card">
-                <div>
-                  <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#38bdf8; font-weight:800;">Amount Payable</div>
-                  <div style="font-size:1.05rem; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">FINAL TOTAL</div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                <div class="cv-fin-box" style="display:flex; align-items:center; justify-content:space-between;">
+                  <span class="cv-fin-label">Discount (%)</span>
+                  <input type="number" id="labDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0" style="width:65px; height:28px; text-align:center;">
                 </div>
-                <span id="labFinalTotal" class="cv-lab-final-total-amount">₹0.00</span>
+                <div class="cv-fin-box">
+                  <span class="cv-fin-label">GST Amount</span>
+                  <span id="labGstAmount" class="cv-fin-val font-mono">0.00</span>
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                <div class="cv-fin-box">
+                  <span class="cv-fin-label">Discount Amount</span>
+                  <span id="labDiscountAmount" class="cv-fin-val font-mono">0.00</span>
+                </div>
+                <div class="cv-fin-box">
+                  <span class="cv-fin-label">Net Amount</span>
+                  <span id="labNetAmount" class="cv-fin-val font-mono">0.00</span>
+                </div>
+              </div>
+
+              <div class="cv-fin-box" style="display:flex; align-items:center; justify-content:space-between;">
+                <span class="cv-fin-label">GSTIN</span>
+                <input type="text" id="labGstinInput" class="cv-form-input" style="width:160px; height:28px; font-size:0.76rem; text-transform:uppercase;" placeholder="29ABCDE1234F">
+              </div>
+
+              <!-- Glowing Final Total Card -->
+              <div class="cv-lab-final-total-pill">
+                <div class="total-label-area">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:24px; height:24px; color:#0d9488;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <div>
+                    <div style="font-size:0.72rem; color:#0f766e; text-transform:uppercase; letter-spacing:0.04em; font-weight:700;">Amount Payable</div>
+                    <div style="font-size:1.05rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">FINAL TOTAL</div>
+                  </div>
+                </div>
+                <span id="labFinalTotal" class="total-amount">₹0.00</span>
               </div>
             </div>
 
-            <!-- Right Side: Payment & Collection -->
-            <div class="cv-lab-settlement-card">
-              <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:0.85rem; align-items:stretch;">
-                <div>
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                    <label style="font-size:0.72rem; font-weight:700; color:#475569; letter-spacing:0.02em; text-transform:uppercase;">
-                      AMOUNT PAID (₹) <span style="color:var(--cv-danger);">*</span>
-                    </label>
-                    <button type="button" id="btnLabPayFull" class="cv-link-btn" title="Set paid amount equal to final total" style="font-size:0.75rem; font-weight:600; color:var(--cv-primary);">
-                      Pay Full
-                    </button>
-                  </div>
-                  <div style="display:flex; gap:0.4rem; align-items:center;">
-                    <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:40px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
-                    <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:40px; padding:0 0.95rem;">
-                      UNPAID
-                    </button>
-                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:40px; padding:0 0.95rem;">
-                      PAID
-                    </button>
+            <!-- Right Section: Paid Amount, Buttons, Balance, Payment Method, Notes, Create Order -->
+            <div style="display:flex; flex-direction:column; gap:0.85rem;">
+              <div style="display:grid; grid-template-columns: 1fr auto auto 1fr; gap:0.6rem; align-items:flex-end;">
+                <div class="cv-field-group" style="margin:0;">
+                  <label class="cv-field-label">Amount Paid (₹) <span style="color:var(--cv-danger);">*</span></label>
+                  <div class="cv-input-icon-wrap">
+                    <span class="cv-field-icon" style="font-weight:700; font-size:1.05rem;">₹</span>
+                    <input type="number" id="labPaidAmount" min="0" step="0.01" value="0.00" style="text-align:right; font-weight:700; font-size:1.05rem;">
                   </div>
                 </div>
 
-                <div class="cv-balance-card">
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:0.68rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Balance Due</span>
-                    <span id="labPaymentStatusBadge" class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.65rem; padding:0.12rem 0.5rem;">PAID</span>
+                <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:42px; padding:0 1.15rem;">
+                  UNPAID
+                </button>
+
+                <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:42px; padding:0 1.15rem;">
+                  PAID
+                </button>
+
+                <div class="cv-lab-balance-pill" style="height:42px;">
+                  <div class="balance-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px; color:#f43f5e;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Balance Due
                   </div>
-                  <div id="labBalanceAmount" style="font-size:1.35rem; font-weight:800; color:var(--cv-danger); text-align:right; line-height:1.2; font-family:monospace;">₹0.00</div>
+                  <span id="labBalanceDue" class="balance-amount">₹0.00</span>
                 </div>
               </div>
 
-              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.85rem;">
-                <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
-                    PAYMENT METHOD
-                  </label>
-                  <select id="labPaymentMethod" class="cv-form-select" style="height:38px; font-size:0.84rem;">
+              <div class="cv-field-group">
+                <label class="cv-field-label">Payment Method</label>
+                <div class="cv-input-icon-wrap">
+                  <span class="cv-field-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><rect x="2" y="5" width="20" height="14" rx="2" stroke-width="2"/><line x1="2" y1="10" x2="22" y2="10" stroke-width="2"/></svg>
+                  </span>
+                  <select id="labPaymentMethod">
                     <option value="CASH">Cash Payment</option>
-                    <option value="UPI">UPI / Digital QR</option>
                     <option value="CARD">Debit / Credit Card</option>
-                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="UPI">UPI / QR Code</option>
+                    <option value="NET_BANKING">Net Banking</option>
                     <option value="INSURANCE">Insurance TPA</option>
-                    <option value="CHEQUE">Cheque</option>
                   </select>
                 </div>
-                <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
-                    CLINICAL / ORDER NOTES
-                  </label>
-                  <input type="text" id="labNotes" class="cv-form-input" style="height:38px; font-size:0.84rem;" placeholder="Clinical indication / fasting notes...">
+              </div>
+
+              <div class="cv-field-group">
+                <label class="cv-field-label">Clinical / Order Notes</label>
+                <div class="cv-input-icon-wrap">
+                  <span class="cv-field-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  </span>
+                  <input type="text" id="labNotes" placeholder="Clinical indication / fasting notes...">
                 </div>
               </div>
 
-              <!-- Action Buttons -->
-              <div style="display:flex; gap:0.75rem; margin-top:0.45rem;">
-                <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="flex:1; height:42px; font-weight:600; font-size:0.88rem;">
+              <div style="display:flex; gap:0.75rem; margin-top:0.35rem;">
+                <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="height:46px; padding:0 1.25rem; display:inline-flex; align-items:center; gap:0.4rem; font-weight:700;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px; height:16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                   Reset
                 </button>
-                <button type="button" class="cv-btn-primary" id="btnLabCreateOrder" style="flex:2; height:42px; font-weight:700; font-size:0.92rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.3);">
-                  <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+
+                <button type="button" class="cv-btn-primary" id="btnLabCreateOrder" style="flex:1; height:46px; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; font-size:1rem; font-weight:800; letter-spacing:0.01em;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:20px; height:20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
                   Create Lab Order
                 </button>
               </div>
@@ -10844,91 +10961,17 @@ const Admin = (function () {
     recalculateLabBill();
   }
 
-  function renderLabPatientAutofillHtml(patient) {
-    if (!patient) {
-      return `
-        <div class="cv-lab-divider"><span>OR DIRECT / WALK-IN PATIENT DETAILS</span></div>
-        <div class="cv-lab-walkin-grid">
-          <div class="cv-lab-field">
-            <label>Patient Full Name <span style="color:var(--cv-danger);">*</span></label>
-            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="e.g. Rajesh Sharma" maxlength="100" autocomplete="off">
-          </div>
-          <div class="cv-lab-field">
-            <label>Phone Number (10 digits)</label>
-            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input" placeholder="e.g. 9876543210" maxlength="10" autocomplete="off">
-          </div>
-          <div class="cv-lab-field">
-            <label>Consulting Doctor</label>
-            <input type="text" id="labWalkinDoctor" class="cv-form-input" placeholder="e.g. Dr. A. Sharma">
-          </div>
-          <div class="cv-lab-field">
-            <label>Department</label>
-            <input type="text" id="labWalkinDept" class="cv-form-input" placeholder="e.g. Diagnostics / General">
-          </div>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="cv-lab-patient-banner">
-        <div style="display:flex; align-items:center; gap:0.85rem;">
-          <div class="cv-lab-patient-avatar">
-            ${escapeHtml((patient.fullName || patient.name || 'P').charAt(0).toUpperCase())}
-          </div>
-          <div>
-            <div style="font-weight:800; font-size:1.05rem; color:#0f172a;">${escapeHtml(patient.fullName || patient.name || '')}</div>
-            <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
-              ${patient.age ? patient.age + ' yrs' : 'Age N/A'} &bull; ${escapeHtml(patient.gender || 'Gender N/A')}
-            </div>
-          </div>
-        </div>
-
-        <div class="cv-lab-autofill-grid">
-          <div class="cv-lab-autofill-item">
-            <label>UHID</label>
-            <span style="font-family:monospace; color:var(--cv-primary); font-weight:700;">${escapeHtml(patient.uhid || 'N/A')}</span>
-          </div>
-          <div class="cv-lab-autofill-item">
-            <label>OP ID</label>
-            <span style="font-family:monospace;">${escapeHtml(patient.opId || 'N/A')}</span>
-          </div>
-          <div class="cv-lab-autofill-item">
-            <label>IP ID</label>
-            <span style="font-family:monospace;">${escapeHtml(patient.ipId || 'N/A')}</span>
-          </div>
-          <div class="cv-lab-autofill-item">
-            <label>Phone Number</label>
-            <span>${escapeHtml(patient.phone || 'N/A')}</span>
-          </div>
-          <div class="cv-lab-autofill-item">
-            <label>Consulting Doctor</label>
-            <span>${escapeHtml(patient.doctorName || 'Dr. On Duty')}</span>
-          </div>
-          <div class="cv-lab-autofill-item">
-            <label>Department</label>
-            <span>${escapeHtml(patient.department || 'Diagnostics')}</span>
-          </div>
-        </div>
-
-        <button type="button" class="cv-btn-secondary" id="btnLabClearPatient" style="padding:0.4rem 0.85rem; font-size:0.8rem; white-space:nowrap; align-self:center; display:inline-flex; align-items:center; gap:0.35rem;">
-          <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Change Patient
-        </button>
-      </div>
-    `;
-  }
-
   function renderLabOrderTableBodyHtml() {
     if (!labOrderItems || labOrderItems.length === 0) {
       return `
         <tr>
-          <td colspan="7" style="text-align:center; padding:2.5rem 1rem; color:var(--cv-text-muted);">
+          <td colspan="7" style="text-align:center; padding:2.5rem 1rem; color:#94a3b8;">
             <div style="display:flex; flex-direction:column; align-items:center; gap:0.5rem;">
-              <svg style="width:36px; height:36px; color:#cbd5e1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style="width:36px; height:36px; color:#0d9488; opacity:0.8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
               </svg>
-              <div style="font-weight:600; color:#475569; font-size:0.9rem;">No laboratory tests added yet</div>
-              <div style="font-size:0.8rem; color:#94a3b8;">Select a test from the master catalog above and click <strong>+ Add Test to Order</strong></div>
+              <div style="font-weight:700; color:#e2e8f0; font-size:0.95rem;">No laboratory tests added yet</div>
+              <div style="font-size:0.82rem; color:#94a3b8;">Select a test from the master catalog above and click <strong>+ Add Test to List</strong></div>
             </div>
           </td>
         </tr>
@@ -10937,22 +10980,22 @@ const Admin = (function () {
 
     return labOrderItems.map((item, idx) => `
       <tr data-index="${idx}">
-        <td style="text-align:center; color:#64748b; font-weight:600; font-size:0.82rem;">${idx + 1}</td>
+        <td style="text-align:center; color:#94a3b8; font-weight:700; font-size:0.85rem;">${idx + 1}</td>
         <td>
-          <div style="font-weight:700; color:#0f172a; font-size:0.9rem;">${escapeHtml(item.testName)}</div>
+          <div style="font-weight:700; color:#ffffff; font-size:0.92rem;">${escapeHtml(item.testName)}</div>
           <div style="margin-top:0.15rem;">
             <span class="cv-lab-tag">${escapeHtml(item.testCode)}</span>
           </div>
         </td>
         <td><span class="cv-lab-cat-pill">${escapeHtml(item.category || 'General')}</span></td>
         <td><span class="cv-lab-sample-pill">${escapeHtml(item.sampleType || 'Blood')}</span></td>
-        <td style="font-size:0.82rem; color:#475569; font-family:monospace;">${escapeHtml(item.referenceRange || 'N/A')} ${escapeHtml(item.unit || '')}</td>
+        <td style="font-size:0.84rem; color:#cbd5e1; font-family:monospace;">${escapeHtml(item.referenceRange || 'N/A')} ${escapeHtml(item.unit || '')}</td>
         <td style="text-align:right;">
           <input type="number" class="cv-form-input lab-item-rate" data-index="${idx}" min="0" step="0.01" value="${Number(item.price).toFixed(2)}" style="height:34px; width:105px; text-align:right; font-weight:700; display:inline-block; font-size:0.88rem;">
         </td>
         <td style="text-align:center;">
-          <button type="button" class="btn-remove-lab-item" data-index="${idx}" title="Remove test" style="background:none; border:none; cursor:pointer; color:#ef4444; padding:5px; border-radius:6px; transition:background 0.15s ease;">
-            <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          <button type="button" class="btn-remove-lab-item" data-index="${idx}" title="Remove test" style="background:none; border:none; cursor:pointer; color:#ef4444; padding:5px; border-radius:6px; transition:all 0.15s ease;">
+            <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         </td>
       </tr>
@@ -10962,6 +11005,28 @@ const Admin = (function () {
   function setupLabOrderEvents() {
     bindStrictNameInput(document.getElementById('labWalkinName'));
     bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
+
+    // Mode Switchers
+    document.getElementById('btnLabModeRegistered')?.addEventListener('click', () => {
+      labIsWalkinMode = false;
+      document.getElementById('btnLabModeRegistered')?.classList.add('active');
+      document.getElementById('btnLabModeWalkin')?.classList.remove('active');
+      const wrap = document.getElementById('labPatientSearchWrap');
+      if (wrap) wrap.style.display = 'block';
+    });
+
+    document.getElementById('btnLabModeWalkin')?.addEventListener('click', () => {
+      labIsWalkinMode = true;
+      document.getElementById('btnLabModeWalkin')?.classList.add('active');
+      document.getElementById('btnLabModeRegistered')?.classList.remove('active');
+      const wrap = document.getElementById('labPatientSearchWrap');
+      if (wrap) wrap.style.display = 'none';
+      clearLabPatient();
+    });
+
+    document.getElementById('btnLabBackDashboard')?.addEventListener('click', () => {
+      navigateTo('dashboard', 'main', () => renderDashboardLayout(false));
+    });
 
     // 1. Patient search autocomplete
     const searchInput = document.getElementById('labPatientSearchInput');
@@ -10986,18 +11051,18 @@ const Admin = (function () {
               dropdown.innerHTML = sorted.map(p => `
                 <div class="cv-patient-dropdown-item" data-patient='${JSON.stringify(p).replace(/'/g, "&apos;")}'>
                   <div>
-                    <div style="font-weight:700; color:var(--cv-text-main); font-size:0.9rem;">
+                    <div style="font-weight:700; color:#ffffff; font-size:0.9rem;">
                       ${escapeHtml(p.fullName)}
                     </div>
-                    <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; gap:0.5rem; margin-top:0.15rem;">
-                      <span>UHID: <strong style="color:var(--cv-primary); font-family:monospace;">${escapeHtml(p.uhid)}</strong></span>
+                    <div style="font-size:0.75rem; color:#94a3b8; display:flex; gap:0.5rem; margin-top:0.15rem;">
+                      <span>UHID: <strong style="color:#0f766e; font-family:monospace;">${escapeHtml(p.uhid)}</strong></span>
                       ${p.opId ? `<span>OP: <strong style="font-family:monospace;">${escapeHtml(p.opId)}</strong></span>` : ''}
                       ${p.ipId ? `<span>IP: <strong style="font-family:monospace;">${escapeHtml(p.ipId)}</strong></span>` : ''}
                       <span>Phone: ${escapeHtml(p.phone || 'N/A')}</span>
                     </div>
                   </div>
                   <div>
-                    <span style="font-size:0.72rem; background:#dbeafe; color:#1e40af; padding:0.2rem 0.5rem; border-radius:12px; font-weight:700;">Select</span>
+                    <span style="font-size:0.72rem; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; padding:0.2rem 0.5rem; border-radius:12px; font-weight:700;">Select</span>
                   </div>
                 </div>
               `).join('');
@@ -11014,7 +11079,7 @@ const Admin = (function () {
                 });
               });
             } else {
-              dropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:var(--cv-text-muted); font-size:0.85rem;">No matching patients found.</div>`;
+              dropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:#94a3b8; font-size:0.85rem;">No matching patients found.</div>`;
               dropdown.style.display = 'block';
             }
           } catch (err) {
@@ -11073,23 +11138,12 @@ const Admin = (function () {
       }
     });
 
-    // 5. Discount, GST, Paid Amount calculation triggers
+    // 5. Calculation triggers
     document.getElementById('labDiscountPct')?.addEventListener('input', recalculateLabBill);
     document.getElementById('labGstPct')?.addEventListener('input', recalculateLabBill);
     document.getElementById('labPaidAmount')?.addEventListener('input', recalculateLabBill);
 
-    // 6. Pay Full Amount button
-    document.getElementById('btnLabPayFull')?.addEventListener('click', () => {
-      const finalTotalStr = document.getElementById('labFinalTotal')?.textContent?.replace('₹', '')?.replace(/,/g, '')?.trim();
-      const finalTotal = parseFloat(finalTotalStr) || 0;
-      const paidInput = document.getElementById('labPaidAmount');
-      if (paidInput) {
-        paidInput.value = finalTotal.toFixed(2);
-        recalculateLabBill();
-      }
-    });
-
-    // 7. Reset Order
+    // 6. Reset Order
     document.getElementById('btnLabResetOrder')?.addEventListener('click', () => {
       if (confirm('Reset the laboratory order form?')) {
         labOrderItems = [];
@@ -11099,403 +11153,102 @@ const Admin = (function () {
       }
     });
 
-    // 8. Create Lab Order
+    // 7. Create Lab Order
     document.getElementById('btnLabCreateOrder')?.addEventListener('click', createLabOrder);
 
-    // 9. Direct PAID Button Handler (Single-Click Real MySQL Payment Collection)
+    // 8. Direct PAID Button Handler
     document.getElementById('btnLabDirectPaid')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      if (btn.disabled || btn.dataset.processing === 'true') return;
-
-      const amtVal = document.getElementById('labPaidAmount')?.value;
-      if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
-        showToast('Please enter an amount to pay.', 'danger');
-        return;
+      const finalTotalStr = document.getElementById('labFinalTotal')?.textContent?.replace('₹', '')?.replace(/,/g, '')?.trim();
+      const finalTotal = parseFloat(finalTotalStr) || 0;
+      const paidInput = document.getElementById('labPaidAmount');
+      if (paidInput) {
+        paidInput.value = finalTotal.toFixed(2);
       }
-      const numAmt = parseFloat(amtVal);
-      if (isNaN(numAmt) || numAmt <= 0) {
-        showToast('Payment amount must be greater than zero.', 'danger');
-        return;
-      }
-
-      // SUBSEQUENT PAYMENT ON ALREADY CREATED LAB ORDER
-      if (labActiveSavedOrder) {
-        const curBal = (labActiveSavedOrder.balanceAmount != null)
-          ? parseFloat(labActiveSavedOrder.balanceAmount)
-          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - (labActiveSavedOrder.paidAmount || 0));
-
-        if (curBal <= 0) {
-          showToast('This laboratory order is already fully paid.', 'info');
-          return;
-        }
-        if (numAmt > curBal + 0.001) {
-          showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
-          return;
-        }
-
-        await executeBillPayment({
-          moduleType: 'LABORATORY',
-          billId: labActiveSavedOrder.id,
-          billNumber: labActiveSavedOrder.orderNumber,
-          amount: numAmt,
-          balance: curBal,
-          paymentMethod: document.getElementById('labPaymentMethod')?.value || 'CASH',
-          buttonEl: btn,
-          onSuccess: async (data) => {
-            labActiveSavedOrder.paidAmount = data.amountPaid;
-            labActiveSavedOrder.balanceAmount = data.balanceAmount;
-            labActiveSavedOrder.paymentStatus = data.paymentStatus;
-            labActiveSavedOrder.paymentMethod = data.paymentMethod;
-
-            const isNowPaid = (data.balanceAmount <= 0);
-            const balElem = document.getElementById('labBalanceAmount');
-            if (balElem) balElem.textContent = '₹' + formatCurrency(data.balanceAmount);
-
-            const statusBadge = document.getElementById('labPaymentStatusBadge');
-            if (statusBadge) {
-              statusBadge.textContent = data.paymentStatus;
-              statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
-            }
-
-            const amtInput = document.getElementById('labPaidAmount');
-            if (amtInput) {
-              amtInput.value = isNowPaid ? '0.00' : data.balanceAmount.toFixed(2);
-              amtInput.disabled = isNowPaid;
-            }
-
-            if (btn) {
-              btn.disabled = isNowPaid;
-              delete btn.dataset.processing;
-              btn.innerHTML = 'PAID';
-            }
-
-            showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
-          }
-        });
-        return;
-      }
-
-      // INITIAL LAB ORDER CREATION + PAYMENT RECORDING
-      let patientName = '';
-      let uhid = '';
-      let phone = '';
-      let opId = '';
-      let ipId = '';
-      let doctorName = '';
-      let department = '';
-      let patientId = null;
-
-      if (labSelectedPatient) {
-        patientId = labSelectedPatient.id;
-        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
-        uhid = labSelectedPatient.uhid || '';
-        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
-        opId = labSelectedPatient.opId || '';
-        ipId = labSelectedPatient.ipId || '';
-        doctorName = labSelectedPatient.doctorName || '';
-        department = labSelectedPatient.department || '';
-      } else {
-        const rawName = document.getElementById('labWalkinName')?.value;
-        const rawPhone = document.getElementById('labWalkinPhone')?.value;
-        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
-        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
-
-        const vName = validatePatientName(rawName, true);
-        if (!vName.valid) {
-          showToast(vName.message, 'danger');
-          document.getElementById('labWalkinName')?.focus();
-          return;
-        }
-
-        const vPhone = validatePatientPhone(rawPhone, false);
-        if (!vPhone.valid) {
-          showToast(vPhone.message, 'danger');
-          document.getElementById('labWalkinPhone')?.focus();
-          return;
-        }
-
-        patientName = vName.value;
-        phone = vPhone.value || '';
-        doctorName = walkinDoctor || 'Dr. On Duty';
-        department = walkinDept || 'Diagnostics';
-        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
-      }
-
-      if (!labOrderItems || labOrderItems.length === 0) {
-        showToast('Please add at least one laboratory test to the order.', 'danger');
-        return;
-      }
-
-      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
-      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
-      const notes = document.getElementById('labNotes')?.value?.trim() || '';
-
-      const subtotal = labOrderItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
-      const discountAmount = parseFloat(((subtotal * discountPercentage) / 100).toFixed(2));
-      const netAmount = Math.max(0, subtotal - discountAmount);
-      const gstAmount = parseFloat(((netAmount * gstPercentage) / 100).toFixed(2));
-      const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-
-      if (numAmt > finalTotal + 0.001) {
-        showToast(`Payment amount cannot exceed the order total of ₹${formatCurrency(finalTotal)}.`, 'danger');
-        return;
-      }
-
-      const payload = {
-        patientId: patientId,
-        patientName: patientName,
-        uhid: uhid,
-        phone: phone,
-        opId: opId,
-        ipId: ipId,
-        doctorName: doctorName,
-        department: department,
-        discountPercentage: discountPercentage,
-        gstPercentage: gstPercentage,
-        gstin: gstin,
-        paidAmount: numAmt,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        items: labOrderItems.map(item => ({
-          testId: item.testId,
-          testCode: item.testCode,
-          testName: item.testName,
-          category: item.category,
-          sampleType: item.sampleType,
-          price: item.price,
-          referenceRange: item.referenceRange,
-          unit: item.unit
-        }))
-      };
-
-      btn.disabled = true;
-      btn.dataset.processing = 'true';
-      btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-
-      try {
-        const res = await Api.post('/api/laboratory/orders', payload);
-        if (res && res.success && res.data) {
-          const createdOrder = res.data;
-          labActiveSavedOrder = createdOrder;
-
-          // Clear items to prevent duplicate order generation on next click
-          labOrderItems = [];
-          const tbody = document.getElementById('labOrderTableBody');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved to MySQL.</td></tr>`;
-
-          const isNowPaid = (createdOrder.balanceAmount <= 0);
-
-          const balElem = document.getElementById('labBalanceAmount');
-          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
-
-          const statusBadge = document.getElementById('labPaymentStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = createdOrder.paymentStatus;
-            statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
-          }
-
-          const amtInput = document.getElementById('labPaidAmount');
-          if (amtInput) {
-            amtInput.value = isNowPaid ? '0.00' : createdOrder.balanceAmount.toFixed(2);
-            amtInput.disabled = isNowPaid;
-          }
-
-          btn.disabled = isNowPaid;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-
-          showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} recorded for Order ${createdOrder.orderNumber}. Total Paid: ₹${formatCurrency(createdOrder.paidAmount)}, Balance: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'success');
-        } else {
-          showToast((res && res.message) ? res.message : 'Failed to save laboratory payment.', 'danger');
-          btn.disabled = false;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-        }
-      } catch (err) {
-        showToast('Error recording laboratory payment: ' + (err.message || err), 'danger');
-        btn.disabled = false;
-        delete btn.dataset.processing;
-        btn.innerHTML = 'PAID';
-      }
+      recalculateLabBill();
+      showToast(`Paid in full: ₹${formatCurrency(finalTotal)}`, 'success');
     });
 
-    // 10. Direct UNPAID Button Handler
-    async function processLabUnpaidAction(btn) {
-      if (btn && (btn.disabled || btn.dataset.processing === 'true')) return;
-      const amtInput = document.getElementById('labPaidAmount');
-      if (amtInput) amtInput.value = '0.00';
+    // 9. Direct UNPAID Button Handler
+    document.getElementById('btnLabDirectUnpaid')?.addEventListener('click', (e) => {
+      const paidInput = document.getElementById('labPaidAmount');
+      if (paidInput) {
+        paidInput.value = '0.00';
+      }
       recalculateLabBill();
+      showToast('Marked as UNPAID (₹0.00)', 'info');
+    });
 
-      // Case A: Subsequent payment on already created lab order
-      if (labActiveSavedOrder) {
-        const curPaid = (labActiveSavedOrder.paidAmount != null) ? parseFloat(labActiveSavedOrder.paidAmount) : 0;
-        const curBal = (labActiveSavedOrder.balanceAmount != null)
-          ? parseFloat(labActiveSavedOrder.balanceAmount)
-          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - curPaid);
-
-        if (curPaid > 0) {
-          showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
-        } else {
-          showToast(`Laboratory order remains UNPAID (₹0.00 collected). Full balance of ₹${formatCurrency(curBal)} remains due.`, 'info');
-        }
-        return;
-      }
-
-      // Case B: Initial Lab Order Creation with UNPAID status
-      let patientName = '';
-      let uhid = '';
-      let phone = '';
-      let opId = '';
-      let ipId = '';
-      let doctorName = '';
-      let department = '';
-      let patientId = null;
-
-      if (labSelectedPatient) {
-        patientId = labSelectedPatient.id;
-        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
-        uhid = labSelectedPatient.uhid || '';
-        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
-        opId = labSelectedPatient.opId || '';
-        ipId = labSelectedPatient.ipId || '';
-        doctorName = labSelectedPatient.doctorName || '';
-        department = labSelectedPatient.department || '';
-      } else {
-        const rawName = document.getElementById('labWalkinName')?.value;
-        const rawPhone = document.getElementById('labWalkinPhone')?.value;
-        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
-        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
-
-        const vName = validatePatientName(rawName, true);
-        if (!vName.valid) {
-          showToast(vName.message, 'danger');
-          document.getElementById('labWalkinName')?.focus();
-          return;
-        }
-
-        const vPhone = validatePatientPhone(rawPhone, false);
-        if (!vPhone.valid) {
-          showToast(vPhone.message, 'danger');
-          document.getElementById('labWalkinPhone')?.focus();
-          return;
-        }
-
-        patientName = vName.value;
-        phone = vPhone.value || '';
-        doctorName = walkinDoctor || 'Dr. On Duty';
-        department = walkinDept || 'Diagnostics';
-        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
-      }
-
-      if (!labOrderItems || labOrderItems.length === 0) {
-        showToast('Please add at least one laboratory test to the order.', 'danger');
-        return;
-      }
-
-      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
-      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
-      const notes = document.getElementById('labNotes')?.value?.trim() || '';
-
-      const payload = {
-        patientId: patientId,
-        patientName: patientName,
-        uhid: uhid,
-        phone: phone,
-        opId: opId,
-        ipId: ipId,
-        doctorName: doctorName,
-        department: department,
-        discountPercentage: discountPercentage,
-        gstPercentage: gstPercentage,
-        gstin: gstin,
-        paidAmount: 0.00,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        items: labOrderItems.map(item => ({
-          testId: item.testId,
-          testCode: item.testCode,
-          testName: item.testName,
-          category: item.category,
-          sampleType: item.sampleType,
-          price: item.price,
-          referenceRange: item.referenceRange,
-          unit: item.unit
-        }))
-      };
-
-      if (btn) {
-        btn.disabled = true;
-        btn.dataset.processing = 'true';
-        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-      }
-
-      try {
-        const res = await Api.post('/api/laboratory/orders', payload);
-        if (res && res.success && res.data) {
-          const createdOrder = res.data;
-          labActiveSavedOrder = createdOrder;
-
-          labOrderItems = [];
-          const tbody = document.getElementById('labOrderTableBody');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved as UNPAID to MySQL.</td></tr>`;
-
-          const balElem = document.getElementById('labBalanceAmount');
-          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
-
-          const statusBadge = document.getElementById('labPaymentStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = createdOrder.paymentStatus || 'UNPAID';
-            statusBadge.className = 'cv-payment-balance-badge cv-badge-unpaid';
-          }
-
-          if (amtInput) {
-            amtInput.value = createdOrder.balanceAmount.toFixed(2);
-            amtInput.disabled = false;
-          }
-
-          if (btn) {
-            btn.disabled = false;
-            delete btn.dataset.processing;
-            btn.innerHTML = 'UNPAID';
-          }
-
-          showToast(`Laboratory order ${createdOrder.orderNumber} recorded as UNPAID. Balance due: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'info');
-        } else {
-          showToast((res && res.message) ? res.message : 'Failed to save laboratory order.', 'danger');
-          if (btn) {
-            btn.disabled = false;
-            delete btn.dataset.processing;
-            btn.innerHTML = 'UNPAID';
-          }
-        }
-      } catch (err) {
-        showToast('Error recording laboratory order: ' + (err.message || err), 'danger');
-        if (btn) {
-          btn.disabled = false;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'UNPAID';
-        }
-      }
-    }
-
-    document.getElementById('btnLabDirectUnpaid')?.addEventListener('click', (e) => processLabUnpaidAction(e.currentTarget));
-
-    // Bind table events
     bindLabTableEvents();
   }
 
+  function selectLabPatient(p) {
+    labSelectedPatient = p;
+    labActiveSavedOrder = null;
+    const searchInput = document.getElementById('labPatientSearchInput');
+    const dropdown = document.getElementById('labPatientDropdown');
+
+    if (searchInput) searchInput.value = `${p.fullName} (${p.uhid})`;
+    if (dropdown) dropdown.style.display = 'none';
+
+    // Populate all 10 fields in the grid
+    const nameInput = document.getElementById('labWalkinName');
+    if (nameInput) nameInput.value = p.fullName || p.name || '';
+    const phoneInput = document.getElementById('labWalkinPhone');
+    if (phoneInput) phoneInput.value = p.phone || '';
+    const uhidInput = document.getElementById('labWalkinUhid');
+    if (uhidInput) uhidInput.value = p.uhid || '';
+    const opIdInput = document.getElementById('labWalkinOpId');
+    if (opIdInput) opIdInput.value = p.opId || '';
+    const ipIdInput = document.getElementById('labWalkinIpId');
+    if (ipIdInput) ipIdInput.value = p.ipId || '';
+    const ageInput = document.getElementById('labWalkinAge');
+    if (ageInput) ageInput.value = p.age || '';
+    const genderSelect = document.getElementById('labWalkinGender');
+    if (genderSelect && p.gender) genderSelect.value = p.gender;
+    const bgSelect = document.getElementById('labWalkinBloodGroup');
+    if (bgSelect && p.bloodGroup) bgSelect.value = p.bloodGroup;
+    const docInput = document.getElementById('labWalkinDoctor');
+    if (docInput) docInput.value = p.doctorName || 'Dr. A. Sharma';
+    const deptInput = document.getElementById('labWalkinDept');
+    if (deptInput) deptInput.value = p.department || 'General Medicine';
+
+    const badge = document.getElementById('labPatientSelectedBadge');
+    if (badge) {
+      badge.innerHTML = `<span class="cv-stock-info-pill cv-stock-in" style="cursor:pointer;" id="btnLabClearPatient">Selected: ${escapeHtml(p.fullName || p.name)} (Click to Change)</span>`;
+      document.getElementById('btnLabClearPatient')?.addEventListener('click', clearLabPatient);
+    }
+  }
+
+  function clearLabPatient() {
+    labSelectedPatient = null;
+    labActiveSavedOrder = null;
+    const searchInput = document.getElementById('labPatientSearchInput');
+    if (searchInput) searchInput.value = '';
+
+    const nameInput = document.getElementById('labWalkinName');
+    if (nameInput) nameInput.value = '';
+    const phoneInput = document.getElementById('labWalkinPhone');
+    if (phoneInput) phoneInput.value = '';
+    const uhidInput = document.getElementById('labWalkinUhid');
+    if (uhidInput) uhidInput.value = '';
+    const opIdInput = document.getElementById('labWalkinOpId');
+    if (opIdInput) opIdInput.value = '';
+    const ipIdInput = document.getElementById('labWalkinIpId');
+    if (ipIdInput) ipIdInput.value = '';
+    const ageInput = document.getElementById('labWalkinAge');
+    if (ageInput) ageInput.value = '';
+
+    const badge = document.getElementById('labPatientSelectedBadge');
+    if (badge) badge.innerHTML = '';
+  }
+
   function bindLabTableEvents() {
-    // Rate inline edit
+    // Rate inputs
     document.querySelectorAll('.lab-item-rate').forEach(input => {
       input.addEventListener('change', (e) => {
         const idx = parseInt(e.target.getAttribute('data-index'));
         const item = labOrderItems[idx];
         if (!item) return;
-
         let newRate = parseFloat(e.target.value) || 0;
         if (newRate < 0) newRate = 0;
         item.price = newRate;
@@ -11515,39 +11268,11 @@ const Admin = (function () {
     });
   }
 
-  function selectLabPatient(p) {
-    labSelectedPatient = p;
-    labActiveSavedOrder = null;
-    const searchInput = document.getElementById('labPatientSearchInput');
-    const dropdown = document.getElementById('labPatientDropdown');
-    const container = document.getElementById('labPatientAutofillContainer');
-
-    if (searchInput) searchInput.value = `${p.fullName} (${p.uhid})`;
-    if (dropdown) dropdown.style.display = 'none';
-    if (container) {
-      container.innerHTML = renderLabPatientAutofillHtml(labSelectedPatient);
-      document.getElementById('btnLabClearPatient')?.addEventListener('click', clearLabPatient);
-    }
-  }
-
-  function clearLabPatient() {
-    labSelectedPatient = null;
-    labActiveSavedOrder = null;
-    const searchInput = document.getElementById('labPatientSearchInput');
-    const container = document.getElementById('labPatientAutofillContainer');
-    if (searchInput) searchInput.value = '';
-    if (container) {
-      container.innerHTML = renderLabPatientAutofillHtml(null);
-      bindStrictNameInput(document.getElementById('labWalkinName'));
-      bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
-    }
-  }
-
   function addTestToLabOrder() {
     const testSelect = document.getElementById('labTestSelect');
     const opt = testSelect?.selectedOptions?.[0];
     if (!opt || !opt.value) {
-      alert('Please select a laboratory test to add.');
+      showToast('Please select a laboratory test to add.', 'warning');
       return;
     }
 
@@ -11562,7 +11287,7 @@ const Admin = (function () {
 
     const existingIdx = labOrderItems.findIndex(i => i.testId === testId);
     if (existingIdx >= 0) {
-      alert(`The test "${testName}" is already added to this order.`);
+      showToast(`The test "${testName}" is already added to this order.`, 'info');
       return;
     }
 
@@ -11583,6 +11308,7 @@ const Admin = (function () {
     document.getElementById('labTestUnitPrice').value = '0.00';
 
     refreshLabOrderTable();
+    showToast(`Added ${testName} to order.`, 'success');
   }
 
   function refreshLabOrderTable() {
@@ -11616,51 +11342,24 @@ const Admin = (function () {
 
     let balance = parseFloat(Math.max(0, finalTotal - paidAmount).toFixed(2));
 
-    let status = 'UNPAID';
-    let statusClass = 'cv-badge-unpaid';
-
-    if (finalTotal > 0) {
-      if (paidAmount >= finalTotal) {
-        status = 'PAID';
-        statusClass = 'cv-badge-paid';
-        balance = 0;
-      } else if (paidAmount > 0) {
-        status = 'PARTIALLY PAID';
-        statusClass = 'cv-badge-partial';
-      } else {
-        status = 'UNPAID';
-        statusClass = 'cv-badge-unpaid';
-      }
-    } else {
-      status = 'PAID';
-      statusClass = 'cv-badge-paid';
-      balance = 0;
-    }
-
     // Update DOM
     const subtotalElem = document.getElementById('labSummarySubtotal');
-    if (subtotalElem) subtotalElem.textContent = `₹${formatCurrency(subtotal)}`;
+    if (subtotalElem) subtotalElem.textContent = formatCurrency(subtotal);
 
     const discountAmtElem = document.getElementById('labDiscountAmount');
-    if (discountAmtElem) discountAmtElem.textContent = `- ₹${formatCurrency(discountAmount)}`;
+    if (discountAmtElem) discountAmtElem.textContent = formatCurrency(discountAmount);
 
     const netAmountElem = document.getElementById('labNetAmount');
-    if (netAmountElem) netAmountElem.textContent = `₹${formatCurrency(netAmount)}`;
+    if (netAmountElem) netAmountElem.textContent = formatCurrency(netAmount);
 
     const gstAmountElem = document.getElementById('labGstAmount');
-    if (gstAmountElem) gstAmountElem.textContent = `+ ₹${formatCurrency(gstAmount)}`;
+    if (gstAmountElem) gstAmountElem.textContent = formatCurrency(gstAmount);
 
     const finalTotalElem = document.getElementById('labFinalTotal');
     if (finalTotalElem) finalTotalElem.textContent = `₹${formatCurrency(finalTotal)}`;
 
-    const balanceElem = document.getElementById('labBalanceAmount');
+    const balanceElem = document.getElementById('labBalanceDue') || document.getElementById('labBalanceAmount');
     if (balanceElem) balanceElem.textContent = `₹${formatCurrency(balance)}`;
-
-    const statusBadge = document.getElementById('labPaymentStatusBadge');
-    if (statusBadge) {
-      statusBadge.textContent = status;
-      statusBadge.className = `cv-payment-balance-badge ${statusClass}`;
-    }
   }
 
   async function createLabOrder() {
@@ -11690,14 +11389,14 @@ const Admin = (function () {
 
       const vName = validatePatientName(rawName, true);
       if (!vName.valid) {
-        alert(vName.message);
+        showToast(vName.message, 'danger');
         document.getElementById('labWalkinName')?.focus();
         return;
       }
 
       const vPhone = validatePatientPhone(rawPhone, false);
       if (!vPhone.valid) {
-        alert(vPhone.message);
+        showToast(vPhone.message, 'danger');
         document.getElementById('labWalkinPhone')?.focus();
         return;
       }
@@ -11706,11 +11405,13 @@ const Admin = (function () {
       phone = vPhone.value || '';
       doctorName = walkinDoctor || 'Dr. On Duty';
       department = walkinDept || 'Diagnostics';
-      uhid = 'WALKIN-' + Date.now().toString().slice(-6);
+      uhid = document.getElementById('labWalkinUhid')?.value || ('WALKIN-' + Date.now().toString().slice(-6));
+      opId = document.getElementById('labWalkinOpId')?.value || '';
+      ipId = document.getElementById('labWalkinIpId')?.value || '';
     }
 
     if (!labOrderItems || labOrderItems.length === 0) {
-      alert('Please add at least one laboratory test to the order.');
+      showToast('Please add at least one laboratory test to the order.', 'danger');
       return;
     }
 
@@ -11758,7 +11459,7 @@ const Admin = (function () {
       const res = await Api.post('/api/laboratory/orders', payload);
       if (res && res.success && res.data) {
         const createdOrder = res.data;
-        alert(`Laboratory order created successfully!\n\nLab Order ID: ${createdOrder.orderNumber}\nTotal Amount: ₹${formatCurrency(createdOrder.finalTotal)}\nPayment Status: ${createdOrder.paymentStatus}`);
+        showToast(`Laboratory order ${createdOrder.orderNumber} created successfully! Total: ₹${formatCurrency(createdOrder.finalTotal)}, Payment: ${createdOrder.paymentStatus}`, 'success');
 
         labOrderItems = [];
         labSelectedPatient = null;
@@ -11768,11 +11469,11 @@ const Admin = (function () {
           switchLabTab('processing');
         }
       } else {
-        alert(res?.message || 'Failed to create laboratory order.');
+        showToast(res?.message || 'Failed to create laboratory order.', 'danger');
       }
     } catch (err) {
       console.error('Error creating lab order:', err);
-      alert('Network or server error while creating laboratory order.');
+      showToast('Network or server error while creating laboratory order.', 'danger');
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -11781,7 +11482,6 @@ const Admin = (function () {
     }
   }
 
-  // ------------------------------------------------------------------
   // TAB 2: LABORATORY PROCESSING
   // ------------------------------------------------------------------
   let labProcessingPagination = null;
@@ -18580,10 +18280,10 @@ const Admin = (function () {
         </div>
 
         <!-- FINANCIAL SECTIONS AREA (Separate Tabs / Navigation Buttons) -->
-        <div class="cv-card" style="padding:0.75rem 1rem; margin-bottom:1.25rem; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0; border-radius:10px;">
+        <div class="cv-card" style="padding:0.75rem 1rem; margin-bottom:1.25rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
             <div style="display:flex; align-items:center; gap:0.5rem;">
-              <span style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:0.4rem;">
+              <span style="font-size:0.78rem; font-weight:800; color:#0f766e; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:0.4rem;">
                 <svg style="width:16px; height:16px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                 FINANCIAL SECTIONS:
               </span>
@@ -18624,10 +18324,10 @@ const Admin = (function () {
         <div class="cv-card" style="padding:1.25rem; margin-bottom:1.25rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
             <div>
-              <div style="font-size:0.75rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">SECTION D &bull; EXECUTIVE FINANCIAL SUMMARY</div>
+              <div style="font-size:0.75rem; font-weight:800; color:#0f766e; text-transform:uppercase; letter-spacing:0.04em;">SECTION D &bull; EXECUTIVE FINANCIAL SUMMARY</div>
               <h2 style="font-size:1.15rem; font-weight:800; color:var(--cv-deep-blue); margin:0.2rem 0 0 0;">Overall Financial Performance</h2>
             </div>
-            <div style="font-size:0.75rem; color:#64748b; background:#f1f5f9; padding:0.35rem 0.75rem; border-radius:6px;">
+            <div style="font-size:0.75rem; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; padding:0.35rem 0.75rem; border-radius:6px;">
               Sales &amp; Collections are separated &bull; Zero Double-Counting
             </div>
           </div>
@@ -18651,11 +18351,11 @@ const Admin = (function () {
             </div>
 
             <!-- 2. Total Collection / Received -->
-            <div class="cv-money-kpi-card" style="border-left:4px solid #059669; background:#ffffff;">
+            <div class="cv-money-kpi-card cv-money-kpi-coll">
               <div>
                 <div class="cv-money-kpi-title">
                   <span>TOTAL COLLECTION</span>
-                  <span style="font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:4px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;">RECEIVED</span>
+                  <span class="cv-money-badge-coll">RECEIVED</span>
                 </div>
                 <div class="cv-money-kpi-amount" style="color:#059669;">₹${formatCurrency(data.totalRevenueCollected)}</div>
               </div>
@@ -18663,6 +18363,9 @@ const Admin = (function () {
                 <div style="display:flex; justify-content:space-between;">
                   <span>Actual Cash Realized:</span>
                   <strong style="color:#059669;">₹${formatCurrency(data.totalRevenueCollected)}</strong>
+                </div>
+              </div>
+            </div>
                 </div>
               </div>
             </div>
