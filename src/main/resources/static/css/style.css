@@ -848,7 +848,7 @@ body.cv-dashboard-active #app {
   padding: 2rem 2.5rem;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--cv-bg);
+  background: transparent;
 }
 
 .cv-page-header {
@@ -876,20 +876,24 @@ body.cv-dashboard-active #app {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.25rem;
   margin-bottom: 2rem;
+  background: transparent;
 }
 
 .cv-metric-card {
-  background: var(--cv-surface);
-  border: 1px solid var(--cv-border);
-  border-radius: var(--cv-radius-md);
+  background: rgba(255, 255, 255, 0.20);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 14px;
   padding: 1.5rem;
-  box-shadow: var(--cv-shadow-xs);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
   transition: var(--cv-transition);
 }
 
 .cv-metric-card:hover {
-  box-shadow: var(--cv-shadow-sm);
-  border-color: var(--cv-primary-border);
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06);
 }
 
 .cv-metric-label {
@@ -917,11 +921,13 @@ body.cv-dashboard-active #app {
 
 /* Empty State / Welcome Canvas */
 .cv-welcome-card {
-  background: var(--cv-surface);
-  border: 1px solid var(--cv-border);
-  border-radius: var(--cv-radius-lg);
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 14px;
   padding: 2rem 2.25rem;
-  box-shadow: var(--cv-shadow-xs);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
 }
 
 .cv-welcome-card h2 {
@@ -1543,11 +1549,13 @@ body.cv-dashboard-active #app {
 
 /* Dashboard Chart Container (Section 19) */
 .cv-chart-card {
-  background: var(--cv-surface);
-  border: 1px solid var(--cv-border);
+  background: rgba(255, 255, 255, 0.20);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: var(--cv-radius-lg);
   padding: 1.5rem;
-  box-shadow: var(--cv-shadow-xs);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
   margin-bottom: 2rem;
 }
 
@@ -4970,36 +4978,58 @@ body.cv-dashboard-active #app {
    Applied universally across Admin, Super Admin, and all modules
    ==================================================================== */
 
-/* Universal Glass Panels */
+/* Universal Transparent Glass Panels — No Solid White Backgrounds */
 .glass-panel,
 .cv-card,
 .cv-lab-card,
-.cv-metric-card,
 .cv-table-wrapper,
 .cv-bill-table-wrapper,
-.cv-login-card,
 .cv-panel,
-.cv-modal-content,
 .cv-patient-banner,
 .cv-lab-ledger-card,
 .cv-lab-settlement-card,
-.cv-balance-card,
 .cv-welcome-card,
 .cv-op-card,
+.cv-op-section-card,
+.cv-patient-search-card,
 .cv-ip-card,
+.cv-ip-summary-card,
 .cv-pharmacy-card,
+.cv-pharmacy-summary-card,
 .cv-billing-card,
+.cv-billing-kpi-card,
 .cv-money-card,
+.cv-money-kpi-card,
+.cv-money-source-card,
 .cv-summary-card,
 .cv-stat-card,
 .cv-bed-card,
-.cv-room-card {
-  background: rgba(255, 255, 255, 0.74) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+.cv-room-card,
+.cv-settings-section-card,
+.cv-sa-card {
+  background: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
   border-radius: 14px !important;
-  box-shadow: 0 4px 20px rgba(15, 35, 60, 0.06) !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Dedicated Admin Dashboard Sections & Statistics Panels */
+.cv-metric-card,
+.cv-chart-card,
+.cv-welcome-card {
+  background: rgba(255, 255, 255, 0.20) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.52) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04) !important;
+}
+
+.cv-metric-card:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
 }
 
 /* Translucent Main Viewport */
