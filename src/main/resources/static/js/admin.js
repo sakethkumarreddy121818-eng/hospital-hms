@@ -523,7 +523,7 @@ const Admin = (function () {
     sub = sub || 'main';
 
     currentNavState = { mod, sub, fn: null };
-    updateSidebarNavActive(mod);
+    updateSidebarNavActive(mod, sub);
 
     if (mod === 'dashboard') {
       renderDashboardLayout(false);
@@ -531,6 +531,8 @@ const Admin = (function () {
       executeOpTab(sub && sub !== 'main' ? sub : 'register');
     } else if (mod === 'ip') {
       executeIpTab(sub && sub !== 'main' ? sub : 'admission');
+    } else if (mod === 'rooms') {
+      executeIpTab('rooms');
     } else if (mod === 'pharmacy') {
       executePharTab(sub && sub !== 'main' ? sub : 'billing');
     } else if (mod === 'laboratory') {
@@ -545,8 +547,12 @@ const Admin = (function () {
       } else {
         renderBillingModule('billing', sub && sub !== 'main' ? sub : 'op');
       }
+    } else if (mod === 'mainbilling') {
+      renderBillingModule('main');
     } else if (mod === 'money') {
       renderMoneyManagementModule();
+    } else if (mod === 'reports') {
+      renderSettingsModule('audit');
     } else if (mod === 'settings') {
       renderSettingsModule(sub && sub !== 'main' ? sub : 'all');
     } else {
@@ -571,11 +577,14 @@ const Admin = (function () {
     }
   }
 
-  function updateSidebarNavActive(mod) {
+  function updateSidebarNavActive(mod, sub) {
     const navList = document.getElementById('sidebarNavList');
     if (!navList) return;
+    let targetMod = mod;
+    if (mod === 'ip' && sub === 'rooms') targetMod = 'rooms';
+    if (mod === 'billing' && (sub === 'main' || sub === 'history' || sub === 'main-history' || sub === 'main-billing')) targetMod = 'mainbilling';
     navList.querySelectorAll('.cv-nav-item').forEach((i) => {
-      if (i.dataset.mod === mod) {
+      if (i.dataset.mod === targetMod) {
         i.classList.add('active');
       } else {
         i.classList.remove('active');
@@ -691,32 +700,44 @@ const Admin = (function () {
 
     navList.innerHTML = `
       <li><a class="cv-nav-item active" data-mod="dashboard" title="Dashboard" data-tooltip="Dashboard">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
         <span>Dashboard</span>
       </a></li>
-      <li><a class="cv-nav-item" data-mod="op" title="Outpatient (OP)" data-tooltip="Outpatient (OP)">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-        <span>Outpatient (OP)</span>
+      <li><a class="cv-nav-item" data-mod="op" title="Outpatient (OP)" data-tooltip="Outpatient">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+        <span>Outpatient</span>
       </a></li>
-      <li><a class="cv-nav-item" data-mod="ip" title="Inpatient (IP) & Rooms" data-tooltip="Inpatient (IP) & Rooms">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-        <span>Inpatient (IP) &amp; Rooms</span>
+      <li><a class="cv-nav-item" data-mod="ip" title="Inpatient (IP)" data-tooltip="Inpatient">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+        <span>Inpatient</span>
+      </a></li>
+      <li><a class="cv-nav-item" data-mod="rooms" title="Rooms & Beds" data-tooltip="Rooms & Beds">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+        <span>Rooms &amp; Beds</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="pharmacy" title="Pharmacy" data-tooltip="Pharmacy">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
         <span>Pharmacy</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="laboratory" title="Laboratory" data-tooltip="Laboratory">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
         <span>Laboratory</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="billing" title="Central Billing" data-tooltip="Central Billing">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
         <span>Central Billing</span>
+      </a></li>
+      <li><a class="cv-nav-item" data-mod="mainbilling" title="Main Billing" data-tooltip="Main Billing">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path></svg>
+        <span>Main Billing</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="money" title="Money Management" data-tooltip="Money Management">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <span>Money Management</span>
+      </a></li>
+      <li><a class="cv-nav-item" data-mod="reports" title="Reports" data-tooltip="Reports">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+        <span>Reports</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="settings" title="Settings" data-tooltip="Settings">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -734,16 +755,22 @@ const Admin = (function () {
           navigateTo('op', 'register', () => renderOpModule('register'));
         } else if (mod === 'ip') {
           navigateTo('ip', 'admission', () => renderIpModule('admission'));
+        } else if (mod === 'rooms') {
+          navigateTo('ip', 'rooms', () => renderIpModule('rooms'));
         } else if (mod === 'pharmacy') {
           navigateTo('pharmacy', 'billing', () => renderPharmacyModule('billing'));
         } else if (mod === 'laboratory') {
           navigateTo('laboratory', 'orders', () => renderLaboratoryModule('orders'));
         } else if (mod === 'billing') {
           navigateTo('billing', 'op', () => renderBillingModule('billing', 'op'));
+        } else if (mod === 'mainbilling') {
+          navigateTo('billing', 'main', () => renderBillingModule('billing', 'main'));
         } else if (mod === 'money') {
           navigateTo('money', 'overview', () => renderMoneyManagementModule());
+        } else if (mod === 'reports') {
+          navigateTo('reports', 'all', () => renderSettingsModule('audit'));
         } else if (mod === 'settings') {
-          navigateTo('settings', 'all', () => renderSettingsModule());
+          navigateTo('settings', 'all', () => renderSettingsModule('all'));
         }
       });
     });
