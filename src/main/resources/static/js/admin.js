@@ -282,12 +282,14 @@ const Admin = (function () {
     }
     return { valid: true, value: trimmed };
   }
-
   function init(user) {
-    currentUser = user || Auth.getCurrentUser();
-    if (currentUser && currentUser.role === 'ADMIN') {
-      currentUser.hospitalName = 'CITYCARE SUPER SPECIALITY HOSPITAL';
+    const authUser = user || Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'ADMIN') {
+      Auth.showLogin();
+      return;
     }
+    currentUser = authUser;
+    currentUser.hospitalName = 'CITYCARE SUPER SPECIALITY HOSPITAL';
     initAdminSidebar();
     loadAndApplyTenantSettings();
     setupAdminNavigation();
@@ -315,6 +317,12 @@ const Admin = (function () {
   }
 
   function handlePopstate(e) {
+    const authUser = Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'ADMIN') {
+      Auth.showLogin();
+      return;
+    }
+
     // 1. Dismiss any open modal
     const modal = document.querySelector('.cv-op-modal-backdrop, .cv-modal-backdrop, #activeModalContainer');
     if (modal) {
@@ -519,6 +527,12 @@ const Admin = (function () {
   }
 
   function dispatchAdminRoute(mod, sub) {
+    const authUser = Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'ADMIN') {
+      Auth.showLogin();
+      return;
+    }
+
     mod = mod || 'dashboard';
     sub = sub || 'main';
 
@@ -11134,14 +11148,22 @@ const Admin = (function () {
       const btn = e.currentTarget;
       if (btn.disabled || btn.dataset.processing === 'true') return;
 
-      const amtVal = document.getElementById('labPaidAmount')?.value;
-      if (amtVal === undefined || amtVal === null || String(amtVal).trim() === '') {
-        showToast('Please enter an amount to pay.', 'danger');
-        return;
-      }
-      const numAmt = parseFloat(amtVal);
+      let amtVal = document.getElementById('labPaidAmount')?.value;
+      let numAmt = parseFloat(amtVal);
       if (isNaN(numAmt) || numAmt <= 0) {
-        showToast('Payment amount must be greater than zero.', 'danger');
+        const finalTotalStr = document.getElementById('labFinalTotal')?.textContent?.replace(/[^0-9.]/g, '')?.trim();
+        const finalTotal = parseFloat(finalTotalStr) || 0;
+        if (finalTotal > 0) {
+          numAmt = finalTotal;
+          const paidInput = document.getElementById('labPaidAmount');
+          if (paidInput) {
+            paidInput.value = finalTotal.toFixed(2);
+            recalculateLabBill();
+          }
+        }
+      }
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Please enter an amount to pay.', 'danger');
         return;
       }
 

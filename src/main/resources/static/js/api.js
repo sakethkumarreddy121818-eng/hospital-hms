@@ -8,13 +8,14 @@ const Api = (function () {
 
   function getStoredToken() {
     try {
-      if (typeof localStorage !== 'undefined') {
-        const t = localStorage.getItem('carevista_token');
-        if (t) return t;
-      }
+      // Tokens are strictly kept in sessionStorage for tab/session lifetime
       if (typeof sessionStorage !== 'undefined') {
         const t = sessionStorage.getItem('carevista_token');
         if (t) return t;
+      }
+      // Purge any stale persistent tokens from localStorage
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('carevista_token');
       }
     } catch (e) {}
     return null;
@@ -22,13 +23,13 @@ const Api = (function () {
 
   function setStoredToken(token) {
     try {
-      if (typeof localStorage !== 'undefined') {
-        if (token) localStorage.setItem('carevista_token', token);
-        else localStorage.removeItem('carevista_token');
-      }
       if (typeof sessionStorage !== 'undefined') {
         if (token) sessionStorage.setItem('carevista_token', token);
         else sessionStorage.removeItem('carevista_token');
+      }
+      // Ensure persistent localStorage never holds authentication tokens
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('carevista_token');
       }
     } catch (e) {}
   }
@@ -65,6 +66,14 @@ const Api = (function () {
         } else if (typeof data === 'string' && data.length > 0) {
           errorMsg = data;
         }
+
+        // Automatic session expiry handling
+        if (response.status === 401 && endpoint !== '/api/auth/login' && endpoint !== '/api/auth/me') {
+          if (typeof window !== 'undefined' && window.Auth && typeof window.Auth.handleSessionExpired === 'function') {
+            window.Auth.handleSessionExpired();
+          }
+        }
+
         return {
           ok: false,
           success: false,

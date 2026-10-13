@@ -95,12 +95,14 @@ const Auth = (function () {
           Api.setToken(res.data.token);
         }
         try {
-          localStorage.setItem('carevista_user', JSON.stringify(res.data));
+          sessionStorage.setItem('carevista_user', JSON.stringify(res.data));
+          localStorage.removeItem('carevista_user');
+          localStorage.removeItem('carevista_token');
         } catch (e) {}
         showAlert('Login successful! Redirecting to dashboard...', 'success');
         setTimeout(() => {
           showDashboard(currentUser);
-        }, 500);
+        }, 400);
       } else {
         showAlert(res.message || 'Invalid login credentials. Please try again.', 'danger');
       }
@@ -160,6 +162,19 @@ const Auth = (function () {
   }
 
   async function checkSession() {
+    // Only attempt session restoration if active tab has a session token
+    const token = Api.getToken();
+    if (!token) {
+      currentUser = null;
+      try {
+        sessionStorage.removeItem('carevista_user');
+        localStorage.removeItem('carevista_user');
+        localStorage.removeItem('carevista_token');
+      } catch (e) {}
+      showLogin();
+      return;
+    }
+
     const res = await Api.get('/api/auth/me');
     if (res.ok && res.data) {
       currentUser = res.data;
@@ -167,12 +182,19 @@ const Auth = (function () {
         Api.setToken(res.data.token);
       }
       try {
-        localStorage.setItem('carevista_user', JSON.stringify(res.data));
+        sessionStorage.setItem('carevista_user', JSON.stringify(res.data));
+        localStorage.removeItem('carevista_user');
+        localStorage.removeItem('carevista_token');
       } catch (e) {}
       showDashboard(currentUser);
     } else {
       Api.setToken(null);
-      try { localStorage.removeItem('carevista_user'); } catch (e) {}
+      currentUser = null;
+      try {
+        sessionStorage.removeItem('carevista_user');
+        localStorage.removeItem('carevista_user');
+        localStorage.removeItem('carevista_token');
+      } catch (e) {}
       showLogin();
     }
   }
@@ -182,20 +204,55 @@ const Auth = (function () {
       await Api.post('/api/auth/logout', {});
     } catch (e) {}
     Api.setToken(null);
-    try { localStorage.removeItem('carevista_user'); } catch (e) {}
     currentUser = null;
+    try {
+      sessionStorage.removeItem('carevista_user');
+      sessionStorage.removeItem('carevista_token');
+      localStorage.removeItem('carevista_user');
+      localStorage.removeItem('carevista_token');
+    } catch (e) {}
     showLogin();
+  }
+
+  function handleSessionExpired() {
+    Api.setToken(null);
+    currentUser = null;
+    try {
+      sessionStorage.removeItem('carevista_user');
+      sessionStorage.removeItem('carevista_token');
+      localStorage.removeItem('carevista_user');
+      localStorage.removeItem('carevista_token');
+    } catch (e) {}
+    showLogin();
+    showAlert('Your session has expired. Please sign in again to continue.', 'danger');
   }
 
   function showLogin() {
     document.body.classList.remove('cv-dashboard-active');
     document.body.classList.remove('cv-sidebar-collapsed-mode');
+
+    // Hide authenticated header components from login view
+    const navSearch = document.getElementById('cvNavCenterSearch');
+    if (navSearch) navSearch.style.display = 'none';
+    const navActions = document.getElementById('cvNavActions');
+    if (navActions) navActions.style.display = 'none';
+    const navProfile = document.getElementById('cvNavProfilePill');
+    if (navProfile) navProfile.style.display = 'none';
+    const navUserName = document.getElementById('navTopUserName');
+    if (navUserName) navUserName.textContent = '';
+    const navAvatar = document.getElementById('navAvatarInitial');
+    if (navAvatar) navAvatar.textContent = '';
+
+    // Clear sidebar navigation & main dashboard DOM
     const appSidebar = document.getElementById('appSidebar');
     if (appSidebar) {
       appSidebar.classList.remove('cv-sidebar-collapsed');
     }
     const navList = document.getElementById('sidebarNavList');
     if (navList) navList.innerHTML = '';
+    const dashboardMain = document.getElementById('dashboardMain');
+    if (dashboardMain) dashboardMain.innerHTML = '';
+
     const backBtn = document.getElementById('cvFloatingBackBtn');
     const backWrap = document.getElementById('sidebarBackWrap');
     if (backBtn) backBtn.style.display = 'none';
@@ -209,16 +266,39 @@ const Auth = (function () {
       window.history.replaceState(null, '', window.location.pathname);
     } catch (e) {}
 
-    document.getElementById('loginView').style.display = 'flex';
-    document.getElementById('dashboardView').classList.remove('active');
+    const loginView = document.getElementById('loginView');
+    if (loginView) loginView.style.display = 'flex';
+    const dbView = document.getElementById('dashboardView');
+    if (dbView) dbView.classList.remove('active');
     clearAlert();
   }
 
   function showDashboard(user) {
+    if (!user) {
+      showLogin();
+      return;
+    }
     document.body.classList.add('cv-dashboard-active');
-    document.getElementById('loginView').style.display = 'none';
+
+    // Show authenticated header components
+    const navSearch = document.getElementById('cvNavCenterSearch');
+    if (navSearch) navSearch.style.display = '';
+    const navActions = document.getElementById('cvNavActions');
+    if (navActions) navActions.style.display = '';
+    const navProfile = document.getElementById('cvNavProfilePill');
+    if (navProfile) navProfile.style.display = 'flex';
+
+    const displayName = user.fullName || (user.role === 'ADMIN' ? 'Hospital Admin' : (user.role === 'SUPER_ADMIN' ? 'Super Administrator' : user.email));
+    const navUserName = document.getElementById('navTopUserName');
+    if (navUserName) navUserName.textContent = displayName;
+    const navAvatar = document.getElementById('navAvatarInitial');
+    if (navAvatar) navAvatar.textContent = displayName.charAt(0).toUpperCase();
+
+    const loginView = document.getElementById('loginView');
+    if (loginView) loginView.style.display = 'none';
     const dbView = document.getElementById('dashboardView');
-    dbView.classList.add('active');
+    if (dbView) dbView.classList.add('active');
+
     Dashboard.render(user);
   }
 
@@ -226,6 +306,10 @@ const Auth = (function () {
     init: init,
     checkSession: checkSession,
     logout: logout,
-    getCurrentUser: () => currentUser
+    showLogin: showLogin,
+    showDashboard: showDashboard,
+    handleSessionExpired: handleSessionExpired,
+    getCurrentUser: () => currentUser,
+    isAuthenticated: () => currentUser !== null
   };
 })();

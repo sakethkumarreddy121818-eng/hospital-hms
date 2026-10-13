@@ -5560,6 +5560,123 @@ label,
   font-size: 1.35rem !important;
 }
 
+/* ====================================================================
+   LABORATORY MODULE — PLAIN CREAM MINIMALIST HEALTHCARE THEME (#F7F3EA)
+   Solid cream background, zero background photograph/overlays, teal accents
+   ==================================================================== */
+.cv-laboratory-mode {
+  background-color: #F7F3EA !important;
+  background-image: none !important;
+}
+
+.cv-laboratory-mode .cv-lab-wrapper {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.cv-laboratory-mode .cv-lab-topbar {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(120, 90, 60, 0.04) !important;
+}
+
+.cv-laboratory-mode .cv-lab-card {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(120, 90, 60, 0.04) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.cv-laboratory-mode .cv-lab-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px rgba(120, 90, 60, 0.06) !important;
+}
+
+.cv-laboratory-mode .cv-lab-title-icon {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.12) 0%, rgba(2, 132, 199, 0.15) 100%) !important;
+  border: 1px solid rgba(13, 148, 136, 0.25) !important;
+  color: #0d9488 !important;
+}
+
+.cv-laboratory-mode .cv-lab-nav-tabs {
+  background: #f5efe6 !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 10px !important;
+}
+
+.cv-laboratory-mode .cv-lab-tab-btn.active {
+  background: #ffffff !important;
+  color: #0d9488 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(120, 90, 60, 0.08) !important;
+}
+
+.cv-laboratory-mode .cv-lab-tab-btn:hover:not(.active) {
+  color: #0d9488 !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.cv-laboratory-mode .cv-form-input,
+.cv-laboratory-mode .cv-form-select,
+.cv-laboratory-mode .cv-calc-input,
+.cv-laboratory-mode #labPatientSearchInput,
+.cv-laboratory-mode #labTestSelect,
+.cv-laboratory-mode #labTestUnitPrice,
+.cv-laboratory-mode #labPaidAmount,
+.cv-laboratory-mode #labDiscountPct,
+.cv-laboratory-mode #labGstPct,
+.cv-laboratory-mode #labGstinInput,
+.cv-laboratory-mode #labPaymentMethod,
+.cv-laboratory-mode #labNotes {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.cv-laboratory-mode .cv-form-input:focus,
+.cv-laboratory-mode .cv-form-select:focus,
+.cv-laboratory-mode .cv-calc-input:focus,
+.cv-laboratory-mode #labPatientSearchInput:focus,
+.cv-laboratory-mode #labTestSelect:focus,
+.cv-laboratory-mode #labTestUnitPrice:focus,
+.cv-laboratory-mode #labPaidAmount:focus {
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15) !important;
+  outline: none !important;
+}
+
+.cv-laboratory-mode .cv-lab-table th {
+  background: #fbf9f4 !important;
+  border-bottom: 1px solid #eadbcc !important;
+  color: #475569 !important;
+}
+
+.cv-laboratory-mode .cv-lab-table td {
+  border-bottom: 1px solid #f1ebe1 !important;
+}
+
+.cv-laboratory-mode .cv-lab-ledger-card {
+  background: #fbf9f4 !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 12px !important;
+}
+
+.cv-laboratory-mode .cv-lab-settlement-card {
+  background: transparent !important;
+  border: none !important;
+}
+
+.cv-laboratory-mode .cv-balance-card {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 10px !important;
+}
+
+
 
 
 

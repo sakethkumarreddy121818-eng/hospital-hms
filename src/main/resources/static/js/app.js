@@ -48,11 +48,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Centralized Native Browser Back / Forward handler (Chrome Back/Forward support)
   window.addEventListener('popstate', (e) => {
     const user = Auth.getCurrentUser();
-    if (!user) return;
+    if (!user) {
+      Auth.showLogin();
+      return;
+    }
     if (user.role === 'SUPER_ADMIN' && typeof SuperAdmin !== 'undefined' && SuperAdmin.handlePopstate) {
       SuperAdmin.handlePopstate(e);
     } else if (user.role === 'ADMIN' && typeof Admin !== 'undefined' && Admin.handlePopstate) {
       Admin.handlePopstate(e);
+    } else {
+      Auth.showLogin();
     }
   });
 

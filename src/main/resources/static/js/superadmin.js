@@ -14,6 +14,12 @@ const SuperAdmin = (function () {
   let isNavigatingHistory = false;
 
   function init() {
+    const authUser = Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'SUPER_ADMIN') {
+      Auth.showLogin();
+      return;
+    }
+
     initSuperAdminSidebar();
     setupSidebarNavigation();
 
@@ -150,6 +156,12 @@ const SuperAdmin = (function () {
   }
 
   function navigateToTab(tab, recordHistory = true) {
+    const authUser = Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'SUPER_ADMIN') {
+      Auth.showLogin();
+      return;
+    }
+
     if (currentTab === tab && !document.getElementById('activeModalContainer')) {
       return;
     }
@@ -179,6 +191,12 @@ const SuperAdmin = (function () {
   }
 
   function handlePopstate(e) {
+    const authUser = Auth.getCurrentUser();
+    if (!authUser || authUser.role !== 'SUPER_ADMIN') {
+      Auth.showLogin();
+      return;
+    }
+
     const state = e.state;
     closeModal();
     isNavigatingHistory = true;
