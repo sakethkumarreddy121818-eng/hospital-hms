@@ -23,6 +23,7 @@ import com.carevista.hms.pharmacy.repository.PharmacyBillRepository;
 import com.carevista.hms.laboratory.entity.LabOrder;
 import com.carevista.hms.laboratory.dto.LabOrderDto;
 import com.carevista.hms.laboratory.repository.LabOrderRepository;
+import com.carevista.hms.admin.money.service.MoneyManagementService;
 import com.carevista.hms.patient.entity.Patient;
 import com.carevista.hms.patient.repository.PatientRepository;
 import com.carevista.hms.tenant.entity.Tenant;
@@ -55,6 +56,7 @@ public class BillingService {
     @Autowired private PatientRepository patientRepository;
     @Autowired private TenantRepository tenantRepository;
     @Autowired(required = false) private AuditService auditService;
+    @Autowired(required = false) private MoneyManagementService moneyManagementService;
 
     @Transactional(readOnly = true)
     public BillingConsolidatedDto getConsolidatedCharges(Long tenantId, Long patientId) {
@@ -593,6 +595,12 @@ public class BillingService {
             pr.setPaymentTime(payTime);
             pr.setNotes("Payment on Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
             paymentRecordRepository.save(pr);
+        }
+
+        if (moneyManagementService != null) {
+            try {
+                moneyManagementService.evictCacheForTenant(tenant.getId());
+            } catch (Exception ignored) {}
         }
 
         if (auditService != null) {
@@ -1251,6 +1259,12 @@ public class BillingService {
                 (request.getNotes() != null && !request.getNotes().trim().isEmpty() ? " | " + request.getNotes().trim() : "");
         pr.setNotes(notesStr.length() > 255 ? notesStr.substring(0, 255) : notesStr);
         paymentRecordRepository.save(pr);
+
+        if (moneyManagementService != null) {
+            try {
+                moneyManagementService.evictCacheForTenant(tenant.getId());
+            } catch (Exception ignored) {}
+        }
 
         if (auditService != null) {
             try {

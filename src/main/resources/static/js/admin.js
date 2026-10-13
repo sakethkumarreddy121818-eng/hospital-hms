@@ -2848,64 +2848,6 @@ const Admin = (function () {
               <input type="text" id="opNotesInput" class="cv-input" placeholder="">
             </div>
           </div>
-
-          <!-- 5. Payment & Billing Settlement Card -->
-          <div class="cv-op-section-card" style="grid-column:1 / -1;">
-            <div class="cv-op-section-header">
-              <span>OP Billing & Payment Collection</span>
-              <span class="cv-op-section-badge" style="background:#ecfdf5; color:#059669;">Real-Time MySQL Persistence</span>
-            </div>
-
-            <div id="opBillingSummaryRow" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; margin-bottom:1rem; background:#f8fafc; padding:0.75rem 1rem; border-radius:6px; border:1px solid #e2e8f0;">
-              <div>
-                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Total Bill (Fee)</div>
-                <div id="opDisplayTotalFee" style="font-size:1.1rem; font-weight:800; color:#0f172a;">₹0.00</div>
-              </div>
-              <div>
-                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Total Paid</div>
-                <div id="opDisplayTotalPaid" style="font-size:1.1rem; font-weight:800; color:#059669;">₹0.00</div>
-              </div>
-              <div>
-                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Remaining Balance</div>
-                <div id="opDisplayRemainingBal" style="font-size:1.1rem; font-weight:800; color:var(--cv-danger);">₹0.00</div>
-              </div>
-              <div>
-                <div style="font-size:0.72rem; font-weight:700; color:#64748b; text-transform:uppercase;">Payment Status</div>
-                <div id="opDisplayStatusBadge" style="margin-top:0.2rem;"><span class="cv-payment-balance-badge cv-badge-unpaid">UNPAID</span></div>
-              </div>
-            </div>
-
-            <div class="cv-op-fields-row" style="grid-template-columns: 1fr 1.5fr 1fr;">
-              <div class="cv-form-group">
-                <label class="cv-form-label" for="opPaymentMethod">Payment Method *</label>
-                <select id="opPaymentMethod" class="cv-input" required>
-                  <option value="CASH">Cash Payment</option>
-                  <option value="CARD">Debit / Credit Card</option>
-                  <option value="UPI">UPI / Digital QR</option>
-                  <option value="NET_BANKING">Net Banking / Transfer</option>
-                </select>
-              </div>
-
-              <div class="cv-form-group">
-                <label class="cv-form-label" for="opAmountPaid">Amount Paid / Collect (&#8377;) *</label>
-                <div style="display:flex; gap:0.4rem; align-items:center;">
-                  <input type="number" id="opAmountPaid" class="cv-input" value="0.00" min="0" step="any" required style="flex:1;">
-                  <button type="button" id="btnOpDirectPaid" class="cv-btn-paid" style="height:42px; padding:0 1rem;" title="Record payment">
-                    PAID
-                  </button>
-                  <button type="button" id="btnOpDirectUnpaid" class="cv-btn-unpaid" style="height:42px; padding:0 1rem;" title="Record as unpaid bill with ₹0.00 collected">
-                    UNPAID
-                  </button>
-                </div>
-                <span class="cv-feedback-error" id="errAmount">Please enter a valid consultation amount.</span>
-              </div>
-
-              <div class="cv-form-group">
-                <label class="cv-form-label" for="opPaymentStatusDisplay">Payment Status</label>
-                <input type="text" id="opPaymentStatusDisplay" class="cv-input cv-op-input-readonly" readonly value="UNPAID">
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Form Action Footer -->
@@ -2913,9 +2855,9 @@ const Admin = (function () {
           <button type="button" id="btnResetOpForm" class="cv-btn-secondary" style="padding:0.75rem 1.4rem;">
             Cancel / Reset Form
           </button>
-          <button type="submit" id="btnRegisterOpSubmit" class="cv-btn-primary" style="padding:0.75rem 2rem; font-size:1rem;">
-            <span id="opRegisterSpinner" class="cv-spinner" style="margin-right:0.5rem;"></span>
-            <span id="opRegisterBtnText">Register OP (Outpatient)</span>
+          <button type="submit" id="btnRegisterOpSubmit" class="cv-btn-primary" style="padding:0.75rem 2.2rem; font-size:1rem; font-weight:700;">
+            <span id="opRegisterSpinner" class="cv-spinner" style="margin-right:0.5rem; display:none;"></span>
+            <span id="opRegisterBtnText">Done</span>
           </button>
         </div>
       </form>
@@ -2924,10 +2866,27 @@ const Admin = (function () {
     setupPatientSearchEvents();
     loadDoctorDropdown();
     setupOpFormSubmission();
+    setupOpFormEnterNavigation();
 
     bindStrictNameInput(document.getElementById('opPatientName'));
     bindStrictAgeInput(document.getElementById('opPatientAge'));
     bindStrictPhoneInput(document.getElementById('opPatientPhone'));
+
+    const regForm = document.getElementById('opRegistrationForm');
+    regForm?.addEventListener('input', (e) => {
+      if (activeRegisteredOp) {
+        activeRegisteredOp = null;
+      }
+      if (e.target && (e.target.id === 'opPatientName' || e.target.id === 'opPatientPhone')) {
+        if (opLoadedPatient) {
+          opLoadedPatient = null;
+          const uhidInput = document.getElementById('opPatientUhid');
+          if (uhidInput) uhidInput.value = '';
+          const banner = document.getElementById('opPatientFoundBanner');
+          if (banner) banner.style.display = 'none';
+        }
+      }
+    });
 
     document.getElementById('btnResetOpForm')?.addEventListener('click', () => {
       resetOpForm();
@@ -3025,6 +2984,7 @@ const Admin = (function () {
   }
 
   function fillPatientIntoForm(p) {
+    activeRegisteredOp = null;
     opLoadedPatient = p;
     document.getElementById('opPatientName').value = p.fullName || '';
     document.getElementById('opPatientAge').value = p.age || '';
@@ -3044,7 +3004,15 @@ const Admin = (function () {
     if (banner && bannerText) {
       banner.style.display = 'flex';
       bannerText.innerHTML = `Existing Patient Loaded: <strong>${escapeHtml(p.fullName)}</strong> (UHID: <strong>${escapeHtml(p.uhid)}</strong>, Phone: <strong>${escapeHtml(p.phone)}</strong>)`;
+      if (p.lastOpId) {
+        bannerText.innerHTML += ` &bull; <button type="button" id="btnBannerViewPrevOp" class="cv-link-btn" style="font-size:0.75rem; font-weight:700; color:var(--cv-primary); text-decoration:underline; vertical-align:baseline;">View Previous Invoice (${escapeHtml(p.lastOpId)})</button>`;
+      }
     }
+
+    document.getElementById('btnBannerViewPrevOp')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      showBillPaymentsModal('OP', null, p.lastOpId);
+    });
 
     const searchInput = document.getElementById('opPatientSearchInput');
     if (searchInput) searchInput.value = '';
@@ -3054,14 +3022,15 @@ const Admin = (function () {
 
   function updateOpSummaryDisplay() {
     const feeEl = document.getElementById('opFeeInput');
-    const paidInput = document.getElementById('opAmountPaid');
     const feeVal = feeEl ? parseFloat(feeEl.value) || 0 : 0;
-    const currentPaid = activeRegisteredOp ? (activeRegisteredOp.paidAmount || 0) : 0;
+    const paidInput = document.getElementById('opAmountPaid');
     const payingNow = paidInput ? parseFloat(paidInput.value) || 0 : 0;
 
+    const currentPaid = activeRegisteredOp ? (activeRegisteredOp.paidAmount || 0) : payingNow;
     const totalBill = activeRegisteredOp ? (activeRegisteredOp.consultationFee || feeVal) : feeVal;
-    const totalPaid = activeRegisteredOp ? currentPaid : payingNow;
-    const remaining = activeRegisteredOp ? (activeRegisteredOp.balanceAmount != null ? activeRegisteredOp.balanceAmount : Math.max(0, totalBill - totalPaid)) : Math.max(0, totalBill - totalPaid);
+    const remaining = activeRegisteredOp ?
+      (activeRegisteredOp.balanceAmount != null ? activeRegisteredOp.balanceAmount : Math.max(0, totalBill - currentPaid)) :
+      Math.max(0, totalBill - currentPaid);
 
     const dispFee = document.getElementById('opDisplayTotalFee');
     const dispPaid = document.getElementById('opDisplayTotalPaid');
@@ -3070,11 +3039,11 @@ const Admin = (function () {
     const statusInput = document.getElementById('opPaymentStatusDisplay');
 
     if (dispFee) dispFee.textContent = '₹' + formatCurrency(totalBill);
-    if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(totalPaid);
+    if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(currentPaid);
     if (dispBal) dispBal.textContent = '₹' + formatCurrency(remaining);
 
-    const statusText = (remaining <= 0 && totalBill > 0) ? 'PAID' : (totalPaid > 0 ? 'PARTIALLY PAID' : 'UNPAID');
-    const badgeClass = (remaining <= 0 && totalBill > 0) ? 'cv-badge-paid' : (totalPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+    const statusText = (remaining <= 0 && totalBill > 0) ? 'PAID' : (currentPaid > 0 ? 'PARTIALLY PAID' : 'UNPAID');
+    const badgeClass = (remaining <= 0 && totalBill > 0) ? 'cv-badge-paid' : (currentPaid > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
 
     if (dispBadge) {
       dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${badgeClass}">${statusText}</span>`;
@@ -3091,15 +3060,59 @@ const Admin = (function () {
     const banner = document.getElementById('opPatientFoundBanner');
     if (banner) banner.style.display = 'none';
 
-    document.getElementById('opPatientUhid').value = '';
-    document.getElementById('opDepartmentInput').value = '';
-    document.getElementById('opRoomNumberInput').value = '';
-    document.getElementById('opFeeInput').value = '0.00';
-    document.getElementById('opAmountPaid').value = '0.00';
+    const uhidInput = document.getElementById('opPatientUhid');
+    if (uhidInput) uhidInput.value = '';
+
+    const deptInput = document.getElementById('opDepartmentInput');
+    if (deptInput) deptInput.value = '';
+
+    const roomInput = document.getElementById('opRoomNumberInput');
+    if (roomInput) roomInput.value = '';
+
+    const feeInput = document.getElementById('opFeeInput');
+    if (feeInput) feeInput.value = '0.00';
+
+    const paidInput = document.getElementById('opAmountPaid');
+    if (paidInput) paidInput.value = '0.00';
+
+    const idPreview = document.getElementById('opIdPreview');
+    if (idPreview) idPreview.value = 'Auto-Generated on Save';
+
+    const docSelect = document.getElementById('opDoctorSelect');
+    if (docSelect) docSelect.selectedIndex = 0;
+
+    const visitTypeSelect = document.getElementById('opVisitType');
+    if (visitTypeSelect) visitTypeSelect.value = 'GENERAL';
+
+    const genderSelect = document.getElementById('opPatientGender');
+    if (genderSelect) genderSelect.value = '';
+
+    const addressInput = document.getElementById('opAddressInput');
+    if (addressInput) addressInput.value = '';
+
+    const notesInput = document.getElementById('opNotesInput');
+    if (notesInput) notesInput.value = '';
+
+    const searchInput = document.getElementById('opPatientSearchInput');
+    if (searchInput) searchInput.value = '';
+
+    const searchDropdown = document.getElementById('opSearchResultsDropdown');
+    if (searchDropdown) {
+      searchDropdown.style.display = 'none';
+      searchDropdown.innerHTML = '';
+    }
+
+    const clearSearchBtn = document.getElementById('btnClearSearch');
+    if (clearSearchBtn) clearSearchBtn.style.display = 'none';
 
     const now = new Date();
-    document.getElementById('opRegDateInput').value = formatDDMMYYYY(now);
-    document.getElementById('opRegTimeInput').value = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const regDateInput = document.getElementById('opRegDateInput');
+    if (regDateInput) regDateInput.value = formatDDMMYYYY(now);
+
+    const regTimeInput = document.getElementById('opRegTimeInput');
+    if (regTimeInput && !regTimeInput.dataset.fixed) {
+      regTimeInput.value = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    }
 
     document.querySelectorAll('.cv-feedback-error').forEach(el => el.classList.remove('show'));
     document.querySelectorAll('.cv-input').forEach(el => el.classList.remove('is-invalid'));
@@ -3108,6 +3121,7 @@ const Admin = (function () {
     if (alertBox) {
       alertBox.style.display = 'none';
       alertBox.textContent = '';
+      alertBox.className = 'cv-alert';
     }
 
     const btnPaid = document.getElementById('btnOpDirectPaid');
@@ -3160,14 +3174,16 @@ const Admin = (function () {
             document.getElementById('opDepartmentInput').value = dept;
             document.getElementById('opRoomNumberInput').value = room;
             document.getElementById('opFeeInput').value = fee;
-            document.getElementById('opAmountPaid').value = fee;
+            const paidInput = document.getElementById('opAmountPaid');
+            if (paidInput) paidInput.value = fee;
             document.getElementById('errDoctor')?.classList.remove('show');
             docSelect.classList.remove('is-invalid');
           } else {
             document.getElementById('opDepartmentInput').value = '';
             document.getElementById('opRoomNumberInput').value = '';
             document.getElementById('opFeeInput').value = '0.00';
-            document.getElementById('opAmountPaid').value = '0.00';
+            const paidInput = document.getElementById('opAmountPaid');
+            if (paidInput) paidInput.value = '0.00';
           }
           updateOpSummaryDisplay();
         });
@@ -3180,153 +3196,353 @@ const Admin = (function () {
     }
   }
 
+  // ====================================================================
+  // OP BILLING & PAYMENT COLLECTION POP-UP (TASK 1)
+  // ====================================================================
+  function showOpBillingModal(op, options = {}) {
+    if (!op) return;
+
+    const prev = document.getElementById('cvOpBillingModalOverlay');
+    if (prev) prev.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cv-modal-backdrop show';
+    overlay.id = 'cvOpBillingModalOverlay';
+    overlay.style.zIndex = '1050';
+
+    const totalFee = Number(op.consultationFee || 0);
+    const paidAmt = Number(op.paidAmount || 0);
+    const balAmt = (op.balanceAmount != null) ? Number(op.balanceAmount) : Math.max(0, totalFee - paidAmt);
+    const isPaid = (balAmt <= 0);
+    const status = op.paymentStatus || (isPaid ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID'));
+    const badgeClass = isPaid ? 'cv-badge-paid' : (paidAmt > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+
+    overlay.innerHTML = `
+      <div class="cv-modal" style="max-width: 540px; width: 95%; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28); border-radius: 16px; overflow: hidden; animation: cvModalIn 0.22s ease-out;">
+        <div class="cv-modal-header" style="background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95)); padding: 1.15rem 1.4rem; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <div style="width:36px; height:36px; border-radius:10px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <div>
+              <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">OP Billing &amp; Payment Collection</h3>
+              <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+                Invoice ID: <span style="font-family:monospace; color:var(--cv-primary); font-weight:800;">${escapeHtml(op.opId)}</span> &bull; UHID: <span style="font-family:monospace; font-weight:700;">${escapeHtml(op.uhid || '—')}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="cv-modal-close" id="btnOpBillingModalClose" style="cursor:pointer; font-size:1.4rem; border:none; background:transparent; color:#64748b; line-height:1;" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="cv-modal-body" style="padding: 1.35rem;">
+          <!-- Patient Summary Strip -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.85rem 1rem; margin-bottom:1.15rem; font-size:0.84rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Patient:</span>
+              <strong style="color:#0f172a;">${escapeHtml(op.patientName)} <span style="font-weight:normal; color:#64748b;">(${op.gender || '—'}, ${op.age ? op.age + ' yrs' : '—'})</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Consulting Doctor:</span>
+              <strong style="color:#0f172a;">Dr. ${escapeHtml(op.doctorName)} <span style="font-weight:normal; color:#64748b;">(${escapeHtml(op.department || 'General')})</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Date &amp; Time:</span>
+              <span style="color:#334155; font-weight:600;">${formatDDMMYYYY(new Date())}</span>
+            </div>
+          </div>
+
+          <!-- Billing Financial Overview -->
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.75rem; margin-bottom:1.25rem;">
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Total Payable</div>
+              <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:0.25rem;">₹${formatCurrency(totalFee)}</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Previously Paid</div>
+              <div id="opModalDisplayPaid" style="font-size:1.15rem; font-weight:800; color:#059669; margin-top:0.25rem;">₹${formatCurrency(paidAmt)}</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Remaining Balance</div>
+              <div id="opModalDisplayBal" style="font-size:1.15rem; font-weight:800; color:var(--cv-danger); margin-top:0.25rem;">₹${formatCurrency(balAmt)}</div>
+            </div>
+          </div>
+
+          <!-- Payment Status Row -->
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(241, 245, 249, 0.6); border:1px solid #e2e8f0; border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:1.15rem;">
+            <span style="font-size:0.8rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.03em;">Payment Status</span>
+            <div id="opModalStatusBadge"><span class="cv-payment-balance-badge ${badgeClass}">${status}</span></div>
+          </div>
+
+          <!-- Payment Input Fields -->
+          <div id="opModalPaymentControls">
+            <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.75rem; margin-bottom:1rem;">
+              <div>
+                <label for="opModalPaymentMethod" class="cv-form-label" style="font-size:0.75rem; font-weight:700;">Payment Method</label>
+                <select id="opModalPaymentMethod" class="cv-input" style="height:42px; font-size:0.88rem;">
+                  <option value="CASH">Cash Payment</option>
+                  <option value="CARD">Debit / Credit Card</option>
+                  <option value="UPI">UPI / Digital QR</option>
+                  <option value="NET_BANKING">Net Banking / Transfer</option>
+                </select>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label for="opModalAmountToPay" class="cv-form-label" style="font-size:0.75rem; font-weight:700; margin-bottom:0.2rem;">Amount to Pay (₹) *</label>
+                  <button type="button" id="btnOpModalPayFull" class="cv-link-btn" style="font-size:0.72rem; font-weight:700;" title="Set to remaining balance">Pay Full</button>
+                </div>
+                <input type="number" id="opModalAmountToPay" class="cv-input" style="height:42px; font-size:1.05rem; font-weight:700; color:#0f172a;" placeholder="0.00" value="${balAmt > 0 ? balAmt.toFixed(2) : '0.00'}" min="0.01" step="any" ${isPaid ? 'disabled' : ''}>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:0.6rem; align-items:center; margin-top:0.5rem;">
+              <button type="button" id="btnOpModalCollectPayment" class="cv-btn-primary" style="flex:1; height:44px; font-size:0.95rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.4rem;" ${isPaid ? 'disabled' : ''}>
+                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Paid / Collect Payment</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="opModalPaidBanner" style="display:${isPaid ? 'block' : 'none'}; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem; text-align:center; color:#065f46; font-size:0.88rem; font-weight:700; margin-top:0.75rem;">
+            ✓ OP Invoice Fully Settled (₹${formatCurrency(totalFee)} collected)
+          </div>
+        </div>
+
+        <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background: #f8fafc; border-top: 1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="cv-btn-secondary" id="btnOpModalHistory" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600;">
+            Payment History
+          </button>
+          <button type="button" class="cv-btn-secondary" id="btnOpModalDoneClose" style="padding:0.45rem 1.4rem; font-size:0.88rem; font-weight:600;">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeModal = () => {
+      overlay.remove();
+      if (typeof options?.onClose === 'function') {
+        options.onClose();
+      }
+    };
+    document.getElementById('btnOpBillingModalClose')?.addEventListener('click', closeModal);
+    document.getElementById('btnOpModalDoneClose')?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    document.getElementById('btnOpModalPayFull')?.addEventListener('click', () => {
+      const curBal = (op.balanceAmount != null) ? Number(op.balanceAmount) : (Number(op.consultationFee || 0) - Number(op.paidAmount || 0));
+      const inp = document.getElementById('opModalAmountToPay');
+      if (inp) inp.value = Math.max(0, curBal).toFixed(2);
+    });
+
+    document.getElementById('btnOpModalHistory')?.addEventListener('click', () => {
+      showBillPaymentsModal('OP', op.id, op.opId);
+    });
+
+    document.getElementById('btnOpModalCollectPayment')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || btn.dataset.processing === 'true') return;
+
+      const amtInput = document.getElementById('opModalAmountToPay');
+      const rawVal = amtInput ? amtInput.value : '';
+      if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+        showToast('Please enter a payment amount.', 'danger');
+        return;
+      }
+      const numAmt = parseFloat(rawVal);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Payment amount must be greater than zero.', 'danger');
+        return;
+      }
+      const curBal = (op.balanceAmount != null) ? Number(op.balanceAmount) : (Number(op.consultationFee || 0) - Number(op.paidAmount || 0));
+      if (numAmt > curBal + 0.001) {
+        showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.dataset.processing = 'true';
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></span> Recording Payment...';
+
+      const method = document.getElementById('opModalPaymentMethod')?.value || 'CASH';
+
+      try {
+        const res = await Api.post('/api/billing/payment', {
+          moduleType: 'OP',
+          billId: op.id,
+          billNumber: op.opId,
+          paymentAmount: numAmt,
+          paymentMethod: method,
+          notes: 'OP registration payment installment'
+        });
+
+        if (res && res.success && res.data) {
+          const d = res.data;
+          op.paidAmount = d.amountPaid;
+          op.balanceAmount = d.balanceAmount;
+          op.paymentStatus = d.paymentStatus;
+          op.paymentMethod = d.paymentMethod;
+
+          const isNowPaid = (d.balanceAmount <= 0);
+
+          // Update in-modal displays
+          const dispPaid = document.getElementById('opModalDisplayPaid');
+          const dispBal = document.getElementById('opModalDisplayBal');
+          const dispBadge = document.getElementById('opModalStatusBadge');
+          if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(d.amountPaid);
+          if (dispBal) {
+            dispBal.textContent = '₹' + formatCurrency(d.balanceAmount);
+            dispBal.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+          }
+          if (dispBadge) {
+            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${d.paymentStatus}</span>`;
+          }
+
+          if (amtInput) {
+            if (isNowPaid) {
+              amtInput.value = '0.00';
+              amtInput.disabled = true;
+            } else {
+              amtInput.value = d.balanceAmount.toFixed(2);
+            }
+          }
+
+          if (isNowPaid) {
+            btn.disabled = true;
+            const paidBanner = document.getElementById('opModalPaidBanner');
+            if (paidBanner) paidBanner.style.display = 'block';
+          }
+
+          showToast(`Payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(d.amountPaid)}, Balance: ₹${formatCurrency(d.balanceAmount)}`, 'success');
+
+          if (typeof loadOpHistoryList === 'function') loadOpHistoryList();
+        } else {
+          showToast(res?.message || 'Payment processing failed.', 'danger');
+        }
+      } catch (err) {
+        showToast('Payment processing error: ' + (err.message || err), 'danger');
+      } finally {
+        delete btn.dataset.processing;
+        if (op.balanceAmount > 0) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        } else {
+          btn.innerHTML = '<span>Paid</span>';
+        }
+      }
+    });
+  }
+
+  // ====================================================================
+  // ENTER-KEY NAVIGATION HANDLER FOR OP REGISTRATION (TASK 2)
+  // Moves cursor to the next input field instead of submitting form unexpectedly
+  // Field order: Patient Full Name -> Age -> Gender -> Phone Number -> Email ID ->
+  // Consultation Type -> Attending Doctor -> Consultation Fee -> Address -> Complaint Notes
+  // ====================================================================
+  function setupOpFormEnterNavigation() {
+    const form = document.getElementById('opRegistrationForm');
+    if (!form) return;
+
+    const OP_FORM_FIELD_ORDER = [
+      'opPatientName',       // 1. Patient Full Name
+      'opPatientAge',        // 2. Patient Age (Years)
+      'opPatientGender',     // 3. Patient Gender
+      'opPatientPhone',      // 4. Patient Phone Number
+      'opPatientEmail',      // 5. Patient Email ID (Optional)
+      'opVisitType',         // 6. Consultation Type
+      'opDoctorSelect',      // 7. Attending Doctor
+      'opFeeInput',          // 8. Consultation Fee
+      'opAddressInput',      // 9. Residential Address
+      'opNotesInput'         // 10. Clinical Triage / Notes (Last field)
+    ];
+
+    form.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+
+      // Do not intercept if user holds Ctrl, Alt, or Meta
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const target = e.target;
+      if (!target) return;
+
+      // Allow native buttons (Cancel, Done) to perform their action on Enter
+      if (target.tagName === 'BUTTON' || target.type === 'submit' || target.type === 'button') {
+        return;
+      }
+
+      // In textarea, Shift+Enter creates a new line
+      if (target.tagName === 'TEXTAREA' && e.shiftKey) {
+        return;
+      }
+
+      const currentId = target.id;
+      const currentIndex = OP_FORM_FIELD_ORDER.indexOf(currentId);
+
+      // If target is inside the form but not in the sequence (e.g. unexpected input), prevent submit
+      if (currentIndex === -1) {
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) {
+          e.preventDefault();
+        }
+        return;
+      }
+
+      e.preventDefault();
+
+      // If this is the last field (opNotesInput), trigger Done submission
+      if (currentIndex === OP_FORM_FIELD_ORDER.length - 1) {
+        const submitBtn = document.getElementById('btnRegisterOpSubmit');
+        if (submitBtn && !submitBtn.disabled && submitBtn.dataset.processing !== 'true') {
+          submitBtn.click();
+        }
+        return;
+      }
+
+      // Move focus to the next visible, non-disabled, non-readonly field
+      for (let i = currentIndex + 1; i < OP_FORM_FIELD_ORDER.length; i++) {
+        const nextId = OP_FORM_FIELD_ORDER[i];
+        const nextEl = document.getElementById(nextId);
+        if (nextEl && !nextEl.disabled && !nextEl.readOnly && nextEl.offsetParent !== null) {
+          nextEl.focus();
+          if (typeof nextEl.select === 'function' && nextEl.tagName === 'INPUT' && nextEl.type !== 'file') {
+            try { nextEl.select(); } catch (_) {}
+          }
+          return;
+        }
+      }
+
+      // If no subsequent field found, trigger submit
+      const submitBtn = document.getElementById('btnRegisterOpSubmit');
+      if (submitBtn && !submitBtn.disabled && submitBtn.dataset.processing !== 'true') {
+        submitBtn.click();
+      }
+    });
+  }
+
   function setupOpFormSubmission() {
     const form = document.getElementById('opRegistrationForm');
-    const btnDirectPaid = document.getElementById('btnOpDirectPaid');
-    const feeInput = document.getElementById('opFeeInput');
-    const amountPaidInput = document.getElementById('opAmountPaid');
+    if (!form) return;
 
-    feeInput?.addEventListener('input', updateOpSummaryDisplay);
-    amountPaidInput?.addEventListener('input', updateOpSummaryDisplay);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    async function processOpPaidAction(triggerBtn, explicitUnpaid = false) {
       const alertBox = document.getElementById('opFormAlert');
       if (alertBox) {
         alertBox.style.display = 'none';
         alertBox.textContent = '';
       }
 
-      // Check double-click prevention
-      if (triggerBtn) {
-        if (triggerBtn.disabled || triggerBtn.dataset.processing === 'true') return;
+      const submitBtn = document.getElementById('btnRegisterOpSubmit');
+      const spinner = document.getElementById('opRegisterSpinner');
+      const btnText = document.getElementById('opRegisterBtnText');
+
+      if (submitBtn) {
+        if (submitBtn.disabled || submitBtn.dataset.processing === 'true') return;
       }
 
-      const amountPaidStr = document.getElementById('opAmountPaid')?.value;
-      let numAmt = (amountPaidStr !== undefined && amountPaidStr !== null && String(amountPaidStr).trim() !== '')
-        ? parseFloat(amountPaidStr)
-        : 0;
-      if (isNaN(numAmt) || numAmt < 0) numAmt = 0;
-
-      if (explicitUnpaid) {
-        numAmt = 0;
-        const amtInput = document.getElementById('opAmountPaid');
-        if (amtInput) amtInput.value = '0.00';
-      }
-
-      const paymentMethod = document.getElementById('opPaymentMethod')?.value || 'CASH';
-
-      // ====================================================================
-      // SUBSEQUENT PAYMENT ON EXISTING REGISTERED OP
-      // ====================================================================
-      if (activeRegisteredOp) {
-        const curBal = (activeRegisteredOp.balanceAmount != null)
-          ? parseFloat(activeRegisteredOp.balanceAmount)
-          : Math.max(0, (activeRegisteredOp.consultationFee || 0) - (activeRegisteredOp.paidAmount || 0));
-
-        if (explicitUnpaid || numAmt <= 0) {
-          const prevPaid = activeRegisteredOp.paidAmount || 0;
-          if (prevPaid > 0) {
-            showToast(`Previous payments of ₹${formatCurrency(prevPaid)} preserved. Outstanding balance remains ₹${formatCurrency(curBal)} (Status: ${activeRegisteredOp.paymentStatus || 'PARTIALLY PAID'}).`, 'info');
-          } else {
-            showToast(`Bill remains UNPAID with ₹${formatCurrency(curBal)} outstanding balance due.`, 'info');
-          }
-          const amtInput = document.getElementById('opAmountPaid');
-          if (amtInput) amtInput.value = '0.00';
-          updateOpSummaryDisplay();
-          return;
-        }
-
-        if (curBal <= 0) {
-          showToast('This OP bill is already fully paid.', 'info');
-          return;
-        }
-
-        if (numAmt > curBal + 0.001) {
-          showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
-          return;
-        }
-
-        if (triggerBtn) {
-          triggerBtn.disabled = true;
-          triggerBtn.dataset.processing = 'true';
-          triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-        }
-
-        try {
-          const res = await Api.post('/api/billing/payment', {
-            moduleType: 'OP',
-            billId: activeRegisteredOp.id,
-            billNumber: activeRegisteredOp.opId,
-            paymentAmount: numAmt,
-            paymentMethod: paymentMethod,
-            notes: 'OP registration payment installment'
-          });
-
-          if (res && res.success && res.data) {
-            const d = res.data;
-            activeRegisteredOp.paidAmount = d.amountPaid;
-            activeRegisteredOp.balanceAmount = d.balanceAmount;
-            activeRegisteredOp.paymentStatus = d.paymentStatus;
-            activeRegisteredOp.paymentMethod = d.paymentMethod;
-
-            const isNowPaid = (d.balanceAmount <= 0);
-
-            // Update UI elements immediately
-            const dispPaid = document.getElementById('opDisplayTotalPaid');
-            const dispBal = document.getElementById('opDisplayRemainingBal');
-            const dispBadge = document.getElementById('opDisplayStatusBadge');
-            const statusInput = document.getElementById('opPaymentStatusDisplay');
-
-            if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(d.amountPaid);
-            if (dispBal) dispBal.textContent = '₹' + formatCurrency(d.balanceAmount);
-            if (dispBadge) {
-              dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${d.paymentStatus}</span>`;
-            }
-            if (statusInput) statusInput.value = d.paymentStatus;
-
-            const amtInput = document.getElementById('opAmountPaid');
-            if (amtInput) {
-              if (isNowPaid) {
-                amtInput.value = '0.00';
-              } else {
-                amtInput.value = d.balanceAmount.toFixed(2);
-              }
-            }
-
-            if (triggerBtn) {
-              triggerBtn.disabled = isNowPaid;
-              delete triggerBtn.dataset.processing;
-              triggerBtn.innerHTML = isNowPaid ? 'PAID' : 'PAID';
-            }
-
-            showToast(`Payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(d.amountPaid)}, Balance: ₹${formatCurrency(d.balanceAmount)}`, 'success');
-
-            // Refresh OP history in background
-            if (typeof loadOpHistoryList === 'function') {
-              loadOpHistoryList();
-            }
-          } else {
-            showToast((res && res.message) ? res.message : 'Payment failed.', 'danger');
-            if (triggerBtn) {
-              triggerBtn.disabled = false;
-              delete triggerBtn.dataset.processing;
-              triggerBtn.innerHTML = 'PAID';
-            }
-          }
-        } catch (err) {
-          showToast('Payment processing error: ' + (err.message || err), 'danger');
-          if (triggerBtn) {
-            triggerBtn.disabled = false;
-            delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = 'PAID';
-          }
-        }
-        return;
-      }
-
-      // ====================================================================
-      // INITIAL OP REGISTRATION + INITIAL PAYMENT
-      // ====================================================================
       const rawPatientName = document.getElementById('opPatientName')?.value;
       const rawAgeStr = document.getElementById('opPatientAge')?.value;
       const gender = document.getElementById('opPatientGender')?.value?.trim();
@@ -3392,16 +3608,6 @@ const Admin = (function () {
         isValid = false;
       }
 
-      if (!explicitUnpaid && triggerBtn?.id === 'btnOpDirectPaid' && numAmt <= 0) {
-        showToast('Payment amount must be greater than zero to record PAID collection.', 'danger');
-        isValid = false;
-      }
-
-      if (numAmt > totalFee + 0.001) {
-        showToast(`Payment amount cannot exceed consultation fee of ₹${formatCurrency(totalFee)}.`, 'danger');
-        isValid = false;
-      }
-
       if (!isValid) {
         if (alertBox) {
           alertBox.className = 'cv-alert cv-alert-danger show';
@@ -3410,13 +3616,12 @@ const Admin = (function () {
         return;
       }
 
-      if (triggerBtn) {
-        triggerBtn.disabled = true;
-        triggerBtn.dataset.processing = 'true';
-        triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Processing...';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.processing = 'true';
       }
-
-      const statusVal = (numAmt >= totalFee && totalFee > 0) ? 'PAID' : (numAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID');
+      if (spinner) spinner.style.display = 'inline-block';
+      if (btnText) btnText.textContent = 'Saving Registration...';
 
       const payload = {
         patientName: vName.value,
@@ -3429,9 +3634,9 @@ const Admin = (function () {
         doctorName: doctorName,
         department: department || 'General Medicine',
         consultationFee: totalFee,
-        paidAmount: numAmt,
-        paymentMethod: paymentMethod,
-        paymentStatus: statusVal,
+        paidAmount: 0.0,
+        paymentMethod: 'CASH',
+        paymentStatus: 'UNPAID',
         notes: notes || null
       };
 
@@ -3439,70 +3644,35 @@ const Admin = (function () {
         const res = await Api.post('/api/op/register', payload);
 
         if (res.ok && res.data) {
-          activeRegisteredOp = res.data;
           const registeredOp = res.data;
-
-          const isNowPaid = (registeredOp.balanceAmount <= 0);
-
-          // Update UI immediately
-          const dispFee = document.getElementById('opDisplayTotalFee');
-          const dispPaid = document.getElementById('opDisplayTotalPaid');
-          const dispBal = document.getElementById('opDisplayRemainingBal');
-          const dispBadge = document.getElementById('opDisplayStatusBadge');
-          const statusInput = document.getElementById('opPaymentStatusDisplay');
-
-          if (dispFee) dispFee.textContent = '₹' + formatCurrency(registeredOp.consultationFee);
-          if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(registeredOp.paidAmount);
-          if (dispBal) dispBal.textContent = '₹' + formatCurrency(registeredOp.balanceAmount);
-          if (dispBadge) {
-            const badgeCls = isNowPaid ? 'cv-badge-paid' : (registeredOp.paidAmount > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
-            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${badgeCls}">${registeredOp.paymentStatus}</span>`;
-          }
-          if (statusInput) statusInput.value = registeredOp.paymentStatus;
-
-          const amtInput = document.getElementById('opAmountPaid');
-          if (amtInput) {
-            if (isNowPaid) {
-              amtInput.value = '0.00';
-            } else {
-              amtInput.value = registeredOp.balanceAmount.toFixed(2);
-            }
-          }
+          activeRegisteredOp = registeredOp;
 
           if (alertBox) {
             alertBox.className = 'cv-alert cv-alert-success show';
             alertBox.innerHTML = `
-              <strong>OP Registration &amp; Billing Recorded!</strong><br>
+              <strong>OP Registration Recorded!</strong><br>
               OP ID: <strong>${registeredOp.opId}</strong> &bull; UHID: <strong>${registeredOp.uhid}</strong> &bull; Patient: <strong>${registeredOp.patientName}</strong><br>
-              Paid: <strong>₹${formatCurrency(registeredOp.paidAmount)}</strong> &bull; Remaining: <strong>₹${formatCurrency(registeredOp.balanceAmount)}</strong> &bull; Status: <strong>${registeredOp.paymentStatus}</strong>
+              Status: <strong>${registeredOp.paymentStatus}</strong> &bull; Balance Due: <strong>₹${formatCurrency(registeredOp.balanceAmount != null ? registeredOp.balanceAmount : registeredOp.consultationFee)}</strong>
             `;
           }
 
-          if (numAmt > 0) {
-            showToast(`OP registered and payment of ₹${formatCurrency(numAmt)} saved to database.`, 'success');
-          } else {
-            showToast(`OP registered as UNPAID. Full consultation fee of ₹${formatCurrency(registeredOp.consultationFee)} is outstanding.`, 'info');
-          }
+          showToast(`OP registered successfully (Invoice: ${registeredOp.opId}). Opening billing pop-up...`, 'success');
 
-          if (triggerBtn) {
-            triggerBtn.disabled = (triggerBtn.id === 'btnOpDirectPaid' && isNowPaid);
-            delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
-          }
-
-          // Refresh history without full browser reload
           if (typeof loadOpHistoryList === 'function') {
             loadOpHistoryList();
           }
+
+          // Automatically open OP Billing and Payments Collection pop-up.
+          // When closed, reset the registration form cleanly so the next patient enters with a fresh slate.
+          showOpBillingModal(registeredOp, {
+            onClose: () => {
+              resetOpForm();
+            }
+          });
         } else {
           if (alertBox) {
             alertBox.className = 'cv-alert cv-alert-danger show';
             alertBox.textContent = res.message || 'Failed to complete OP registration. Please check inputs.';
-          }
-          if (triggerBtn) {
-            triggerBtn.disabled = false;
-            delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
           }
         }
       } catch (networkErr) {
@@ -3510,43 +3680,15 @@ const Admin = (function () {
           alertBox.className = 'cv-alert cv-alert-danger show';
           alertBox.textContent = 'Network error while contacting the server.';
         }
-        if (triggerBtn) {
-          triggerBtn.disabled = false;
-          delete triggerBtn.dataset.processing;
-          triggerBtn.innerHTML = (triggerBtn.id === 'btnOpDirectUnpaid') ? 'UNPAID' : (triggerBtn.id === 'btnOpDirectPaid' ? 'PAID' : 'Register OP (Outpatient)');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          delete submitBtn.dataset.processing;
         }
+        if (spinner) spinner.style.display = 'none';
+        if (btnText) btnText.textContent = 'Done';
       }
-    }
-
-    btnDirectPaid?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const feeInput = document.getElementById('opFeeInput');
-      const paidInput = document.getElementById('opAmountPaid');
-      if (paidInput && (!paidInput.value || parseFloat(paidInput.value) <= 0) && feeInput) {
-        paidInput.value = feeInput.value;
-        updateOpSummaryDisplay();
-      }
-      processOpPaidAction(btnDirectPaid, false);
     });
-
-    document.getElementById('btnOpDirectUnpaid')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const btnUnpaid = document.getElementById('btnOpDirectUnpaid');
-      const paidInput = document.getElementById('opAmountPaid');
-      if (paidInput) paidInput.value = '0.00';
-      updateOpSummaryDisplay();
-      processOpPaidAction(btnUnpaid, true);
-    });
-
-    if (form) {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = document.getElementById('btnRegisterOpSubmit');
-        const paidInput = document.getElementById('opAmountPaid');
-        const isUnpaid = (parseFloat(paidInput?.value) || 0) <= 0;
-        processOpPaidAction(submitBtn, isUnpaid);
-      });
-    }
   }
 
   // ====================================================================
@@ -4359,32 +4501,6 @@ const Admin = (function () {
                 <strong id="ipDisplayTotalDaily" style="color:#059669;">&#8377;0.00 / day</strong>
               </div>
             </div>
-
-            <!-- Initial Deposit & Billing Integration (Section 16 & 17) -->
-            <div class="cv-op-fields-row" style="margin-top:0.85rem; margin-bottom:0;">
-              <div class="cv-form-group" style="margin-bottom:0;">
-                <label class="cv-form-label" for="ipDepositAmount">Initial Deposit (&#8377;)</label>
-                <div style="display:flex; gap:0.4rem; align-items:center;">
-                  <input type="number" id="ipDepositAmount" class="cv-input" placeholder="0.00" min="0" step="100" value="0.00" style="flex:1;">
-                  <button type="button" id="btnIpDepositPaid" class="cv-btn-paid" style="height:42px; padding:0 0.9rem;" title="Set initial deposit to daily rate">
-                    PAID
-                  </button>
-                  <button type="button" id="btnIpDepositUnpaid" class="cv-btn-unpaid" style="height:42px; padding:0 0.9rem;" title="Admit patient with ₹0.00 deposit as UNPAID">
-                    UNPAID
-                  </button>
-                </div>
-              </div>
-              <div class="cv-form-group" style="margin-bottom:0;">
-                <label class="cv-form-label" for="ipPaymentMethod">Deposit Mode</label>
-                <select id="ipPaymentMethod" class="cv-input">
-                  <option value="CASH">Cash</option>
-                  <option value="CARD">Credit / Debit Card</option>
-                  <option value="UPI">UPI / Digital QR</option>
-                  <option value="BANK_TRANSFER">Net Banking / NEFT</option>
-                  <option value="INSURANCE">TPA / Health Insurance</option>
-                </select>
-              </div>
-            </div>
           </div>
 
         </div>
@@ -4739,26 +4855,6 @@ const Admin = (function () {
     const form = document.getElementById('ipAdmissionForm');
     if (!form) return;
 
-    document.getElementById('btnIpDepositPaid')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const depInput = document.getElementById('ipDepositAmount');
-      if (depInput) {
-        const rPrice = parseFloat(document.getElementById('ipRoomSelect')?.selectedOptions[0]?.getAttribute('data-price')) || 1200;
-        const bPrice = parseFloat(document.getElementById('ipBedSelect')?.selectedOptions[0]?.getAttribute('data-price')) || 600;
-        depInput.value = (rPrice + bPrice).toFixed(2);
-        showToast(`Initial deposit set to ₹${formatCurrency(rPrice + bPrice)} (Daily Rate).`, 'info');
-      }
-    });
-
-    document.getElementById('btnIpDepositUnpaid')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const depInput = document.getElementById('ipDepositAmount');
-      if (depInput) {
-        depInput.value = '0.00';
-        showToast('Initial deposit set to ₹0.00 (UNPAID admission). Bed will be occupied with full balance due.', 'info');
-      }
-    });
-
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -4790,10 +4886,6 @@ const Admin = (function () {
 
       const roomId = document.getElementById('ipRoomSelect')?.value;
       const bedId = document.getElementById('ipBedSelect')?.value;
-
-      const depositAmountStr = document.getElementById('ipDepositAmount')?.value?.trim();
-      const depositAmount = depositAmountStr ? parseFloat(depositAmountStr) : 0.0;
-      const paymentMethod = document.getElementById('ipPaymentMethod')?.value || 'CASH';
 
       const vName = validatePatientName(rawPatientName, true);
       const vAge = validatePatientAge(rawAgeStr, true);
@@ -4874,9 +4966,9 @@ const Admin = (function () {
         admissionNotes: admissionNotes || null,
         roomId: parseInt(roomId, 10),
         bedId: parseInt(bedId, 10),
-        depositAmount,
-        paymentMethod,
-        paymentStatus: depositAmount > 0 ? 'PAID' : 'UNPAID'
+        depositAmount: 0.0,
+        paymentMethod: 'CASH',
+        paymentStatus: 'UNPAID'
       };
 
       try {
@@ -4888,10 +4980,10 @@ const Admin = (function () {
 
         if (res.ok && res.data) {
           const adm = res.data;
-          alert(`IP admission created successfully.\n\nAdmission Number: ${adm.ipId}\nPatient: ${adm.patientName} (UHID: ${adm.uhid})\nBed: ${adm.bedNumber} (Room: ${adm.roomNumber})\nStatus: OCCUPIED`);
+          showToast(`IP admission created (${adm.ipId}). Bed ${adm.bedNumber} is OCCUPIED. Opening billing pop-up...`, 'success');
           resetIpForm();
           if (typeof loadRoomsData === 'function') loadRoomsData();
-          switchIpTab('inpatients');
+          showBedPaymentModal(adm.bedId, adm.id, adm);
         } else {
           const errMsg = res.message || 'Failed to create IP admission. The selected bed may have been reserved by another user.';
           if (alertBox) {
@@ -5635,29 +5727,34 @@ const Admin = (function () {
   // IP ROOM / BED PAYMENT COLLECTION (Phase 4)
   // Integrates payment confirmation modal + real MySQL update + print
   // ====================================================================
-  async function showBedPaymentModal(bedId, admissionId) {
-    if (!admissionId) {
+  // ====================================================================
+  // IP ROOM / BED PAYMENT COLLECTION (TASK 2)
+  // ====================================================================
+  async function showBedPaymentModal(bedId, admissionId, preloadedAdm = null) {
+    if (!admissionId && !preloadedAdm) {
       alert('No active inpatient admission found for this bed.');
       return;
     }
 
     try {
-      const res = await Api.get(`/api/ip/admissions/${admissionId}`);
-      if (!res || !res.ok || !res.data) {
-        alert('Could not fetch inpatient billing details for bed.');
-        return;
+      let adm = preloadedAdm;
+      if (!adm) {
+        const res = await Api.get(`/api/ip/admissions/${admissionId}`);
+        if (!res || !res.ok || !res.data) {
+          alert('Could not fetch inpatient billing details for bed.');
+          return;
+        }
+        adm = res.data;
       }
-      const adm = res.data;
+
       const roomBed = (Number(adm.roomPrice || 0) + Number(adm.bedPrice || 0));
       const totalCharges = (Number(adm.totalCharges || 0) > 0) ? Number(adm.totalCharges) : (roomBed > 0 ? roomBed : Number(adm.depositAmount || 0));
       const paidAmount = adm.paidAmount != null ? Number(adm.paidAmount) :
         (adm.paymentStatus === 'PAID' ? totalCharges : (adm.depositAmount != null ? Number(adm.depositAmount) : 0));
       const balanceAmount = adm.balanceAmount != null ? Number(adm.balanceAmount) : Math.max(0, totalCharges - paidAmount);
-
-      if (balanceAmount <= 0) {
-        alert(`This inpatient admission (${adm.ipId}) has already been fully paid (Balance: ₹0.00).`);
-        return;
-      }
+      const isPaid = (balanceAmount <= 0);
+      const paymentStatus = adm.paymentStatus || (isPaid ? 'PAID' : (paidAmount > 0 ? 'PARTIALLY PAID' : 'UNPAID'));
+      const badgeCls = isPaid ? 'cv-badge-paid' : (paidAmount > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
 
       const prev = document.getElementById('cvBedPaymentBackdrop');
       if (prev) prev.remove();
@@ -5668,98 +5765,107 @@ const Admin = (function () {
       backdrop.style.zIndex = '1040';
 
       backdrop.innerHTML = `
-        <div class="cv-modal" style="max-width: 480px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.22); border:1px solid #cbd5e1; background:#ffffff;">
-          <div class="cv-modal-header" style="background:#f8fafc; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--cv-border);">
-            <div style="display:flex; align-items:center; gap:0.6rem;">
-              <span style="width:32px; height:32px; border-radius:8px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center;">
-                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-              </span>
-              <h3 class="cv-modal-title" style="margin:0; font-size:1.1rem; font-weight:700; color:#0f172a;">IP Room / Bed Payment Collection</h3>
+        <div class="cv-modal" style="max-width: 520px; width: 95%; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28); border-radius: 16px; overflow: hidden; animation: cvModalIn 0.22s ease-out;">
+          <div class="cv-modal-header" style="background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95)); padding: 1.15rem 1.4rem; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <div style="width:36px; height:36px; border-radius:10px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+              </div>
+              <div>
+                <h3 class="cv-modal-title" style="margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">IP Room &amp; Bed Billing Collection</h3>
+                <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+                  IP ID: <span style="font-family:monospace; color:var(--cv-primary); font-weight:800;">${escapeHtml(adm.ipId)}</span> &bull; UHID: <span style="font-family:monospace; font-weight:700;">${escapeHtml(adm.uhid || '—')}</span>
+                </div>
+              </div>
             </div>
-            <button type="button" class="cv-modal-close" id="btnBedPayClose" style="cursor:pointer;" aria-label="Close">&times;</button>
+            <button type="button" class="cv-modal-close" id="btnBedPayClose" style="cursor:pointer; font-size:1.4rem; border:none; background:transparent; color:#64748b; line-height:1;" aria-label="Close">&times;</button>
           </div>
 
-          <div class="cv-modal-body" style="padding: 1.4rem;">
+          <div class="cv-modal-body" style="padding: 1.35rem;">
             <!-- Patient & Bed Details Summary -->
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.9rem 1.15rem; margin-bottom:1.15rem; font-size:0.85rem;">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.85rem 1rem; margin-bottom:1.15rem; font-size:0.84rem;">
               <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
                 <span style="color:#64748b;">Patient:</span>
-                <strong style="color:#0f172a;">${escapeHtml(adm.patientName)} <span style="font-family:monospace; color:var(--cv-primary);">(${escapeHtml(adm.uhid || '—')})</span></strong>
+                <strong style="color:#0f172a;">${escapeHtml(adm.patientName)} <span style="font-weight:normal; color:#64748b;">(${adm.gender || '—'}, ${adm.age ? adm.age + ' yrs' : '—'})</span></strong>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
-                <span style="color:#64748b;">IP ID:</span>
-                <strong style="font-family:monospace; color:#0f172a;">${escapeHtml(adm.ipId)}</strong>
+                <span style="color:#64748b;">Assigned Accommodation:</span>
+                <strong style="color:#0f172a;">Room ${escapeHtml(adm.roomNumber)} &bull; Bed ${escapeHtml(adm.bedNumber)} <span style="font-weight:normal; color:#059669;">[OCCUPIED]</span></strong>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
-                <span style="color:#64748b;">Room / Bed:</span>
-                <strong style="color:#0f172a;">Room ${escapeHtml(adm.roomNumber)} &bull; Bed ${escapeHtml(adm.bedNumber)}</strong>
+                <span style="color:#64748b;">Daily Charge Rates:</span>
+                <span style="color:#334155;">Room: ₹${formatCurrency(adm.roomPrice || 0)}/day + Bed: ₹${formatCurrency(adm.bedPrice || 0)}/day</span>
               </div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
-                <span style="color:#64748b;">Total Charges:</span>
+              <div style="display:flex; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:0.35rem; margin-top:0.35rem;">
+                <span style="color:#64748b; font-weight:700;">Daily Hospitalization Charge:</span>
                 <strong style="color:#0f172a;">₹${formatCurrency(totalCharges)}</strong>
               </div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
-                <span style="color:#64748b;">Amount Paid So Far:</span>
-                <strong id="bedPayDisplayPaidSoFar" style="color:#059669;">₹${formatCurrency(paidAmount)}</strong>
+            </div>
+
+            <!-- Financial Summary Cards -->
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.75rem; margin-bottom:1.25rem;">
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Total Payable</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:0.25rem;">₹${formatCurrency(totalCharges)}</div>
               </div>
-              <div style="display:flex; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:0.4rem; margin-top:0.4rem;">
-                <span style="color:#64748b; font-weight:700;">Outstanding Balance:</span>
-                <strong id="bedPayDisplayBalance" style="color:var(--cv-danger); font-size:1.05rem;">₹${formatCurrency(balanceAmount)}</strong>
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Previously Paid</div>
+                <div id="bedPayDisplayPaidSoFar" style="font-size:1.15rem; font-weight:800; color:#059669; margin-top:0.25rem;">₹${formatCurrency(paidAmount)}</div>
               </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.35rem;">
-                <span style="color:#64748b; font-size:0.78rem;">Payment Status:</span>
-                <span id="bedPayDisplayStatus"><span class="cv-payment-balance-badge ${balanceAmount <= 0 ? 'cv-badge-paid' : ((adm.paidAmount || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}">${adm.paymentStatus || (balanceAmount <= 0 ? 'PAID' : ((adm.paidAmount || 0) > 0 ? 'PARTIALLY PAID' : 'UNPAID'))}</span></span>
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Remaining Balance</div>
+                <div id="bedPayDisplayBalance" style="font-size:1.15rem; font-weight:800; color:${isPaid ? '#059669' : 'var(--cv-danger)'}; margin-top:0.25rem;">₹${formatCurrency(balanceAmount)}</div>
               </div>
+            </div>
+
+            <!-- Payment Status Row -->
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(241, 245, 249, 0.6); border:1px solid #e2e8f0; border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:1.15rem;">
+              <span style="font-size:0.8rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.03em;">Payment Status</span>
+              <div id="bedPayDisplayStatus"><span class="cv-payment-balance-badge ${badgeCls}">${paymentStatus}</span></div>
             </div>
 
             <!-- Amount Paid Input & Payment Method -->
-            <div style="margin-bottom:1rem;">
-              <label for="bedPayAmountInput" style="display:block; font-size:0.8rem; font-weight:700; color:#334155; text-transform:uppercase; margin-bottom:0.35rem;">
-                Amount Paid / Enter Amount <span style="color:#dc2626;">*</span>
-              </label>
-              <div style="display:flex; gap:0.4rem; align-items:center;">
-                <div style="position:relative; flex:1;">
-                  <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:700; color:#64748b;">₹</span>
-                  <input type="number" id="bedPayAmountInput" class="cv-form-input" style="padding-left:1.8rem; height:42px; font-size:1.05rem; font-weight:700;" placeholder="0.00" value="${balanceAmount}" min="0.01" max="${balanceAmount}" step="any">
+            <div id="ipModalPaymentControls">
+              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.75rem; margin-bottom:1rem;">
+                <div>
+                  <label for="bedPayMethodSelect" class="cv-form-label" style="font-size:0.75rem; font-weight:700;">Deposit Mode</label>
+                  <select id="bedPayMethodSelect" class="cv-input" style="height:42px; font-size:0.88rem;">
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Credit / Debit Card</option>
+                    <option value="UPI">UPI / Digital QR</option>
+                    <option value="BANK_TRANSFER">Net Banking / NEFT</option>
+                    <option value="INSURANCE">TPA / Health Insurance</option>
+                  </select>
                 </div>
-                <button type="button" class="cv-btn-unpaid" id="btnBedPayDirectUnpaid" style="height:42px; padding:0 1.1rem;">
-                  UNPAID
-                </button>
-                <button type="button" class="cv-btn-paid" id="btnBedPayDirect" style="height:42px; padding:0 1.1rem;">
-                  PAID
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label for="bedPayAmountInput" class="cv-form-label" style="font-size:0.75rem; font-weight:700; margin-bottom:0.2rem;">Amount to Collect (₹) *</label>
+                    <button type="button" id="btnBedPayFull" class="cv-link-btn" style="font-size:0.72rem; font-weight:700;" title="Set to remaining balance">Pay Full</button>
+                  </div>
+                  <input type="number" id="bedPayAmountInput" class="cv-input" style="height:42px; font-size:1.05rem; font-weight:700; color:#0f172a;" placeholder="0.00" value="${balanceAmount > 0 ? balanceAmount.toFixed(2) : '0.00'}" min="0.01" max="${balanceAmount}" step="any" ${isPaid ? 'disabled' : ''}>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:0.6rem; align-items:center; margin-top:0.5rem;">
+                <button type="button" id="btnBedPaySubmit" class="cv-btn-primary" style="flex:1; height:44px; font-size:0.95rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.4rem;" ${isPaid ? 'disabled' : ''}>
+                  <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>Paid / Collect Payment</span>
                 </button>
               </div>
             </div>
 
-            <div style="margin-bottom:0.5rem;">
-              <label for="bedPayMethodSelect" style="display:block; font-size:0.8rem; font-weight:700; color:#334155; text-transform:uppercase; margin-bottom:0.35rem;">
-                Payment Method
-              </label>
-              <select id="bedPayMethodSelect" class="cv-form-select" style="height:40px; font-size:0.88rem;">
-                <option value="CASH">Cash</option>
-                <option value="CARD">Credit/Debit Card</option>
-                <option value="UPI">UPI / Digital Payment</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="OTHER">Other</option>
-              </select>
+            <div id="ipModalPaidBanner" style="display:${isPaid ? 'block' : 'none'}; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem; text-align:center; color:#065f46; font-size:0.88rem; font-weight:700; margin-top:0.75rem;">
+              ✓ IP Room / Bed Charges Fully Settled
             </div>
           </div>
 
-          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background:#f8fafc; border-top:1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
-            <button type="button" class="cv-btn-secondary" id="btnBedPayHistory" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
+          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background: #f8fafc; border-top: 1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+            <button type="button" class="cv-btn-secondary" id="btnBedPayHistory" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600;">
               Payment History
             </button>
-            <div style="display:flex; gap:0.75rem;">
-              <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.5rem 1.1rem; font-size:0.88rem; font-weight:600;">
-                Close
-              </button>
-              <button type="button" class="cv-btn-unpaid" id="btnBedPaySubmitUnpaid" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700;">
-                UNPAID
-              </button>
-              <button type="button" class="cv-btn-paid" id="btnBedPaySubmit" style="padding:0.5rem 1.3rem; font-size:0.88rem; font-weight:700;">
-                PAID
-              </button>
-            </div>
+            <button type="button" class="cv-btn-secondary" id="btnBedPayCancel" style="padding:0.45rem 1.4rem; font-size:0.88rem; font-weight:600;">
+              Close
+            </button>
           </div>
         </div>
       `;
@@ -5769,14 +5875,23 @@ const Admin = (function () {
       const closeBedModal = () => backdrop.remove();
       document.getElementById('btnBedPayClose')?.addEventListener('click', closeBedModal);
       document.getElementById('btnBedPayCancel')?.addEventListener('click', closeBedModal);
-      document.getElementById('btnBedPayHistory')?.addEventListener('click', () => {
-        showBillPaymentsModal('IP', admissionId, adm.ipId);
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeBedModal();
       });
 
-      async function executeBedPaymentDirect(triggerBtn) {
-        if (triggerBtn) {
-          if (triggerBtn.disabled || triggerBtn.dataset.processing === 'true') return;
-        }
+      document.getElementById('btnBedPayFull')?.addEventListener('click', () => {
+        const curBal = (adm.balanceAmount != null) ? Number(adm.balanceAmount) : Math.max(0, totalCharges - (adm.paidAmount || 0));
+        const inp = document.getElementById('bedPayAmountInput');
+        if (inp) inp.value = Math.max(0, curBal).toFixed(2);
+      });
+
+      document.getElementById('btnBedPayHistory')?.addEventListener('click', () => {
+        showBillPaymentsModal('IP', adm.id, adm.ipId);
+      });
+
+      document.getElementById('btnBedPaySubmit')?.addEventListener('click', async (e) => {
+        const triggerBtn = e.currentTarget;
+        if (triggerBtn.disabled || triggerBtn.dataset.processing === 'true') return;
 
         const amtInput = document.getElementById('bedPayAmountInput');
         const rawVal = amtInput ? amtInput.value : '';
@@ -5788,7 +5903,7 @@ const Admin = (function () {
         }
         const enteredAmt = parseFloat(rawVal);
         if (isNaN(enteredAmt) || enteredAmt <= 0) {
-          showToast('Payment amount must be a valid positive number greater than 0.', 'danger');
+          showToast('Payment amount must be greater than zero.', 'danger');
           return;
         }
         const curBal = (adm.balanceAmount != null) ? parseFloat(adm.balanceAmount) : balanceAmount;
@@ -5797,16 +5912,15 @@ const Admin = (function () {
           return;
         }
 
-        if (triggerBtn) {
-          triggerBtn.disabled = true;
-          triggerBtn.dataset.processing = 'true';
-          triggerBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-        }
+        triggerBtn.disabled = true;
+        triggerBtn.dataset.processing = 'true';
+        const origHtml = triggerBtn.innerHTML;
+        triggerBtn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></span> Recording Payment...';
 
         try {
           const payRes = await Api.post('/api/billing/payment', {
             moduleType: 'IP',
-            billId: admissionId,
+            billId: adm.id,
             billNumber: adm.ipId,
             paymentAmount: enteredAmt,
             paymentMethod: method,
@@ -5847,19 +5961,13 @@ const Admin = (function () {
               }
             }
 
-            if (triggerBtn) {
-              triggerBtn.disabled = isNowPaid;
-              delete triggerBtn.dataset.processing;
-              triggerBtn.innerHTML = 'PAID';
-            }
-            const btnOther = (triggerBtn.id === 'btnBedPayDirect') ? document.getElementById('btnBedPaySubmit') : document.getElementById('btnBedPayDirect');
-            if (btnOther) {
-              btnOther.disabled = isNowPaid;
-              delete btnOther.dataset.processing;
-              btnOther.innerHTML = 'PAID';
+            if (isNowPaid) {
+              triggerBtn.disabled = true;
+              const paidBanner = document.getElementById('ipModalPaidBanner');
+              if (paidBanner) paidBanner.style.display = 'block';
             }
 
-            showToast(`Payment of ₹${formatCurrency(enteredAmt)} recorded. Remaining: ₹${formatCurrency(data.balanceAmount)}`, 'success');
+            showToast(`Payment of ₹${formatCurrency(enteredAmt)} recorded. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
 
             // Refresh background views without page reload
             loadRoomsData();
@@ -5871,38 +5979,19 @@ const Admin = (function () {
             }
           } else {
             showToast(payRes?.message || 'Payment processing failed.', 'danger');
-            if (triggerBtn) {
-              triggerBtn.disabled = false;
-              delete triggerBtn.dataset.processing;
-              triggerBtn.innerHTML = 'PAID';
-            }
           }
         } catch (err) {
           showToast('Error processing payment: ' + (err.message || err), 'danger');
-          if (triggerBtn) {
+        } finally {
+          delete triggerBtn.dataset.processing;
+          if (adm.balanceAmount > 0) {
             triggerBtn.disabled = false;
-            delete triggerBtn.dataset.processing;
-            triggerBtn.innerHTML = 'PAID';
+            triggerBtn.innerHTML = origHtml;
+          } else {
+            triggerBtn.innerHTML = '<span>Paid</span>';
           }
         }
-      }
-
-      function handleBedPaymentUnpaid() {
-        const amtInput = document.getElementById('bedPayAmountInput');
-        if (amtInput) amtInput.value = '0.00';
-        const curPaid = (adm.paidAmount != null) ? parseFloat(adm.paidAmount) : 0;
-        const curBal = (adm.balanceAmount != null) ? parseFloat(adm.balanceAmount) : balanceAmount;
-        if (curPaid > 0) {
-          showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} and bed assignment are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
-        } else {
-          showToast(`Admission recorded as UNPAID (₹0.00 collected). Bed assignment is active and preserved. Balance due: ₹${formatCurrency(curBal)}.`, 'info');
-        }
-      }
-
-      document.getElementById('btnBedPayDirect')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPayDirect')));
-      document.getElementById('btnBedPaySubmit')?.addEventListener('click', () => executeBedPaymentDirect(document.getElementById('btnBedPaySubmit')));
-      document.getElementById('btnBedPayDirectUnpaid')?.addEventListener('click', handleBedPaymentUnpaid);
-      document.getElementById('btnBedPaySubmitUnpaid')?.addEventListener('click', handleBedPaymentUnpaid);
+      });
 
     } catch (e) {
       console.error(e);
@@ -7222,130 +7311,20 @@ const Admin = (function () {
               </tbody>
             </table>
           </div>
-        </div>
 
-        <!-- 4. Billing & Payment Summary Card -->
-        <div class="cv-pharmacy-card cv-pharmacy-summary-card">
-          <div class="cv-pharmacy-card-header" style="margin-bottom:0.5rem; border-bottom:1px solid #e2e8f0; padding-bottom:0.35rem;">
-            <div class="cv-pharmacy-card-title" style="font-size:0.88rem;">
-              <svg style="width:18px; height:18px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              4. Invoicing, Taxes &amp; Settlement
+          <!-- Cart Summary & Proceed to Settlement Action -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding-top:0.85rem; border-top:1px solid #e2e8f0;">
+            <div style="font-size:0.85rem; color:#64748b;">
+              Selected Medicines: <strong id="pharCartItemCount" style="color:#0f172a;">${pharBillItems.length}</strong> items &bull; Estimated Subtotal: <strong id="pharCartSubtotalPreview" style="color:var(--cv-primary); font-size:1.05rem;">₹${formatCurrency(pharBillItems.reduce((acc, it) => acc + (it.amount || it.totalPrice || 0), 0))}</strong>
             </div>
-            <span style="font-size:0.75rem; color:var(--cv-text-muted); font-weight:600;">Dispensary Bill Settlement</span>
-          </div>
-          
-          <div class="cv-pharmacy-summary-grid">
-            
-            <!-- Left Column: Calculation -->
-            <div class="cv-summary-calc-col">
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Subtotal</span>
-                <span id="pharSummarySubtotal" class="cv-calc-value">₹0.00</span>
-              </div>
-              
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <span class="cv-calc-label">Discount</span>
-                  <div style="display:inline-flex; align-items:center; gap:0.2rem;">
-                    <input type="number" id="pharDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0">
-                    <span style="font-size:0.75rem; font-weight:700; color:var(--cv-text-muted);">%</span>
-                  </div>
-                </div>
-                <span id="pharDiscountAmount" style="font-weight:700; color:var(--cv-danger); font-size:0.86rem;">- ₹0.00</span>
-              </div>
-              <div id="pharDiscountWarningHint" style="display:none; color:#d97706; font-size:0.7rem; font-weight:700; text-align:right;">
-                ⚠️ Discount exceeds standard 15% threshold
-              </div>
-              
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Net Taxable Amount</span>
-                <span id="pharNetAmount" class="cv-calc-value">₹0.00</span>
-              </div>
-              
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">GSTIN</span>
-                <input type="text" id="pharGstNumber" class="cv-form-input" style="height:26px; width:155px; font-size:0.74rem; font-family:monospace; text-transform:uppercase; text-align:right;" placeholder="22AAAAA0000A1Z5" value="22AAAAA0000A1Z5">
-              </div>
-
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <span class="cv-calc-label">GST</span>
-                  <div style="display:inline-flex; align-items:center; gap:0.2rem;">
-                    <input type="number" id="pharGstPct" class="cv-calc-input" min="0" max="28" step="0.5" value="5.0">
-                    <span style="font-size:0.75rem; font-weight:700; color:var(--cv-text-muted);">%</span>
-                  </div>
-                </div>
-                <span id="pharGstAmount" style="font-weight:700; color:#0369a1; font-size:0.86rem;">+ ₹0.00</span>
-              </div>
-              
-              <div class="final-total-highlight">
-                <div>
-                  <div style="font-size:0.62rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--cv-primary); font-weight:800;">Amount Payable</div>
-                  <div style="font-size:0.95rem; font-weight:800; color:#0f172a; line-height:1.1;">FINAL TOTAL</div>
-                </div>
-                <span id="pharFinalTotal" class="cv-final-total-amount">₹0.00</span>
-              </div>
-            </div>
-
-            <!-- Right Column: Payment & Settlement -->
-            <div class="cv-summary-pay-col">
-              
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.5rem;">
-                  <span class="cv-calc-label" style="font-weight:700; color:#0f172a;">Amount Paid (₹) <span style="color:var(--cv-danger);">*</span></span>
-                  <button type="button" id="btnPharPayFull" class="cv-link-btn" title="Set paid amount equal to total">Pay Full</button>
-                </div>
-                <div style="display:flex; gap:0.35rem; align-items:center;">
-                  <input type="number" id="pharPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:30px; width:95px; font-weight:700; font-size:0.9rem; text-align:right; color:#0f172a;">
-                  <button type="button" id="btnPharDirectUnpaid" class="cv-btn-unpaid" style="height:30px; padding:0 0.75rem; font-size:0.8rem;">
-                    UNPAID
-                  </button>
-                  <button type="button" id="btnPharDirectPaid" class="cv-btn-paid" style="height:30px; padding:0 0.75rem; font-size:0.8rem;">
-                    PAID
-                  </button>
-                </div>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Balance Due</span>
-                <span id="pharBalanceAmount" style="font-size:1.05rem; font-weight:800; color:var(--cv-danger);">₹0.00</span>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Payment Status</span>
-                <span id="pharPaymentStatusBadge" class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.68rem; padding:0.12rem 0.55rem;">PAID</span>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Payment Method</span>
-                <select id="pharPaymentMethod" class="cv-form-select" style="height:26px; width:155px; font-size:0.78rem; padding:0.1rem 0.35rem;">
-                  <option value="CASH">Cash Payment</option>
-                  <option value="UPI">UPI / Digital QR</option>
-                  <option value="CARD">Debit / Credit Card</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="INSURANCE">Insurance TPA</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Prescription / Notes</span>
-                <input type="text" id="pharNotes" class="cv-form-input" style="height:26px; width:180px; font-size:0.78rem; padding:0.1rem 0.4rem;" placeholder="Prescription ref / notes...">
-              </div>
-
-              <!-- Action Buttons -->
-              <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.4rem;">
-                <button type="button" class="cv-btn-secondary" id="btnPharResetBill" style="flex:1; height:32px; font-weight:600; font-size:0.82rem; padding:0 0.5rem;">
-                  Reset
-                </button>
-                <button type="button" class="cv-btn-primary" id="btnPharGenerateBill" style="flex:2; height:32px; font-weight:700; font-size:0.84rem; display:inline-flex; align-items:center; justify-content:center; gap:0.4rem; box-shadow:0 1px 4px rgba(37, 99, 235, 0.2);">
-                  <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  Generate &amp; Save Bill
-                </button>
-              </div>
-
+            <div style="display:flex; gap:0.6rem;">
+              <button type="button" class="cv-btn-secondary" id="btnPharResetBill" style="padding:0.5rem 1.1rem; font-weight:600; font-size:0.84rem;">
+                Clear Cart
+              </button>
+              <button type="button" class="cv-btn-primary" id="btnPharOpenCheckout" style="padding:0.55rem 1.5rem; font-weight:700; font-size:0.92rem; display:inline-flex; align-items:center; gap:0.45rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.25);">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Proceed to Settlement</span>
+              </button>
             </div>
           </div>
         </div>
@@ -7691,18 +7670,6 @@ const Admin = (function () {
       if (warnHint) warnHint.style.display = (p > 15) ? 'block' : 'none';
       recalculatePharmacyBill();
     });
-    document.getElementById('pharGstPct')?.addEventListener('input', recalculatePharmacyBill);
-    document.getElementById('pharPaidAmount')?.addEventListener('input', recalculatePharmacyBill);
-
-    document.getElementById('btnPharPayFull')?.addEventListener('click', () => {
-      const finalTotalStr = document.getElementById('pharFinalTotal')?.textContent.replace(/[^0-9.]/g, '') || '0';
-      const paidInput = document.getElementById('pharPaidAmount');
-      if (paidInput) {
-        paidInput.value = parseFloat(finalTotalStr).toFixed(2);
-        recalculatePharmacyBill();
-      }
-    });
-
     document.getElementById('btnPharResetBill')?.addEventListener('click', () => {
       if (confirm('Are you sure you want to reset this bill? All selected medicines will be cleared.')) {
         pharBillItems = [];
@@ -7712,9 +7679,7 @@ const Admin = (function () {
       }
     });
 
-    document.getElementById('btnPharGenerateBill')?.addEventListener('click', () => checkoutPharmacyBill('DEFAULT'));
-    document.getElementById('btnPharDirectPaid')?.addEventListener('click', () => checkoutPharmacyBill('PAID'));
-    document.getElementById('btnPharDirectUnpaid')?.addEventListener('click', () => checkoutPharmacyBill('UNPAID'));
+    document.getElementById('btnPharOpenCheckout')?.addEventListener('click', openPharmacySettlementWorkflow);
   }
 
   async function selectMedicineForPOS(medicineId) {
@@ -8165,75 +8130,27 @@ const Admin = (function () {
     });
     subtotal = parseFloat(subtotal.toFixed(2));
 
-    const discountPct = parseFloat(document.getElementById('pharDiscountPct')?.value) || 0;
-    const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
-    const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
-
-    const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
-    const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
-    const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-
-    let paidAmount = parseFloat(document.getElementById('pharPaidAmount')?.value) || 0;
-    if (paidAmount < 0) paidAmount = 0;
-
-    let balance = parseFloat(Math.max(0, finalTotal - paidAmount).toFixed(2));
-
-    let status = 'UNPAID';
-    let statusClass = 'cv-badge-unpaid';
-
-    if (finalTotal > 0) {
-      if (paidAmount >= finalTotal) {
-        status = 'PAID';
-        statusClass = 'cv-badge-paid';
-        balance = 0;
-      } else if (paidAmount > 0) {
-        status = 'PARTIALLY PAID';
-        statusClass = 'cv-badge-partial';
-      } else {
-        status = 'UNPAID';
-        statusClass = 'cv-badge-unpaid';
-      }
-    } else {
-      status = 'PAID';
-      statusClass = 'cv-badge-paid';
-      balance = 0;
-    }
-
-    const subtotalElem = document.getElementById('pharSummarySubtotal');
-    if (subtotalElem) subtotalElem.textContent = `₹${formatCurrency(subtotal)}`;
-
-    const discountAmtElem = document.getElementById('pharDiscountAmount');
-    if (discountAmtElem) discountAmtElem.textContent = `- ₹${formatCurrency(discountAmount)}`;
-
-    const netAmountElem = document.getElementById('pharNetAmount');
-    if (netAmountElem) netAmountElem.textContent = `₹${formatCurrency(netAmount)}`;
-
-    const gstAmountElem = document.getElementById('pharGstAmount');
-    if (gstAmountElem) gstAmountElem.textContent = `+ ₹${formatCurrency(gstAmount)}`;
-
-    const finalTotalElem = document.getElementById('pharFinalTotal');
-    if (finalTotalElem) finalTotalElem.textContent = `₹${formatCurrency(finalTotal)}`;
-
-    const balanceElem = document.getElementById('pharBalanceAmount');
-    if (balanceElem) balanceElem.textContent = `₹${formatCurrency(balance)}`;
-
-    const statusBadge = document.getElementById('pharPaymentStatusBadge');
-    if (statusBadge) {
-      statusBadge.textContent = status;
-      statusBadge.className = `cv-payment-balance-badge ${statusClass}`;
-    }
+    const cartCount = document.getElementById('pharCartItemCount');
+    if (cartCount) cartCount.textContent = pharBillItems.length;
+    const cartSubtotalPreview = document.getElementById('pharCartSubtotalPreview');
+    if (cartSubtotalPreview) cartSubtotalPreview.textContent = `₹${formatCurrency(subtotal)}`;
   }
 
   // ------------------------------------------------------------------
-  // CHECKOUT WORKFLOW: PRESCRIPTION CONFIRMATION & BILL CREATION
+  // PHARMACY SETTLEMENT WORKFLOW & GLASSMORPHISM MODAL (TASK 3)
   // ------------------------------------------------------------------
-  async function checkoutPharmacyBill(actionType = 'DEFAULT') {
-    if (!pharBillItems || pharBillItems.length === 0) {
-      alert('Please add at least one medicine to the bill.');
+  async function openPharmacySettlementWorkflow() {
+    // If a bill has already been generated in this session, reopen it directly
+    if (pharActiveSavedBill) {
+      showPharmacySettlementModal(pharActiveSavedBill);
       return;
     }
 
-    // 1. Patient check
+    if (!pharBillItems || pharBillItems.length === 0) {
+      alert('Please add at least one medicine to the cart before proceeding to settlement.');
+      return;
+    }
+
     let patientName = '';
     let uhid = '';
     let phone = '';
@@ -8275,15 +8192,7 @@ const Admin = (function () {
       uhid = 'WALKIN-' + Date.now().toString().slice(-6);
     }
 
-    // 2. High Discount Confirmation (> 15%)
-    const discountPct = parseFloat(document.getElementById('pharDiscountPct')?.value) || 0;
-    if (discountPct > 15) {
-      if (!confirm(`Warning: The applied discount is ${discountPct}%, which exceeds the standard 15% threshold. Do you wish to proceed?`)) {
-        return;
-      }
-    }
-
-    // 3. Prescription Verification Check (Rx check)
+    // Prescription Verification Check (Rx check)
     const rxItems = pharBillItems.filter(i => i.hasPrescription);
     if (rxItems.length > 0) {
       const rxNames = rxItems.map(i => i.medicineName).join(', ');
@@ -8291,49 +8200,7 @@ const Admin = (function () {
       if (!confirmed) return;
     }
 
-    // 4. Calculate final payload
-    let subtotal = 0;
-    const requestItems = pharBillItems.map(item => {
-      const q = parseInt(item.quantity);
-      const p = parseFloat(item.unitPrice);
-      const tot = parseFloat((q * p).toFixed(2));
-      subtotal += tot;
-      return {
-        medicineId: item.medicineId,
-        medicineCode: item.medicineCode,
-        medicineName: item.medicineName,
-        batchId: item.batchId,
-        batchNumber: item.batchNumber,
-        expiryDate: item.expiryDate,
-        unit: item.unit,
-        basicUnitQuantity: item.basicUnitQuantity,
-        quantity: q,
-        unitPrice: p,
-        totalPrice: tot,
-        hasPrescription: item.hasPrescription,
-        hsnCode: item.hsnCode,
-        gstPercentage: item.gstPercentage
-      };
-    });
-
-    const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
-    const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
-    const gstPct = parseFloat(document.getElementById('pharGstPct')?.value) || 0;
-    const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
-    const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-
-    let paidAmount = parseFloat(document.getElementById('pharPaidAmount')?.value) || 0;
-    if (actionType === true || actionType === 'PAID') {
-      paidAmount = finalTotal;
-      const pInput = document.getElementById('pharPaidAmount');
-      if (pInput) pInput.value = finalTotal.toFixed(2);
-    } else if (actionType === 'UNPAID') {
-      paidAmount = 0.00;
-      const pInput = document.getElementById('pharPaidAmount');
-      if (pInput) pInput.value = '0.00';
-    }
-
-    const payload = {
+    const draftData = {
       patientId: patientId,
       patientName: patientName,
       uhid: uhid,
@@ -8342,64 +8209,667 @@ const Admin = (function () {
       ipId: ipId,
       doctorName: doctorName || 'Dr. On Duty',
       department: department || 'General Medicine',
-      discountPercentage: discountPct,
-      discountAmount: discountAmount,
-      gstNumber: document.getElementById('pharGstNumber')?.value?.trim() || '22AAAAA0000A1Z5',
-      gstPercentage: gstPct,
-      gstAmount: gstAmount,
-      paidAmount: paidAmount,
-      paymentMethod: document.getElementById('pharPaymentMethod')?.value || 'CASH',
-      notes: document.getElementById('pharNotes')?.value?.trim() || '',
-      items: requestItems
+      items: pharBillItems.map(item => ({
+        medicineId: item.medicineId,
+        medicineCode: item.medicineCode,
+        medicineName: item.medicineName,
+        batchId: item.batchId,
+        batchNumber: item.batchNumber,
+        expiryDate: item.expiryDate,
+        unit: item.unit,
+        basicUnitQuantity: item.basicUnitQuantity,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.amount || (item.quantity * item.unitPrice),
+        hasPrescription: item.hasPrescription,
+        hsnCode: item.hsnCode,
+        gstPercentage: item.gstPercentage
+      }))
     };
 
-    const submitBtn = (actionType === 'UNPAID')
-      ? document.getElementById('btnPharDirectUnpaid')
-      : (actionType === true || actionType === 'PAID' ? document.getElementById('btnPharDirectPaid') : document.getElementById('btnPharGenerateBill'));
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; display:inline-block; margin-right:4px;"></span> Dispensing...';
-    }
+    showPharmacySettlementModal(null, draftData);
+  }
 
-    try {
-      const res = await cvFetch('/api/pharmacy/bills/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+  function showPharmacySettlementModal(savedBill = null, draftData = null) {
+    const prev = document.getElementById('cvPharSettlementModalOverlay');
+    if (prev) prev.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cv-modal-backdrop show';
+    overlay.id = 'cvPharSettlementModalOverlay';
+    overlay.style.zIndex = '1050';
+    overlay.style.padding = '1rem';
+
+    // -------------------------------------------------------------
+    // CASE A: EXISTING / SAVED BILL (VIEW & SUBSEQUENT PARTIAL PAYMENTS)
+    // -------------------------------------------------------------
+    if (savedBill) {
+      const bill = savedBill;
+      const totalAmount = Number(bill.finalTotal || bill.totalAmount || 0);
+      const paidAmt = Number(bill.paidAmount || 0);
+      const balAmt = (bill.balanceAmount != null) ? Number(bill.balanceAmount) : Math.max(0, totalAmount - paidAmt);
+      const isPaid = (balAmt <= 0);
+      const status = bill.paymentStatus || (isPaid ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID'));
+      const badgeClass = isPaid ? 'cv-badge-paid' : (paidAmt > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+
+      const items = bill.items || [];
+      const itemsRowsHtml = items.map((it, idx) => `
+        <tr>
+          <td style="padding:0.4rem 0.5rem; text-align:center; color:#64748b;">${idx + 1}</td>
+          <td style="padding:0.4rem 0.5rem; font-weight:700; color:#0f172a;">
+            ${escapeHtml(it.medicineName)}
+            <span style="font-size:0.72rem; color:#64748b; font-family:monospace; margin-left:0.35rem;">(${escapeHtml(it.medicineCode || '')})</span>
+          </td>
+          <td style="padding:0.4rem 0.5rem; font-family:monospace; font-size:0.8rem;">${escapeHtml(it.batchNumber || '—')}</td>
+          <td style="padding:0.4rem 0.5rem; font-size:0.78rem; color:#64748b;">${escapeHtml(it.expiryDate || 'N/A')}</td>
+          <td style="padding:0.4rem 0.5rem; text-align:center; text-transform:uppercase; font-size:0.75rem; font-weight:700; color:#0369a1;">${escapeHtml(it.unit || 'BASIC')}</td>
+          <td style="padding:0.4rem 0.5rem; text-align:center; font-weight:700;">${it.quantity}</td>
+          <td style="padding:0.4rem 0.5rem; text-align:right;">₹${formatCurrency(it.unitPrice)}</td>
+          <td style="padding:0.4rem 0.5rem; text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(it.totalPrice || (it.quantity * it.unitPrice))}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align:center; padding:1rem; color:#64748b;">No item details.</td></tr>';
+
+      overlay.innerHTML = `
+        <div class="cv-modal" style="max-width: 840px; width: 95%; max-height: 92vh; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28); border-radius: 16px; overflow: hidden; display:flex; flex-direction:column; animation: cvModalIn 0.22s ease-out; margin:auto;">
+          <div class="cv-modal-header" style="background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95)); padding: 1.1rem 1.4rem; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <div style="width:36px; height:36px; border-radius:10px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+              </div>
+              <div>
+                <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">Pharmacy Dispensary Settlement &amp; Billing</h3>
+                <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+                  Invoice No: <span style="font-family:monospace; color:var(--cv-primary); font-weight:800;">${escapeHtml(bill.billNumber)}</span> &bull; UHID: <span style="font-family:monospace; font-weight:700;">${escapeHtml(bill.uhid || '—')}</span>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="cv-modal-close" id="btnPharModalClose" style="cursor:pointer; font-size:1.4rem; border:none; background:transparent; color:#64748b; line-height:1;" aria-label="Close">&times;</button>
+          </div>
+
+          <div class="cv-modal-body" style="padding: 1.25rem; overflow-y: auto;">
+            <!-- Patient Info Strip -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.85rem 1rem; margin-bottom:1rem; font-size:0.84rem;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Patient:</span>
+                <strong style="color:#0f172a;">${escapeHtml(bill.patientName)}</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+                <span style="color:#64748b;">Consulting Doctor:</span>
+                <strong style="color:#0f172a;">${escapeHtml(bill.doctorName || 'Dr. On Duty')} <span style="font-weight:normal; color:#64748b;">(${escapeHtml(bill.department || 'General')})</span></strong>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:#64748b;">Date &amp; Time:</span>
+                <span style="color:#334155; font-weight:600;">${escapeHtml(bill.billDate || '')} ${escapeHtml(bill.billTime || '')}</span>
+              </div>
+            </div>
+
+            <!-- Medicines Breakdown Table -->
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; margin-bottom:1.15rem;">
+              <div style="font-size:0.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.4rem;">
+                Dispensed Medicines (${items.length} items)
+              </div>
+              <div style="max-height:150px; overflow-y:auto;">
+                <table class="cv-bill-table" style="font-size:0.82rem; margin:0;">
+                  <thead>
+                    <tr>
+                      <th style="width:30px; text-align:center;">#</th>
+                      <th>Medicine</th>
+                      <th>Batch</th>
+                      <th>Expiry</th>
+                      <th style="text-align:center;">Unit</th>
+                      <th style="text-align:center;">Qty</th>
+                      <th style="text-align:right;">Rate</th>
+                      <th style="text-align:right;">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsRowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Financial Overview (3 Cards) -->
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.75rem; margin-bottom:1.15rem;">
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Total Payable</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:0.25rem;">₹${formatCurrency(totalAmount)}</div>
+              </div>
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Previously Paid</div>
+                <div id="pharModalDisplayPaid" style="font-size:1.15rem; font-weight:800; color:#059669; margin-top:0.25rem;">₹${formatCurrency(paidAmt)}</div>
+              </div>
+              <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+                <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Remaining Balance</div>
+                <div id="pharModalDisplayBal" style="font-size:1.15rem; font-weight:800; color:var(--cv-danger); margin-top:0.25rem;">₹${formatCurrency(balAmt)}</div>
+              </div>
+            </div>
+
+            <!-- Payment Status Row -->
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(241, 245, 249, 0.6); border:1px solid #e2e8f0; border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:1.15rem;">
+              <span style="font-size:0.8rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.03em;">Payment Status</span>
+              <div id="pharModalStatusBadge"><span class="cv-payment-balance-badge ${badgeClass}">${status}</span></div>
+            </div>
+
+            <!-- Payment Input Controls (For Subsequent Partial Payments) -->
+            <div id="pharModalPaymentControls">
+              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.75rem; margin-bottom:1rem;">
+                <div>
+                  <label for="pharModalPaymentMethod" class="cv-form-label" style="font-size:0.75rem; font-weight:700;">Payment Method</label>
+                  <select id="pharModalPaymentMethod" class="cv-input" style="height:42px; font-size:0.88rem;">
+                    <option value="CASH">Cash Payment</option>
+                    <option value="CARD">Debit / Credit Card</option>
+                    <option value="UPI">UPI / Digital QR</option>
+                    <option value="NET_BANKING">Net Banking / Transfer</option>
+                    <option value="INSURANCE">Insurance TPA</option>
+                  </select>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label for="pharModalAmountToPay" class="cv-form-label" style="font-size:0.75rem; font-weight:700; margin-bottom:0.2rem;">Amount to Pay (₹) *</label>
+                    <button type="button" id="btnPharModalPayFull" class="cv-link-btn" style="font-size:0.72rem; font-weight:700;" title="Set to remaining balance">Pay Full</button>
+                  </div>
+                  <input type="number" id="pharModalAmountToPay" class="cv-input" style="height:42px; font-size:1.05rem; font-weight:700; color:#0f172a;" placeholder="0.00" value="${balAmt > 0 ? balAmt.toFixed(2) : '0.00'}" min="0.01" step="any" ${isPaid ? 'disabled' : ''}>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:0.6rem; align-items:center; margin-top:0.5rem;">
+                <button type="button" id="btnPharModalCollectPayment" class="cv-btn-primary" style="flex:1; height:44px; font-size:0.95rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.4rem;" ${isPaid ? 'disabled' : ''}>
+                  <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>Paid / Collect Payment</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="pharModalPaidBanner" style="display:${isPaid ? 'block' : 'none'}; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem; text-align:center; color:#065f46; font-size:0.88rem; font-weight:700; margin-top:0.75rem;">
+              ✓ Pharmacy Bill Fully Settled (₹${formatCurrency(totalAmount)} collected)
+            </div>
+          </div>
+
+          <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background: #f8fafc; border-top: 1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; gap:0.5rem;">
+              <button type="button" class="cv-btn-secondary" id="btnPharModalHistory" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600;">
+                Payment History
+              </button>
+              <button type="button" class="cv-btn-secondary" id="btnPharModalPrintInvoice" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600; display:inline-flex; align-items:center; gap:0.35rem;">
+                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Invoice
+              </button>
+            </div>
+            <button type="button" class="cv-btn-secondary" id="btnPharModalDoneClose" style="padding:0.45rem 1.4rem; font-size:0.88rem; font-weight:600;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      const closeModal = () => {
+        overlay.remove();
+        renderPharmacyBillingTab();
+      };
+
+      document.getElementById('btnPharModalClose')?.addEventListener('click', closeModal);
+      document.getElementById('btnPharModalDoneClose')?.addEventListener('click', closeModal);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
       });
 
-      if (res && res.success && res.data) {
-        showToast('Pharmacy bill generated and medicines dispensed successfully!', 'success');
-        const savedBill = res.data;
+      document.getElementById('btnPharModalPrintInvoice')?.addEventListener('click', () => {
+        showPharmacyInvoiceModal(bill);
+      });
 
-        // Reset cart
-        pharBillItems = [];
-        if (!pharLockedDoctor) {
-          pharSelectedPatient = null;
+      document.getElementById('btnPharModalHistory')?.addEventListener('click', () => {
+        showBillPaymentsModal('PHARMACY', bill.id, bill.billNumber);
+      });
+
+      document.getElementById('btnPharModalPayFull')?.addEventListener('click', () => {
+        const curBal = (bill.balanceAmount != null) ? Number(bill.balanceAmount) : (Number(bill.finalTotal || bill.totalAmount || 0) - Number(bill.paidAmount || 0));
+        const inp = document.getElementById('pharModalAmountToPay');
+        if (inp) inp.value = Math.max(0, curBal).toFixed(2);
+      });
+
+      // Subsequent payment collection action (Calling /api/billing/payment)
+      document.getElementById('btnPharModalCollectPayment')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        if (btn.disabled || btn.dataset.processing === 'true') return;
+
+        const amtInput = document.getElementById('pharModalAmountToPay');
+        const rawVal = amtInput ? amtInput.value : '';
+        if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+          showToast('Please enter a payment amount.', 'danger');
+          return;
+        }
+        const numAmt = parseFloat(rawVal);
+        if (isNaN(numAmt) || numAmt <= 0) {
+          showToast('Payment amount must be greater than zero.', 'danger');
+          return;
+        }
+        const curBal = (bill.balanceAmount != null) ? Number(bill.balanceAmount) : (Number(bill.finalTotal || bill.totalAmount || 0) - Number(bill.paidAmount || 0));
+        if (numAmt > curBal + 0.001) {
+          showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+          return;
         }
 
-        // Display Invoice Modal
-        showPharmacyInvoiceModal(savedBill);
+        btn.disabled = true;
+        btn.dataset.processing = 'true';
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></span> Recording Payment...';
 
-        // Re-render billing tab to update stock quantities
-        renderPharmacyBillingTab();
-      } else {
-        alert(res?.message || 'Failed to generate pharmacy bill.');
-      }
-    } catch (err) {
-      alert('Error during bill checkout: ' + err.message);
-    } finally {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        if (actionType === 'UNPAID') {
-          submitBtn.innerHTML = 'UNPAID';
-        } else if (actionType === true || actionType === 'PAID') {
-          submitBtn.innerHTML = 'PAID';
-        } else {
-          submitBtn.innerHTML = '<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Generate &amp; Save Bill';
+        const method = document.getElementById('pharModalPaymentMethod')?.value || 'CASH';
+
+        try {
+          const res = await Api.post('/api/billing/payment', {
+            moduleType: 'PHARMACY',
+            billId: bill.id,
+            billNumber: bill.billNumber,
+            paymentAmount: numAmt,
+            paymentMethod: method,
+            notes: 'Pharmacy subsequent bill installment'
+          });
+
+          if (res && res.success && res.data) {
+            const d = res.data;
+            bill.paidAmount = d.amountPaid;
+            bill.balanceAmount = d.balanceAmount;
+            bill.paymentStatus = d.paymentStatus;
+            bill.paymentMethod = d.paymentMethod;
+
+            const isNowPaid = (d.balanceAmount <= 0);
+
+            // Update in-modal displays
+            const dispPaid = document.getElementById('pharModalDisplayPaid');
+            const dispBal = document.getElementById('pharModalDisplayBal');
+            const dispBadge = document.getElementById('pharModalStatusBadge');
+            if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(d.amountPaid);
+            if (dispBal) {
+              dispBal.textContent = '₹' + formatCurrency(d.balanceAmount);
+              dispBal.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+            }
+            if (dispBadge) {
+              dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${d.paymentStatus}</span>`;
+            }
+
+            if (amtInput) {
+              if (isNowPaid) {
+                amtInput.value = '0.00';
+                amtInput.disabled = true;
+              } else {
+                amtInput.value = d.balanceAmount.toFixed(2);
+              }
+            }
+
+            if (isNowPaid) {
+              btn.disabled = true;
+              const paidBanner = document.getElementById('pharModalPaidBanner');
+              if (paidBanner) paidBanner.style.display = 'block';
+            }
+
+            showToast(`Payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(d.amountPaid)}, Balance: ₹${formatCurrency(d.balanceAmount)}`, 'success');
+          } else {
+            showToast(res?.message || 'Payment processing failed.', 'danger');
+          }
+        } catch (err) {
+          showToast('Payment processing error: ' + (err.message || err), 'danger');
+        } finally {
+          delete btn.dataset.processing;
+          if (!isPaid && btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+          }
         }
-      }
+      });
+      return;
     }
+
+    // -------------------------------------------------------------
+    // CASE B: DRAFT BILL (CALCULATION & FIRST CREATION / DISPENSING)
+    // -------------------------------------------------------------
+    const items = draftData?.items || [];
+    let initialSubtotal = 0;
+    items.forEach(it => { initialSubtotal += Number(it.totalPrice || 0); });
+    initialSubtotal = parseFloat(initialSubtotal.toFixed(2));
+
+    const itemsRowsHtml = items.map((it, idx) => `
+      <tr>
+        <td style="padding:0.4rem 0.5rem; text-align:center; color:#64748b;">${idx + 1}</td>
+        <td style="padding:0.4rem 0.5rem; font-weight:700; color:#0f172a;">
+          ${escapeHtml(it.medicineName)}
+          <span style="font-size:0.72rem; color:#64748b; font-family:monospace; margin-left:0.35rem;">(${escapeHtml(it.medicineCode || '')})</span>
+        </td>
+        <td style="padding:0.4rem 0.5rem; font-family:monospace; font-size:0.8rem;">${escapeHtml(it.batchNumber || '—')}</td>
+        <td style="padding:0.4rem 0.5rem; font-size:0.78rem; color:#64748b;">${escapeHtml(it.expiryDate || 'N/A')}</td>
+        <td style="padding:0.4rem 0.5rem; text-align:center; text-transform:uppercase; font-size:0.75rem; font-weight:700; color:#0369a1;">${escapeHtml(it.unit || 'BASIC')}</td>
+        <td style="padding:0.4rem 0.5rem; text-align:center; font-weight:700;">${it.quantity}</td>
+        <td style="padding:0.4rem 0.5rem; text-align:right;">₹${formatCurrency(it.unitPrice)}</td>
+        <td style="padding:0.4rem 0.5rem; text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(it.totalPrice)}</td>
+      </tr>
+    `).join('');
+
+    overlay.innerHTML = `
+      <div class="cv-modal" style="max-width: 860px; width: 95%; max-height: 94vh; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28); border-radius: 16px; overflow: hidden; display:flex; flex-direction:column; animation: cvModalIn 0.22s ease-out; margin:auto;">
+        <div class="cv-modal-header" style="background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95)); padding: 1.1rem 1.4rem; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <div style="width:36px; height:36px; border-radius:10px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            </div>
+            <div>
+              <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">Pharmacy Dispensary Settlement &amp; Billing</h3>
+              <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+                Patient: <span style="font-weight:700; color:#0f172a;">${escapeHtml(draftData.patientName)}</span> &bull; UHID: <span style="font-family:monospace; color:var(--cv-primary); font-weight:800;">${escapeHtml(draftData.uhid || '—')}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="cv-modal-close" id="btnPharModalClose" style="cursor:pointer; font-size:1.4rem; border:none; background:transparent; color:#64748b; line-height:1;" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="cv-modal-body" style="padding: 1.25rem; overflow-y: auto;">
+          <!-- Patient Summary Strip -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.85rem 1rem; margin-bottom:1rem; font-size:0.84rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Patient:</span>
+              <strong style="color:#0f172a;">${escapeHtml(draftData.patientName)} <span style="font-weight:normal; color:#64748b;">(${draftData.phone || 'No phone'})</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Consulting Doctor:</span>
+              <strong style="color:#0f172a;">${escapeHtml(draftData.doctorName)} <span style="font-weight:normal; color:#64748b;">(${escapeHtml(draftData.department)})</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Date &amp; Time:</span>
+              <span style="color:#334155; font-weight:600;">${formatDDMMYYYY(new Date())}</span>
+            </div>
+          </div>
+
+          <!-- Selected Medicines Table -->
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; margin-bottom:1.15rem;">
+            <div style="font-size:0.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.4rem;">
+              Selected Medicines (${items.length} items)
+            </div>
+            <div style="max-height:140px; overflow-y:auto;">
+              <table class="cv-bill-table" style="font-size:0.82rem; margin:0;">
+                <thead>
+                  <tr>
+                    <th style="width:30px; text-align:center;">#</th>
+                    <th>Medicine</th>
+                    <th>Batch</th>
+                    <th>Expiry</th>
+                    <th style="text-align:center;">Unit</th>
+                    <th style="text-align:center;">Qty</th>
+                    <th style="text-align:right;">Rate</th>
+                    <th style="text-align:right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRowsHtml}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2-Column Calculation & Settlement Grid -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.25rem;">
+            <!-- Left Column: Calculation -->
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem;">
+              <div style="font-size:0.75rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">
+                Tax &amp; Price Breakdown
+              </div>
+
+              <div class="cv-calc-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.84rem;">
+                <span class="cv-calc-label" style="color:#64748b;">Subtotal</span>
+                <span id="pharModalSubtotalVal" style="font-weight:700; color:#0f172a;">₹${formatCurrency(initialSubtotal)}</span>
+              </div>
+
+              <div class="cv-calc-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; font-size:0.84rem;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <span class="cv-calc-label" style="color:#64748b;">Discount</span>
+                  <div style="display:inline-flex; align-items:center; gap:0.2rem;">
+                    <input type="number" id="pharModalDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0" style="width:55px; height:26px; text-align:right; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; padding:0 0.3rem;">
+                    <span style="font-size:0.75rem; font-weight:700; color:#64748b;">%</span>
+                  </div>
+                </div>
+                <span id="pharModalDiscountAmt" style="font-weight:700; color:var(--cv-danger); font-size:0.86rem;">- ₹0.00</span>
+              </div>
+
+              <div id="pharModalDiscountWarn" style="display:none; color:#d97706; font-size:0.7rem; font-weight:700; text-align:right; margin-bottom:0.4rem;">
+                ⚠️ Discount exceeds standard 15% threshold
+              </div>
+
+              <div class="cv-calc-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-size:0.84rem;">
+                <span class="cv-calc-label" style="color:#64748b;">Net Taxable Amount</span>
+                <span id="pharModalNetVal" style="font-weight:700; color:#0f172a;">₹${formatCurrency(initialSubtotal)}</span>
+              </div>
+
+              <div class="cv-calc-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; font-size:0.84rem;">
+                <span class="cv-calc-label" style="color:#64748b;">GSTIN</span>
+                <input type="text" id="pharModalGstin" class="cv-form-input" style="height:26px; width:155px; font-size:0.74rem; font-family:monospace; text-transform:uppercase; text-align:right;" placeholder="22AAAAA0000A1Z5" value="22AAAAA0000A1Z5">
+              </div>
+
+              <div class="cv-calc-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; font-size:0.84rem;">
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <span class="cv-calc-label" style="color:#64748b;">GST</span>
+                  <div style="display:inline-flex; align-items:center; gap:0.2rem;">
+                    <input type="number" id="pharModalGstPct" class="cv-calc-input" min="0" max="28" step="0.5" value="5.0" style="width:55px; height:26px; text-align:right; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; padding:0 0.3rem;">
+                    <span style="font-size:0.75rem; font-weight:700; color:#64748b;">%</span>
+                  </div>
+                </div>
+                <span id="pharModalGstAmt" style="font-weight:700; color:#0369a1; font-size:0.86rem;">+ ₹0.00</span>
+              </div>
+
+              <!-- Final Total Highlight Card -->
+              <div style="background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 0.85rem 1rem; border-radius: 10px; display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+                <div>
+                  <div style="font-size:0.62rem; text-transform:uppercase; letter-spacing:0.06em; color:#38bdf8; font-weight:800;">Amount Payable</div>
+                  <div style="font-size:0.95rem; font-weight:800; color:#ffffff;">FINAL TOTAL</div>
+                </div>
+                <span id="pharModalFinalTotal" style="font-size:1.35rem; font-weight:800; color:#38bdf8; font-family:monospace;">₹0.00</span>
+              </div>
+            </div>
+
+            <!-- Right Column: Settlement & Payment -->
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <div style="font-size:0.75rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">
+                  Payment Collection &amp; Settlement
+                </div>
+
+                <div style="margin-bottom:0.75rem;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                    <label for="pharModalDraftPaidAmt" class="cv-form-label" style="font-size:0.75rem; font-weight:700; margin:0;">Amount Received (₹) *</label>
+                    <button type="button" id="btnPharModalDraftPayFull" class="cv-link-btn" style="font-size:0.72rem; font-weight:700;">Pay Full</button>
+                  </div>
+                  <input type="number" id="pharModalDraftPaidAmt" class="cv-input" style="height:38px; font-size:1.05rem; font-weight:700; color:#0f172a; text-align:right;" placeholder="0.00" value="0.00" min="0" step="any">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom:0.75rem; align-items:center;">
+                  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.5rem 0.75rem;">
+                    <div style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">Balance Due</div>
+                    <div id="pharModalDraftBalVal" style="font-size:1.15rem; font-weight:800; color:var(--cv-danger); font-family:monospace; margin-top:0.15rem;">₹0.00</div>
+                  </div>
+
+                  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.5rem 0.75rem; text-align:center;">
+                    <div style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:0.2rem;">Payment Status</div>
+                    <div id="pharModalDraftStatusBadge"><span class="cv-payment-balance-badge cv-badge-unpaid" style="font-size:0.7rem; padding:0.15rem 0.6rem;">UNPAID</span></div>
+                  </div>
+                </div>
+
+                <div style="margin-bottom:0.65rem;">
+                  <label for="pharModalDraftMethod" class="cv-form-label" style="font-size:0.74rem; font-weight:700; margin-bottom:0.25rem;">Payment Method</label>
+                  <select id="pharModalDraftMethod" class="cv-input" style="height:34px; font-size:0.84rem;">
+                    <option value="CASH">Cash Payment</option>
+                    <option value="UPI">UPI / Digital QR</option>
+                    <option value="CARD">Debit / Credit Card</option>
+                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="INSURANCE">Insurance TPA</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                </div>
+
+                <div style="margin-bottom:0.75rem;">
+                  <label for="pharModalDraftNotes" class="cv-form-label" style="font-size:0.74rem; font-weight:700; margin-bottom:0.25rem;">Prescription / Notes</label>
+                  <input type="text" id="pharModalDraftNotes" class="cv-input" style="height:32px; font-size:0.82rem;" placeholder="Prescription ref / settlement notes...">
+                </div>
+              </div>
+
+              <!-- Action Button: Confirm & Dispense Bill -->
+              <div style="margin-top:0.5rem;">
+                <button type="button" id="btnPharModalConfirmBill" class="cv-btn-primary" style="width:100%; height:44px; font-size:0.95rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.25);">
+                  <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>Confirm &amp; Dispense Bill</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cv-modal-footer" style="padding: 0.85rem 1.4rem; background: #f8fafc; border-top: 1px solid var(--cv-border); display:flex; justify-content:flex-end;">
+          <button type="button" class="cv-btn-secondary" id="btnPharModalCancelClose" style="padding:0.45rem 1.4rem; font-size:0.88rem; font-weight:600;">
+            Cancel / Close
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeModal = () => overlay.remove();
+    document.getElementById('btnPharModalClose')?.addEventListener('click', closeModal);
+    document.getElementById('btnPharModalCancelClose')?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    // Dynamic Calculation logic for Draft
+    function recalcModalDraft() {
+      const discPct = parseFloat(document.getElementById('pharModalDiscountPct')?.value) || 0;
+      const warn = document.getElementById('pharModalDiscountWarn');
+      if (warn) warn.style.display = (discPct > 15) ? 'block' : 'none';
+
+      const discAmt = parseFloat(((initialSubtotal * discPct) / 100).toFixed(2));
+      const netVal = parseFloat(Math.max(0, initialSubtotal - discAmt).toFixed(2));
+
+      const gstPct = parseFloat(document.getElementById('pharModalGstPct')?.value) || 0;
+      const gstAmt = parseFloat(((netVal * gstPct) / 100).toFixed(2));
+      const finalTot = parseFloat((netVal + gstAmt).toFixed(2));
+
+      let paid = parseFloat(document.getElementById('pharModalDraftPaidAmt')?.value) || 0;
+      if (paid < 0) paid = 0;
+
+      let bal = parseFloat(Math.max(0, finalTot - paid).toFixed(2));
+
+      let stat = 'UNPAID';
+      let statClass = 'cv-badge-unpaid';
+      if (finalTot > 0) {
+        if (paid >= finalTot) {
+          stat = 'PAID';
+          statClass = 'cv-badge-paid';
+          bal = 0;
+        } else if (paid > 0) {
+          stat = 'PARTIALLY PAID';
+          statClass = 'cv-badge-part';
+        } else {
+          stat = 'UNPAID';
+          statClass = 'cv-badge-unpaid';
+        }
+      } else {
+        stat = 'PAID';
+        statClass = 'cv-badge-paid';
+        bal = 0;
+      }
+
+      document.getElementById('pharModalDiscountAmt').textContent = `- ₹${formatCurrency(discAmt)}`;
+      document.getElementById('pharModalNetVal').textContent = `₹${formatCurrency(netVal)}`;
+      document.getElementById('pharModalGstAmt').textContent = `+ ₹${formatCurrency(gstAmt)}`;
+      document.getElementById('pharModalFinalTotal').textContent = `₹${formatCurrency(finalTot)}`;
+      document.getElementById('pharModalDraftBalVal').textContent = `₹${formatCurrency(bal)}`;
+      document.getElementById('pharModalDraftStatusBadge').innerHTML = `<span class="cv-payment-balance-badge ${statClass}" style="font-size:0.7rem; padding:0.15rem 0.6rem;">${stat}</span>`;
+
+      return { initialSubtotal, discPct, discAmt, netVal, gstPct, gstAmt, finalTot, paid, bal, stat };
+    }
+
+    document.getElementById('pharModalDiscountPct')?.addEventListener('input', recalcModalDraft);
+    document.getElementById('pharModalGstPct')?.addEventListener('input', recalcModalDraft);
+    document.getElementById('pharModalDraftPaidAmt')?.addEventListener('input', recalcModalDraft);
+
+    document.getElementById('btnPharModalDraftPayFull')?.addEventListener('click', () => {
+      const calc = recalcModalDraft();
+      const pInp = document.getElementById('pharModalDraftPaidAmt');
+      if (pInp) {
+        pInp.value = calc.finalTot.toFixed(2);
+        recalcModalDraft();
+      }
+    });
+
+    // Run initial calc
+    recalcModalDraft();
+
+    // Confirm & Dispense Bill Button Action
+    document.getElementById('btnPharModalConfirmBill')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || btn.dataset.processing === 'true') return;
+
+      const calc = recalcModalDraft();
+      if (calc.discPct > 15) {
+        if (!confirm(`Warning: The applied discount is ${calc.discPct}%, which exceeds the standard 15% threshold. Do you wish to proceed?`)) {
+          return;
+        }
+      }
+
+      btn.disabled = true;
+      btn.dataset.processing = 'true';
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></span> Dispensing Medicines...';
+
+      const payload = {
+        patientId: draftData.patientId,
+        patientName: draftData.patientName,
+        uhid: draftData.uhid,
+        phone: draftData.phone,
+        opId: draftData.opId,
+        ipId: draftData.ipId,
+        doctorName: draftData.doctorName,
+        department: draftData.department,
+        discountPercentage: calc.discPct,
+        discountAmount: calc.discAmt,
+        gstNumber: document.getElementById('pharModalGstin')?.value?.trim() || '22AAAAA0000A1Z5',
+        gstPercentage: calc.gstPct,
+        gstAmount: calc.gstAmt,
+        paidAmount: calc.paid,
+        paymentMethod: document.getElementById('pharModalDraftMethod')?.value || 'CASH',
+        notes: document.getElementById('pharModalDraftNotes')?.value?.trim() || '',
+        items: draftData.items
+      };
+
+      try {
+        const res = await cvFetch('/api/pharmacy/bills/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res && res.success && res.data) {
+          showToast('Pharmacy bill generated and medicines dispensed successfully!', 'success');
+          const savedBill = res.data;
+
+          // Deduct stock once and clear active cart
+          pharBillItems = [];
+          pharActiveSavedBill = savedBill;
+
+          // Transition modal to saved bill view
+          showPharmacySettlementModal(savedBill);
+        } else {
+          alert(res?.message || 'Failed to generate pharmacy bill.');
+          btn.disabled = false;
+          delete btn.dataset.processing;
+          btn.innerHTML = origHtml;
+        }
+      } catch (err) {
+        alert('Error during bill checkout: ' + err.message);
+        btn.disabled = false;
+        delete btn.dataset.processing;
+        btn.innerHTML = origHtml;
+      }
+    });
   }
 
   function showPrescriptionVerificationModal(rxNames) {
@@ -10744,140 +11214,29 @@ const Admin = (function () {
               </tbody>
             </table>
           </div>
-        </div>
 
-        <!-- 4. Billing, Discount, GST & Payment Summary Card -->
-        <div class="cv-lab-card">
-          <div class="cv-lab-card-header">
-            <div class="cv-lab-card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              4. Diagnostic Billing &amp; Payment Settlement
+          <!-- Selected Tests Cart Summary & Create Order Action (Task 4) -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding-top:0.85rem; border-top:1px solid #e2e8f0;">
+            <div style="font-size:0.85rem; color:#64748b;">
+              Selected Tests: <strong id="labCartItemCount" style="color:#0f172a;">${labOrderItems.length}</strong> investigations &bull; Estimated Subtotal: <strong id="labCartSubtotalPreview" style="color:var(--cv-primary); font-size:1.05rem;">₹${formatCurrency(labOrderItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0))}</strong>
             </div>
-            <span class="cv-lab-badge-subtitle">Integrated Central Billing Ledger</span>
-          </div>
-
-          <div class="cv-lab-financial-grid">
-            <!-- Left Side: Financial Ledger -->
-            <div class="cv-lab-ledger-card">
-              <div style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.15rem; display:flex; align-items:center; gap:0.4rem;">
-                <svg style="width:15px; height:15px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                Diagnostic Financial Breakdown
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Subtotal</span>
-                <span id="labSummarySubtotal" class="cv-calc-value font-mono">₹0.00</span>
-              </div>
-
-              <!-- Discount Input Row -->
-              <div class="cv-calc-row">
-                <div style="display:flex; align-items:center; gap:0.45rem;">
-                  <span class="cv-calc-label">Discount (%)</span>
-                  <input type="number" id="labDiscountPct" class="cv-calc-input" min="0" max="100" step="0.5" value="0" style="width:65px; height:30px; font-weight:700;">
-                </div>
-                <span id="labDiscountAmount" class="cv-calc-value font-mono" style="color:var(--cv-danger); font-weight:700;">- ₹0.00</span>
-              </div>
-
-              <div class="cv-calc-row">
-                <span class="cv-calc-label">Net Amount</span>
-                <span id="labNetAmount" class="cv-calc-value font-mono">₹0.00</span>
-              </div>
-
-              <!-- GSTIN & GST % Row -->
-              <div class="cv-calc-row" style="flex-wrap:wrap; gap:0.5rem;">
-                <div style="display:flex; align-items:center; gap:0.4rem;">
-                  <span class="cv-calc-label">GSTIN:</span>
-                  <input type="text" id="labGstinInput" class="cv-form-input" style="width:125px; height:30px; font-size:0.75rem; text-transform:uppercase;" placeholder="29ABCDE1234F">
-                  <span class="cv-calc-label" style="margin-left:0.25rem;">GST (%)</span>
-                  <input type="number" id="labGstPct" class="cv-calc-input" min="0" max="28" step="1" value="0" style="width:55px; height:30px; font-weight:700;">
-                </div>
-                <span id="labGstAmount" class="cv-calc-value font-mono" style="color:var(--cv-primary); font-weight:700;">+ ₹0.00</span>
-              </div>
-
-              <!-- Final Total Card -->
-              <div class="cv-lab-final-card">
-                <div>
-                  <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#38bdf8; font-weight:800;">Amount Payable</div>
-                  <div style="font-size:1.05rem; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">FINAL TOTAL</div>
-                </div>
-                <span id="labFinalTotal" class="cv-lab-final-total-amount">₹0.00</span>
-              </div>
-            </div>
-
-            <!-- Right Side: Payment & Collection -->
-            <div class="cv-lab-settlement-card">
-              <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:0.85rem; align-items:stretch;">
-                <div>
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                    <label style="font-size:0.72rem; font-weight:700; color:#475569; letter-spacing:0.02em; text-transform:uppercase;">
-                      AMOUNT PAID (₹) <span style="color:var(--cv-danger);">*</span>
-                    </label>
-                    <button type="button" id="btnLabPayFull" class="cv-link-btn" title="Set paid amount equal to final total" style="font-size:0.75rem; font-weight:600; color:var(--cv-primary);">
-                      Pay Full
-                    </button>
-                  </div>
-                  <div style="display:flex; gap:0.4rem; align-items:center;">
-                    <input type="number" id="labPaidAmount" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:40px; font-weight:700; font-size:1.1rem; text-align:right; color:#0f172a; flex:1;">
-                    <button type="button" id="btnLabDirectUnpaid" class="cv-btn-unpaid" style="height:40px; padding:0 0.95rem;">
-                      UNPAID
-                    </button>
-                    <button type="button" id="btnLabDirectPaid" class="cv-btn-paid" style="height:40px; padding:0 0.95rem;">
-                      PAID
-                    </button>
-                  </div>
-                </div>
-
-                <div class="cv-balance-card">
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:0.68rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Balance Due</span>
-                    <span id="labPaymentStatusBadge" class="cv-payment-balance-badge cv-badge-paid" style="font-size:0.65rem; padding:0.12rem 0.5rem;">PAID</span>
-                  </div>
-                  <div id="labBalanceAmount" style="font-size:1.35rem; font-weight:800; color:var(--cv-danger); text-align:right; line-height:1.2; font-family:monospace;">₹0.00</div>
-                </div>
-              </div>
-
-              <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.85rem;">
-                <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
-                    PAYMENT METHOD
-                  </label>
-                  <select id="labPaymentMethod" class="cv-form-select" style="height:38px; font-size:0.84rem;">
-                    <option value="CASH">Cash Payment</option>
-                    <option value="UPI">UPI / Digital QR</option>
-                    <option value="CARD">Debit / Credit Card</option>
-                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                    <option value="INSURANCE">Insurance TPA</option>
-                    <option value="CHEQUE">Cheque</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="font-size:0.72rem; font-weight:700; color:#475569; display:block; margin-bottom:0.25rem; letter-spacing:0.02em; text-transform:uppercase;">
-                    CLINICAL / ORDER NOTES
-                  </label>
-                  <input type="text" id="labNotes" class="cv-form-input" style="height:38px; font-size:0.84rem;" placeholder="Clinical indication / fasting notes...">
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div style="display:flex; gap:0.75rem; margin-top:0.45rem;">
-                <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="flex:1; height:42px; font-weight:600; font-size:0.88rem;">
-                  Reset
-                </button>
-                <button type="button" class="cv-btn-primary" id="btnLabCreateOrder" style="flex:2; height:42px; font-weight:700; font-size:0.92rem; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.3);">
-                  <svg style="width:17px; height:17px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  Create Lab Order
-                </button>
-              </div>
+            <div style="display:flex; gap:0.6rem;">
+              <button type="button" class="cv-btn-secondary" id="btnLabResetOrder" style="padding:0.5rem 1.1rem; font-weight:600; font-size:0.84rem;">
+                Reset Order
+              </button>
+              <button type="button" class="cv-btn-primary" id="btnLabCreateOrderAction" style="padding:0.55rem 1.5rem; font-weight:700; font-size:0.92rem; display:inline-flex; align-items:center; gap:0.45rem; box-shadow:0 3px 10px rgba(37, 99, 235, 0.25);">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Create Lab Order</span>
+              </button>
             </div>
           </div>
         </div>
+
       </div>
     `;
 
     setupLabOrderEvents();
-    recalculateLabBill();
+    refreshLabOrderTable();
   }
 
   function renderLabPatientAutofillHtml(patient) {
@@ -11109,23 +11468,7 @@ const Admin = (function () {
       }
     });
 
-    // 5. Discount, GST, Paid Amount calculation triggers
-    document.getElementById('labDiscountPct')?.addEventListener('input', recalculateLabBill);
-    document.getElementById('labGstPct')?.addEventListener('input', recalculateLabBill);
-    document.getElementById('labPaidAmount')?.addEventListener('input', recalculateLabBill);
-
-    // 6. Pay Full Amount button
-    document.getElementById('btnLabPayFull')?.addEventListener('click', () => {
-      const finalTotalStr = document.getElementById('labFinalTotal')?.textContent?.replace('₹', '')?.replace(/,/g, '')?.trim();
-      const finalTotal = parseFloat(finalTotalStr) || 0;
-      const paidInput = document.getElementById('labPaidAmount');
-      if (paidInput) {
-        paidInput.value = finalTotal.toFixed(2);
-        recalculateLabBill();
-      }
-    });
-
-    // 7. Reset Order
+    // 5. Reset Order
     document.getElementById('btnLabResetOrder')?.addEventListener('click', () => {
       if (confirm('Reset the laboratory order form?')) {
         labOrderItems = [];
@@ -11135,398 +11478,8 @@ const Admin = (function () {
       }
     });
 
-    // 8. Create Lab Order
-    document.getElementById('btnLabCreateOrder')?.addEventListener('click', createLabOrder);
-
-    // 9. Direct PAID Button Handler (Single-Click Real MySQL Payment Collection)
-    document.getElementById('btnLabDirectPaid')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      if (btn.disabled || btn.dataset.processing === 'true') return;
-
-      let amtVal = document.getElementById('labPaidAmount')?.value;
-      let numAmt = parseFloat(amtVal);
-      if (isNaN(numAmt) || numAmt <= 0) {
-        const finalTotalStr = document.getElementById('labFinalTotal')?.textContent?.replace(/[^0-9.]/g, '')?.trim();
-        const finalTotal = parseFloat(finalTotalStr) || 0;
-        if (finalTotal > 0) {
-          numAmt = finalTotal;
-          const paidInput = document.getElementById('labPaidAmount');
-          if (paidInput) {
-            paidInput.value = finalTotal.toFixed(2);
-            recalculateLabBill();
-          }
-        }
-      }
-      if (isNaN(numAmt) || numAmt <= 0) {
-        showToast('Please enter an amount to pay.', 'danger');
-        return;
-      }
-
-      // SUBSEQUENT PAYMENT ON ALREADY CREATED LAB ORDER
-      if (labActiveSavedOrder) {
-        const curBal = (labActiveSavedOrder.balanceAmount != null)
-          ? parseFloat(labActiveSavedOrder.balanceAmount)
-          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - (labActiveSavedOrder.paidAmount || 0));
-
-        if (curBal <= 0) {
-          showToast('This laboratory order is already fully paid.', 'info');
-          return;
-        }
-        if (numAmt > curBal + 0.001) {
-          showToast(`Payment amount cannot exceed remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
-          return;
-        }
-
-        await executeBillPayment({
-          moduleType: 'LABORATORY',
-          billId: labActiveSavedOrder.id,
-          billNumber: labActiveSavedOrder.orderNumber,
-          amount: numAmt,
-          balance: curBal,
-          paymentMethod: document.getElementById('labPaymentMethod')?.value || 'CASH',
-          buttonEl: btn,
-          onSuccess: async (data) => {
-            labActiveSavedOrder.paidAmount = data.amountPaid;
-            labActiveSavedOrder.balanceAmount = data.balanceAmount;
-            labActiveSavedOrder.paymentStatus = data.paymentStatus;
-            labActiveSavedOrder.paymentMethod = data.paymentMethod;
-
-            const isNowPaid = (data.balanceAmount <= 0);
-            const balElem = document.getElementById('labBalanceAmount');
-            if (balElem) balElem.textContent = '₹' + formatCurrency(data.balanceAmount);
-
-            const statusBadge = document.getElementById('labPaymentStatusBadge');
-            if (statusBadge) {
-              statusBadge.textContent = data.paymentStatus;
-              statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
-            }
-
-            const amtInput = document.getElementById('labPaidAmount');
-            if (amtInput) {
-              amtInput.value = isNowPaid ? '0.00' : data.balanceAmount.toFixed(2);
-              amtInput.disabled = isNowPaid;
-            }
-
-            if (btn) {
-              btn.disabled = isNowPaid;
-              delete btn.dataset.processing;
-              btn.innerHTML = 'PAID';
-            }
-
-            showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(data.amountPaid)}, Balance: ₹${formatCurrency(data.balanceAmount)}`, 'success');
-          }
-        });
-        return;
-      }
-
-      // INITIAL LAB ORDER CREATION + PAYMENT RECORDING
-      let patientName = '';
-      let uhid = '';
-      let phone = '';
-      let opId = '';
-      let ipId = '';
-      let doctorName = '';
-      let department = '';
-      let patientId = null;
-
-      if (labSelectedPatient) {
-        patientId = labSelectedPatient.id;
-        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
-        uhid = labSelectedPatient.uhid || '';
-        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
-        opId = labSelectedPatient.opId || '';
-        ipId = labSelectedPatient.ipId || '';
-        doctorName = labSelectedPatient.doctorName || '';
-        department = labSelectedPatient.department || '';
-      } else {
-        const rawName = document.getElementById('labWalkinName')?.value;
-        const rawPhone = document.getElementById('labWalkinPhone')?.value;
-        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
-        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
-
-        const vName = validatePatientName(rawName, true);
-        if (!vName.valid) {
-          showToast(vName.message, 'danger');
-          document.getElementById('labWalkinName')?.focus();
-          return;
-        }
-
-        const vPhone = validatePatientPhone(rawPhone, false);
-        if (!vPhone.valid) {
-          showToast(vPhone.message, 'danger');
-          document.getElementById('labWalkinPhone')?.focus();
-          return;
-        }
-
-        patientName = vName.value;
-        phone = vPhone.value || '';
-        doctorName = walkinDoctor || 'Dr. On Duty';
-        department = walkinDept || 'Diagnostics';
-        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
-      }
-
-      if (!labOrderItems || labOrderItems.length === 0) {
-        showToast('Please add at least one laboratory test to the order.', 'danger');
-        return;
-      }
-
-      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
-      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
-      const notes = document.getElementById('labNotes')?.value?.trim() || '';
-
-      const subtotal = labOrderItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
-      const discountAmount = parseFloat(((subtotal * discountPercentage) / 100).toFixed(2));
-      const netAmount = Math.max(0, subtotal - discountAmount);
-      const gstAmount = parseFloat(((netAmount * gstPercentage) / 100).toFixed(2));
-      const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-
-      if (numAmt > finalTotal + 0.001) {
-        showToast(`Payment amount cannot exceed the order total of ₹${formatCurrency(finalTotal)}.`, 'danger');
-        return;
-      }
-
-      const payload = {
-        patientId: patientId,
-        patientName: patientName,
-        uhid: uhid,
-        phone: phone,
-        opId: opId,
-        ipId: ipId,
-        doctorName: doctorName,
-        department: department,
-        discountPercentage: discountPercentage,
-        gstPercentage: gstPercentage,
-        gstin: gstin,
-        paidAmount: numAmt,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        items: labOrderItems.map(item => ({
-          testId: item.testId,
-          testCode: item.testCode,
-          testName: item.testName,
-          category: item.category,
-          sampleType: item.sampleType,
-          price: item.price,
-          referenceRange: item.referenceRange,
-          unit: item.unit
-        }))
-      };
-
-      btn.disabled = true;
-      btn.dataset.processing = 'true';
-      btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-
-      try {
-        const res = await Api.post('/api/laboratory/orders', payload);
-        if (res && res.success && res.data) {
-          const createdOrder = res.data;
-          labActiveSavedOrder = createdOrder;
-
-          // Clear items to prevent duplicate order generation on next click
-          labOrderItems = [];
-          const tbody = document.getElementById('labOrderTableBody');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved to MySQL.</td></tr>`;
-
-          const isNowPaid = (createdOrder.balanceAmount <= 0);
-
-          const balElem = document.getElementById('labBalanceAmount');
-          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
-
-          const statusBadge = document.getElementById('labPaymentStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = createdOrder.paymentStatus;
-            statusBadge.className = `cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}`;
-          }
-
-          const amtInput = document.getElementById('labPaidAmount');
-          if (amtInput) {
-            amtInput.value = isNowPaid ? '0.00' : createdOrder.balanceAmount.toFixed(2);
-            amtInput.disabled = isNowPaid;
-          }
-
-          btn.disabled = isNowPaid;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-
-          showToast(`Laboratory payment of ₹${formatCurrency(numAmt)} recorded for Order ${createdOrder.orderNumber}. Total Paid: ₹${formatCurrency(createdOrder.paidAmount)}, Balance: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'success');
-        } else {
-          showToast((res && res.message) ? res.message : 'Failed to save laboratory payment.', 'danger');
-          btn.disabled = false;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'PAID';
-        }
-      } catch (err) {
-        showToast('Error recording laboratory payment: ' + (err.message || err), 'danger');
-        btn.disabled = false;
-        delete btn.dataset.processing;
-        btn.innerHTML = 'PAID';
-      }
-    });
-
-    // 10. Direct UNPAID Button Handler
-    async function processLabUnpaidAction(btn) {
-      if (btn && (btn.disabled || btn.dataset.processing === 'true')) return;
-      const amtInput = document.getElementById('labPaidAmount');
-      if (amtInput) amtInput.value = '0.00';
-      recalculateLabBill();
-
-      // Case A: Subsequent payment on already created lab order
-      if (labActiveSavedOrder) {
-        const curPaid = (labActiveSavedOrder.paidAmount != null) ? parseFloat(labActiveSavedOrder.paidAmount) : 0;
-        const curBal = (labActiveSavedOrder.balanceAmount != null)
-          ? parseFloat(labActiveSavedOrder.balanceAmount)
-          : Math.max(0, (labActiveSavedOrder.finalTotal || labActiveSavedOrder.totalAmount || 0) - curPaid);
-
-        if (curPaid > 0) {
-          showToast(`No new payment collected (₹0.00). Prior payments of ₹${formatCurrency(curPaid)} are preserved. Remaining balance: ₹${formatCurrency(curBal)}.`, 'warning');
-        } else {
-          showToast(`Laboratory order remains UNPAID (₹0.00 collected). Full balance of ₹${formatCurrency(curBal)} remains due.`, 'info');
-        }
-        return;
-      }
-
-      // Case B: Initial Lab Order Creation with UNPAID status
-      let patientName = '';
-      let uhid = '';
-      let phone = '';
-      let opId = '';
-      let ipId = '';
-      let doctorName = '';
-      let department = '';
-      let patientId = null;
-
-      if (labSelectedPatient) {
-        patientId = labSelectedPatient.id;
-        patientName = labSelectedPatient.fullName || labSelectedPatient.name || '';
-        uhid = labSelectedPatient.uhid || '';
-        phone = (labSelectedPatient.phone || '').replace(/\D/g, '').slice(-10);
-        opId = labSelectedPatient.opId || '';
-        ipId = labSelectedPatient.ipId || '';
-        doctorName = labSelectedPatient.doctorName || '';
-        department = labSelectedPatient.department || '';
-      } else {
-        const rawName = document.getElementById('labWalkinName')?.value;
-        const rawPhone = document.getElementById('labWalkinPhone')?.value;
-        const walkinDoctor = document.getElementById('labWalkinDoctor')?.value?.trim();
-        const walkinDept = document.getElementById('labWalkinDept')?.value?.trim();
-
-        const vName = validatePatientName(rawName, true);
-        if (!vName.valid) {
-          showToast(vName.message, 'danger');
-          document.getElementById('labWalkinName')?.focus();
-          return;
-        }
-
-        const vPhone = validatePatientPhone(rawPhone, false);
-        if (!vPhone.valid) {
-          showToast(vPhone.message, 'danger');
-          document.getElementById('labWalkinPhone')?.focus();
-          return;
-        }
-
-        patientName = vName.value;
-        phone = vPhone.value || '';
-        doctorName = walkinDoctor || 'Dr. On Duty';
-        department = walkinDept || 'Diagnostics';
-        uhid = 'WALKIN-' + Date.now().toString().slice(-6);
-      }
-
-      if (!labOrderItems || labOrderItems.length === 0) {
-        showToast('Please add at least one laboratory test to the order.', 'danger');
-        return;
-      }
-
-      const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-      const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-      const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
-      const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
-      const notes = document.getElementById('labNotes')?.value?.trim() || '';
-
-      const payload = {
-        patientId: patientId,
-        patientName: patientName,
-        uhid: uhid,
-        phone: phone,
-        opId: opId,
-        ipId: ipId,
-        doctorName: doctorName,
-        department: department,
-        discountPercentage: discountPercentage,
-        gstPercentage: gstPercentage,
-        gstin: gstin,
-        paidAmount: 0.00,
-        paymentMethod: paymentMethod,
-        notes: notes,
-        items: labOrderItems.map(item => ({
-          testId: item.testId,
-          testCode: item.testCode,
-          testName: item.testName,
-          category: item.category,
-          sampleType: item.sampleType,
-          price: item.price,
-          referenceRange: item.referenceRange,
-          unit: item.unit
-        }))
-      };
-
-      if (btn) {
-        btn.disabled = true;
-        btn.dataset.processing = 'true';
-        btn.innerHTML = '<span class="cv-spinner" style="width:14px; height:14px; border-width:2px; margin-right:4px;"></span> Recording...';
-      }
-
-      try {
-        const res = await Api.post('/api/laboratory/orders', payload);
-        if (res && res.success && res.data) {
-          const createdOrder = res.data;
-          labActiveSavedOrder = createdOrder;
-
-          labOrderItems = [];
-          const tbody = document.getElementById('labOrderTableBody');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.25rem; color:#059669; font-weight:700;">Order ${escapeHtml(createdOrder.orderNumber)} created and saved as UNPAID to MySQL.</td></tr>`;
-
-          const balElem = document.getElementById('labBalanceAmount');
-          if (balElem) balElem.textContent = '₹' + formatCurrency(createdOrder.balanceAmount);
-
-          const statusBadge = document.getElementById('labPaymentStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = createdOrder.paymentStatus || 'UNPAID';
-            statusBadge.className = 'cv-payment-balance-badge cv-badge-unpaid';
-          }
-
-          if (amtInput) {
-            amtInput.value = createdOrder.balanceAmount.toFixed(2);
-            amtInput.disabled = false;
-          }
-
-          if (btn) {
-            btn.disabled = false;
-            delete btn.dataset.processing;
-            btn.innerHTML = 'UNPAID';
-          }
-
-          showToast(`Laboratory order ${createdOrder.orderNumber} recorded as UNPAID. Balance due: ₹${formatCurrency(createdOrder.balanceAmount)}`, 'info');
-        } else {
-          showToast((res && res.message) ? res.message : 'Failed to save laboratory order.', 'danger');
-          if (btn) {
-            btn.disabled = false;
-            delete btn.dataset.processing;
-            btn.innerHTML = 'UNPAID';
-          }
-        }
-      } catch (err) {
-        showToast('Error recording laboratory order: ' + (err.message || err), 'danger');
-        if (btn) {
-          btn.disabled = false;
-          delete btn.dataset.processing;
-          btn.innerHTML = 'UNPAID';
-        }
-      }
-    }
-
-    document.getElementById('btnLabDirectUnpaid')?.addEventListener('click', (e) => processLabUnpaidAction(e.currentTarget));
+    // 6. Create Lab Order Action (Opens Pop-up)
+    document.getElementById('btnLabCreateOrderAction')?.addEventListener('click', createLabOrder);
 
     // Bind table events
     bindLabTableEvents();
@@ -11636,78 +11589,22 @@ const Admin = (function () {
     const badge = document.getElementById('labItemCountBadge');
     if (badge) badge.textContent = `${labOrderItems.length} tests`;
 
+    const cartCount = document.getElementById('labCartItemCount');
+    if (cartCount) cartCount.textContent = labOrderItems.length;
+
+    const subtotalPreview = document.getElementById('labCartSubtotalPreview');
+    const subtotalVal = labOrderItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
+    if (subtotalPreview) subtotalPreview.textContent = `₹${formatCurrency(subtotalVal)}`;
+
     bindLabTableEvents();
-    recalculateLabBill();
-  }
-
-  function recalculateLabBill() {
-    let subtotal = 0;
-    labOrderItems.forEach(item => {
-      subtotal += parseFloat(item.price) || 0;
-    });
-    subtotal = parseFloat(subtotal.toFixed(2));
-
-    const discountPct = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-    const discountAmount = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
-    const netAmount = parseFloat(Math.max(0, subtotal - discountAmount).toFixed(2));
-
-    const gstPct = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-    const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
-    const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-
-    let paidAmount = parseFloat(document.getElementById('labPaidAmount')?.value) || 0;
-    if (paidAmount < 0) paidAmount = 0;
-
-    let balance = parseFloat(Math.max(0, finalTotal - paidAmount).toFixed(2));
-
-    let status = 'UNPAID';
-    let statusClass = 'cv-badge-unpaid';
-
-    if (finalTotal > 0) {
-      if (paidAmount >= finalTotal) {
-        status = 'PAID';
-        statusClass = 'cv-badge-paid';
-        balance = 0;
-      } else if (paidAmount > 0) {
-        status = 'PARTIALLY PAID';
-        statusClass = 'cv-badge-partial';
-      } else {
-        status = 'UNPAID';
-        statusClass = 'cv-badge-unpaid';
-      }
-    } else {
-      status = 'PAID';
-      statusClass = 'cv-badge-paid';
-      balance = 0;
-    }
-
-    // Update DOM
-    const subtotalElem = document.getElementById('labSummarySubtotal');
-    if (subtotalElem) subtotalElem.textContent = `₹${formatCurrency(subtotal)}`;
-
-    const discountAmtElem = document.getElementById('labDiscountAmount');
-    if (discountAmtElem) discountAmtElem.textContent = `- ₹${formatCurrency(discountAmount)}`;
-
-    const netAmountElem = document.getElementById('labNetAmount');
-    if (netAmountElem) netAmountElem.textContent = `₹${formatCurrency(netAmount)}`;
-
-    const gstAmountElem = document.getElementById('labGstAmount');
-    if (gstAmountElem) gstAmountElem.textContent = `+ ₹${formatCurrency(gstAmount)}`;
-
-    const finalTotalElem = document.getElementById('labFinalTotal');
-    if (finalTotalElem) finalTotalElem.textContent = `₹${formatCurrency(finalTotal)}`;
-
-    const balanceElem = document.getElementById('labBalanceAmount');
-    if (balanceElem) balanceElem.textContent = `₹${formatCurrency(balance)}`;
-
-    const statusBadge = document.getElementById('labPaymentStatusBadge');
-    if (statusBadge) {
-      statusBadge.textContent = status;
-      statusBadge.className = `cv-payment-balance-badge ${statusClass}`;
-    }
   }
 
   async function createLabOrder() {
+    if (labActiveSavedOrder) {
+      showLabBillingModal(labActiveSavedOrder);
+      return;
+    }
+
     let patientName = '';
     let uhid = '';
     let phone = '';
@@ -11734,14 +11631,14 @@ const Admin = (function () {
 
       const vName = validatePatientName(rawName, true);
       if (!vName.valid) {
-        alert(vName.message);
+        showToast(vName.message, 'danger');
         document.getElementById('labWalkinName')?.focus();
         return;
       }
 
       const vPhone = validatePatientPhone(rawPhone, false);
       if (!vPhone.valid) {
-        alert(vPhone.message);
+        showToast(vPhone.message, 'danger');
         document.getElementById('labWalkinPhone')?.focus();
         return;
       }
@@ -11758,16 +11655,11 @@ const Admin = (function () {
       return;
     }
 
-    const discountPercentage = parseFloat(document.getElementById('labDiscountPct')?.value) || 0;
-    const gstPercentage = parseFloat(document.getElementById('labGstPct')?.value) || 0;
-    const gstin = document.getElementById('labGstinInput')?.value?.trim() || '';
-    const paidAmount = parseFloat(document.getElementById('labPaidAmount')?.value) || 0;
-    const paymentMethod = document.getElementById('labPaymentMethod')?.value || 'CASH';
-    const notes = document.getElementById('labNotes')?.value?.trim() || '';
-
-    const btn = document.getElementById('btnLabCreateOrder');
+    const btn = document.getElementById('btnLabCreateOrderAction');
     if (btn) {
+      if (btn.disabled || btn.dataset.processing === 'true') return;
       btn.disabled = true;
+      btn.dataset.processing = 'true';
       btn.innerHTML = `<span class="cv-spinner" style="display:inline-block; margin-right:0.4rem;"></span> Creating Order...`;
     }
 
@@ -11778,14 +11670,14 @@ const Admin = (function () {
       phone: phone,
       opId: opId,
       ipId: ipId,
-      doctorName: doctorName,
-      department: department,
-      discountPercentage: discountPercentage,
-      gstPercentage: gstPercentage,
-      gstin: gstin,
-      paidAmount: paidAmount,
-      paymentMethod: paymentMethod,
-      notes: notes,
+      doctorName: doctorName || 'Dr. On Duty',
+      department: department || 'Diagnostics',
+      discountPercentage: 0.0,
+      gstPercentage: 0.0,
+      gstin: '',
+      paidAmount: 0.0, // Created UNPAID with 0.0 paid amount per Task 4
+      paymentMethod: 'CASH',
+      notes: '',
       items: labOrderItems.map(item => ({
         testId: item.testId,
         testCode: item.testCode,
@@ -11802,15 +11694,15 @@ const Admin = (function () {
       const res = await Api.post('/api/laboratory/orders', payload);
       if (res && res.success && res.data) {
         const createdOrder = res.data;
-        alert(`Laboratory order created successfully!\n\nLab Order ID: ${createdOrder.orderNumber}\nTotal Amount: ₹${formatCurrency(createdOrder.finalTotal)}\nPayment Status: ${createdOrder.paymentStatus}`);
+        labActiveSavedOrder = createdOrder;
+        showToast(`Laboratory Order ${createdOrder.orderNumber} created successfully!`, 'success');
 
         labOrderItems = [];
         labSelectedPatient = null;
         renderLabOrdersTab();
 
-        if (confirm(`Lab Order ${createdOrder.orderNumber} created. Would you like to view it in Laboratory Processing now?`)) {
-          switchLabTab('processing');
-        }
+        // Automatically launch the Laboratory Billing & Payment Collection pop-up
+        showLabBillingModal(createdOrder);
       } else {
         alert(res?.message || 'Failed to create laboratory order.');
       }
@@ -11820,9 +11712,265 @@ const Admin = (function () {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Create Lab Order`;
+        delete btn.dataset.processing;
+        btn.innerHTML = `<svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> <span>Create Lab Order</span>`;
       }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // LABORATORY BILLING & PAYMENT COLLECTION POP-UP (TASK 4)
+  // ------------------------------------------------------------------
+  function showLabBillingModal(order) {
+    if (!order) return;
+
+    const prev = document.getElementById('cvLabBillingModalOverlay');
+    if (prev) prev.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cv-modal-backdrop show';
+    overlay.id = 'cvLabBillingModalOverlay';
+    overlay.style.zIndex = '1050';
+    overlay.style.padding = '1rem';
+
+    const totalFee = Number(order.finalTotal || order.totalAmount || 0);
+    const paidAmt = Number(order.paidAmount || 0);
+    const balAmt = (order.balanceAmount != null) ? Number(order.balanceAmount) : Math.max(0, totalFee - paidAmt);
+    const isPaid = (balAmt <= 0);
+    const status = order.paymentStatus || (isPaid ? 'PAID' : (paidAmt > 0 ? 'PARTIALLY PAID' : 'UNPAID'));
+    const badgeClass = isPaid ? 'cv-badge-paid' : (paidAmt > 0 ? 'cv-badge-part' : 'cv-badge-unpaid');
+
+    const tests = order.items || [];
+    const testsHtml = tests.map((t, idx) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px dashed #e2e8f0; font-size:0.82rem;">
+        <div>
+          <span style="font-weight:700; color:#0f172a;">${idx + 1}. ${escapeHtml(t.testName)}</span>
+          <span style="color:#64748b; font-size:0.74rem; margin-left:0.35rem;">(${escapeHtml(t.testCode || '')}) &bull; ${escapeHtml(t.sampleType || 'Sample')}</span>
+        </div>
+        <strong style="color:var(--cv-primary); font-family:monospace;">₹${formatCurrency(t.price)}</strong>
+      </div>
+    `).join('') || '<div style="font-size:0.8rem; color:#64748b;">No test items listed.</div>';
+
+    overlay.innerHTML = `
+      <div class="cv-modal" style="max-width: 600px; width: 95%; max-height: 92vh; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28); border-radius: 16px; overflow: hidden; display:flex; flex-direction:column; animation: cvModalIn 0.22s ease-out; margin:auto;">
+        <div class="cv-modal-header" style="background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95)); padding: 1.15rem 1.4rem; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:0.65rem;">
+            <div style="width:36px; height:36px; border-radius:10px; background:rgba(2, 132, 199, 0.12); color:var(--cv-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            </div>
+            <div>
+              <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">Laboratory Billing &amp; Payment Settlement</h3>
+              <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:0.15rem;">
+                Order ID: <span style="font-family:monospace; color:var(--cv-primary); font-weight:800;">${escapeHtml(order.orderNumber)}</span> &bull; UHID: <span style="font-family:monospace; font-weight:700;">${escapeHtml(order.uhid || '—')}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="cv-modal-close" id="btnLabBillingModalClose" style="cursor:pointer; font-size:1.4rem; border:none; background:transparent; color:#64748b; line-height:1;" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="cv-modal-body" style="padding: 1.35rem; overflow-y: auto;">
+          <!-- Patient Summary Strip -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:0.85rem 1rem; margin-bottom:1rem; font-size:0.84rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Patient:</span>
+              <strong style="color:#0f172a;">${escapeHtml(order.patientName)}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Consulting Doctor:</span>
+              <strong style="color:#0f172a;">${escapeHtml(order.doctorName || 'Dr. On Duty')} <span style="font-weight:normal; color:#64748b;">(${escapeHtml(order.department || 'Diagnostics')})</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#64748b;">Order Date:</span>
+              <span style="color:#334155; font-weight:600;">${escapeHtml(order.orderDate || formatDDMMYYYY(new Date()))}</span>
+            </div>
+          </div>
+
+          <!-- Selected Tests Breakdown Box -->
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem 1rem; margin-bottom:1.15rem;">
+            <div style="font-size:0.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.4rem;">
+              Ordered Diagnostic Investigations (${tests.length})
+            </div>
+            <div style="max-height:120px; overflow-y:auto;">
+              ${testsHtml}
+            </div>
+          </div>
+
+          <!-- Billing Financial Overview -->
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.75rem; margin-bottom:1.15rem;">
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Total Payable</div>
+              <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:0.25rem;">₹${formatCurrency(totalFee)}</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Previously Paid</div>
+              <div id="labModalDisplayPaid" style="font-size:1.15rem; font-weight:800; color:#059669; margin-top:0.25rem;">₹${formatCurrency(paidAmt)}</div>
+            </div>
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Remaining Balance</div>
+              <div id="labModalDisplayBal" style="font-size:1.15rem; font-weight:800; color:var(--cv-danger); margin-top:0.25rem;">₹${formatCurrency(balAmt)}</div>
+            </div>
+          </div>
+
+          <!-- Payment Status Row -->
+          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(241, 245, 249, 0.6); border:1px solid #e2e8f0; border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:1.15rem;">
+            <span style="font-size:0.8rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.03em;">Payment Status</span>
+            <div id="labModalStatusBadge"><span class="cv-payment-balance-badge ${badgeClass}">${status}</span></div>
+          </div>
+
+          <!-- Payment Input Fields -->
+          <div id="labModalPaymentControls">
+            <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.75rem; margin-bottom:1rem;">
+              <div>
+                <label for="labModalPaymentMethod" class="cv-form-label" style="font-size:0.75rem; font-weight:700;">Payment Method</label>
+                <select id="labModalPaymentMethod" class="cv-input" style="height:42px; font-size:0.88rem;">
+                  <option value="CASH">Cash Payment</option>
+                  <option value="CARD">Debit / Credit Card</option>
+                  <option value="UPI">UPI / Digital QR</option>
+                  <option value="NET_BANKING">Net Banking / Transfer</option>
+                </select>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label for="labModalAmountToPay" class="cv-form-label" style="font-size:0.75rem; font-weight:700; margin-bottom:0.2rem;">Amount to Pay (₹) *</label>
+                  <button type="button" id="btnLabModalPayFull" class="cv-link-btn" style="font-size:0.72rem; font-weight:700;" title="Set to remaining balance">Pay Full</button>
+                </div>
+                <input type="number" id="labModalAmountToPay" class="cv-input" style="height:42px; font-size:1.05rem; font-weight:700; color:#0f172a;" placeholder="0.00" value="${balAmt > 0 ? balAmt.toFixed(2) : '0.00'}" min="0.01" step="any" ${isPaid ? 'disabled' : ''}>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:0.6rem; align-items:center; margin-top:0.5rem;">
+              <button type="button" id="btnLabModalCollectPayment" class="cv-btn-primary" style="flex:1; height:44px; font-size:0.95rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:0.4rem;" ${isPaid ? 'disabled' : ''}>
+                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Paid / Collect Payment</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="labModalPaidBanner" style="display:${isPaid ? 'block' : 'none'}; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem; text-align:center; color:#065f46; font-size:0.88rem; font-weight:700; margin-top:0.75rem;">
+            ✓ Lab Order Fully Settled (₹${formatCurrency(totalFee)} collected)
+          </div>
+        </div>
+
+        <div class="cv-modal-footer" style="padding: 0.9rem 1.4rem; background: #f8fafc; border-top: 1px solid var(--cv-border); display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="cv-btn-secondary" id="btnLabModalHistory" style="padding:0.45rem 1rem; font-size:0.82rem; font-weight:600;">
+            Payment History
+          </button>
+          <button type="button" class="cv-btn-secondary" id="btnLabModalDoneClose" style="padding:0.45rem 1.4rem; font-size:0.88rem; font-weight:600;">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeModal = () => overlay.remove();
+    document.getElementById('btnLabBillingModalClose')?.addEventListener('click', closeModal);
+    document.getElementById('btnLabModalDoneClose')?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    document.getElementById('btnLabModalPayFull')?.addEventListener('click', () => {
+      const curBal = (order.balanceAmount != null) ? Number(order.balanceAmount) : (Number(order.finalTotal || order.totalAmount || 0) - Number(order.paidAmount || 0));
+      const inp = document.getElementById('labModalAmountToPay');
+      if (inp) inp.value = Math.max(0, curBal).toFixed(2);
+    });
+
+    document.getElementById('btnLabModalHistory')?.addEventListener('click', () => {
+      showBillPaymentsModal('LABORATORY', order.id, order.orderNumber);
+    });
+
+    document.getElementById('btnLabModalCollectPayment')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled || btn.dataset.processing === 'true') return;
+
+      const amtInput = document.getElementById('labModalAmountToPay');
+      const rawVal = amtInput ? amtInput.value : '';
+      if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+        showToast('Please enter a payment amount.', 'danger');
+        return;
+      }
+      const numAmt = parseFloat(rawVal);
+      if (isNaN(numAmt) || numAmt <= 0) {
+        showToast('Payment amount must be greater than zero.', 'danger');
+        return;
+      }
+      const curBal = (order.balanceAmount != null) ? Number(order.balanceAmount) : (Number(order.finalTotal || order.totalAmount || 0) - Number(order.paidAmount || 0));
+      if (numAmt > curBal + 0.001) {
+        showToast(`Payment amount cannot exceed the remaining balance of ₹${formatCurrency(curBal)}.`, 'danger');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.dataset.processing = 'true';
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="cv-spinner" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></span> Recording Payment...';
+
+      const method = document.getElementById('labModalPaymentMethod')?.value || 'CASH';
+
+      try {
+        const res = await Api.post('/api/billing/payment', {
+          moduleType: 'LABORATORY',
+          billId: order.id,
+          billNumber: order.orderNumber,
+          paymentAmount: numAmt,
+          paymentMethod: method,
+          notes: 'Laboratory order payment installment'
+        });
+
+        if (res && res.success && res.data) {
+          const d = res.data;
+          order.paidAmount = d.amountPaid;
+          order.balanceAmount = d.balanceAmount;
+          order.paymentStatus = d.paymentStatus;
+          order.paymentMethod = d.paymentMethod;
+
+          const isNowPaid = (d.balanceAmount <= 0);
+
+          // Update in-modal displays
+          const dispPaid = document.getElementById('labModalDisplayPaid');
+          const dispBal = document.getElementById('labModalDisplayBal');
+          const dispBadge = document.getElementById('labModalStatusBadge');
+          if (dispPaid) dispPaid.textContent = '₹' + formatCurrency(d.amountPaid);
+          if (dispBal) {
+            dispBal.textContent = '₹' + formatCurrency(d.balanceAmount);
+            dispBal.style.color = isNowPaid ? '#059669' : 'var(--cv-danger)';
+          }
+          if (dispBadge) {
+            dispBadge.innerHTML = `<span class="cv-payment-balance-badge ${isNowPaid ? 'cv-badge-paid' : 'cv-badge-part'}">${d.paymentStatus}</span>`;
+          }
+
+          if (amtInput) {
+            if (isNowPaid) {
+              amtInput.value = '0.00';
+              amtInput.disabled = true;
+            } else {
+              amtInput.value = d.balanceAmount.toFixed(2);
+            }
+          }
+
+          if (isNowPaid) {
+            btn.disabled = true;
+            const paidBanner = document.getElementById('labModalPaidBanner');
+            if (paidBanner) paidBanner.style.display = 'block';
+          }
+
+          showToast(`Payment of ₹${formatCurrency(numAmt)} saved. Total Paid: ₹${formatCurrency(d.amountPaid)}, Balance: ₹${formatCurrency(d.balanceAmount)}`, 'success');
+          if (typeof loadLabOrdersList === 'function') loadLabOrdersList();
+        } else {
+          showToast(res?.message || 'Payment processing failed.', 'danger');
+        }
+      } catch (err) {
+        showToast('Payment processing error: ' + (err.message || err), 'danger');
+      } finally {
+        delete btn.dataset.processing;
+        if (!isPaid && btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      }
+    });
   }
 
   // ------------------------------------------------------------------
@@ -21107,6 +21255,10 @@ const Admin = (function () {
     showPaymentConfirmationModal: showPaymentConfirmationModal,
     showBedPaymentModal: showBedPaymentModal,
     showBillPaymentsModal: showBillPaymentsModal,
+    showOpBillingModal: showOpBillingModal,
+    showPharmacySettlementModal: showPharmacySettlementModal,
+    openPharmacySettlementWorkflow: openPharmacySettlementWorkflow,
+    showLabBillingModal: showLabBillingModal,
     retryLoadMoneyData: retryLoadMoneyData
   };
 })();

@@ -56,14 +56,12 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 // If session exists or is created, propagate attributes for seamless session continuity
-                HttpSession session = request.getSession(false);
-                if (session != null) {
-                    session.setAttribute("USER_ID", tokenData.getUserId());
-                    session.setAttribute("USER_EMAIL", tokenData.getEmail());
-                    session.setAttribute("USER_ROLE", tokenData.getRole());
-                    if (tokenData.getTenantId() != null) {
-                        session.setAttribute("TENANT_ID", tokenData.getTenantId());
-                    }
+                HttpSession session = request.getSession(true);
+                session.setAttribute("USER_ID", tokenData.getUserId());
+                session.setAttribute("USER_EMAIL", tokenData.getEmail());
+                session.setAttribute("USER_ROLE", tokenData.getRole());
+                if (tokenData.getTenantId() != null) {
+                    session.setAttribute("TENANT_ID", tokenData.getTenantId());
                 }
             }
         }
