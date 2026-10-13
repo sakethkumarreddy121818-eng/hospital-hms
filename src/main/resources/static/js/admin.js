@@ -824,8 +824,8 @@ const Admin = (function () {
 
       <!-- 5 Main Summary Cards (Section 16 & 17) -->
       <div class="cv-cards-grid" id="adminSummaryCards">
-        <!-- 1. TODAY OP -->
-        <div class="cv-metric-card">
+        <!-- 1. TODAY OP REGISTRATION -->
+        <div class="cv-metric-card cv-op-registration-card" id="cardOpRegistration">
           <div class="cv-metric-label" id="lblOpCard">OP Registrations</div>
           <div class="cv-metric-value" id="cardValOp">...</div>
           <div style="margin-top:0.4rem;">
@@ -839,15 +839,15 @@ const Admin = (function () {
           </div>
         </div>
 
-        <!-- 2. TODAY IP -->
-        <div class="cv-metric-card">
+        <!-- 2. TODAY IP SECTION -->
+        <div class="cv-metric-card cv-ip-section-card" id="cardIpSection">
           <div class="cv-metric-label" id="lblIpCard">Inpatient (IP)</div>
           <div class="cv-metric-value" id="cardValIp">...</div>
           <span class="cv-metric-badge" style="background:#f0fdfa; color:#0d9488;">Admissions</span>
         </div>
 
-        <!-- 3. TODAY PHARMACY -->
-        <div class="cv-metric-card">
+        <!-- 3. TODAY PHARMACY BILLS -->
+        <div class="cv-metric-card cv-pharmacy-bills-card" id="cardPharmacyBills">
           <div class="cv-metric-label" id="lblPharCard">Pharmacy Bills</div>
           <div class="cv-metric-value" id="cardValPharmacy">...</div>
           <div style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.35rem;">
@@ -855,8 +855,8 @@ const Admin = (function () {
           </div>
         </div>
 
-        <!-- 4. TODAY LAB -->
-        <div class="cv-metric-card">
+        <!-- 4. TODAY LABORATORY ORDERS -->
+        <div class="cv-metric-card cv-lab-orders-card" id="cardLabOrders">
           <div class="cv-metric-label" id="lblLabCard">Laboratory Orders</div>
           <div class="cv-metric-value" id="cardValLab">...</div>
           <div style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.35rem;">
@@ -865,8 +865,8 @@ const Admin = (function () {
           </div>
         </div>
 
-        <!-- 5. TODAY COLLECTION -->
-        <div class="cv-metric-card">
+        <!-- 5. TODAY TOTAL COLLECTION -->
+        <div class="cv-metric-card cv-total-collection-card" id="cardTotalCollection">
           <div class="cv-metric-label" id="lblCollCard">Total Collection</div>
           <div class="cv-metric-value" id="cardValCollection" style="color:var(--cv-success);">&#8377;...</div>
           <div style="font-size:0.75rem; color:var(--cv-text-muted); margin-top:0.35rem;">
@@ -875,8 +875,8 @@ const Admin = (function () {
         </div>
       </div>
 
-      <!-- Dashboard Interactive Graphs (Section 19) -->
-      <div class="cv-chart-card">
+      <!-- Dashboard Interactive Graphs: 6. Performance Analytics & 7. Trend Analytics (Section 19) -->
+      <div class="cv-chart-card cv-analytics-card" id="adminAnalyticsCard">
         <div class="cv-chart-header">
           <div class="cv-chart-title-area">
             <h2 id="chartHeading">Performance Analytics & Trend Analysis</h2>
@@ -2708,7 +2708,7 @@ const Admin = (function () {
 
             <div class="cv-form-group">
               <label class="cv-form-label" for="opPatientName">Patient Full Name *</label>
-              <input type="text" id="opPatientName" class="cv-input" placeholder="" maxlength="100" autocomplete="off" required>
+              <input type="text" id="opPatientName" class="cv-input" placeholder="Patient Full Name" maxlength="100" autocomplete="off" required>
               <span class="cv-feedback-error" id="errPatientName">Patient name is required.</span>
             </div>
 
@@ -14735,7 +14735,7 @@ const Admin = (function () {
 
       recordsArea.innerHTML = `
         ${selectorHtml}
-        <div style="background:#ffffff; border:1px solid #bfdbfe; border-radius:8px; padding:1.4rem; box-shadow:var(--cv-shadow-xs);">
+        <div style="background:transparent; border:1px solid #eadbcc; border-radius:8px; padding:1.4rem; box-shadow:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem; margin-bottom:1.25rem;">
             <div>
               <span class="cv-badge-unpaid" style="background:#e0e7ff; color:#3730a3; padding:0.2rem 0.5rem; font-size:0.75rem; font-weight:700; margin-right:0.5rem;">OP BILLING RECORD</span>
@@ -15413,7 +15413,7 @@ const Admin = (function () {
 
       recordsArea.innerHTML = `
         ${selectorHtml}
-        <div style="background:#ffffff; border:1px solid #bfdbfe; border-radius:8px; padding:1.4rem; box-shadow:var(--cv-shadow-xs);">
+        <div style="background:transparent; border:1px solid #eadbcc; border-radius:8px; padding:1.4rem; box-shadow:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem; margin-bottom:1.25rem;">
             <div>
               <span class="cv-badge-unpaid" style="background:#fce7f3; color:#9d174d; padding:0.2rem 0.5rem; font-size:0.75rem; font-weight:700; margin-right:0.5rem;">IP BILLING RECORD</span>
@@ -16104,7 +16104,7 @@ const Admin = (function () {
 
       recordsArea.innerHTML = `
         ${selectorHtml}
-        <div style="background:#ffffff; border:1px solid #bfdbfe; border-radius:8px; padding:1.4rem; box-shadow:var(--cv-shadow-xs);">
+        <div style="background:transparent; border:1px solid #eadbcc; border-radius:8px; padding:1.4rem; box-shadow:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem; margin-bottom:1.25rem;">
             <div>
               <span class="cv-badge-unpaid" style="background:#dcfce7; color:#166534; padding:0.2rem 0.5rem; font-size:0.75rem; font-weight:700; margin-right:0.5rem;">PHARMACY BILL</span>
@@ -16808,7 +16808,7 @@ const Admin = (function () {
 
       recordsArea.innerHTML = `
         ${selectorHtml}
-        <div style="background:#ffffff; border:1px solid #bfdbfe; border-radius:8px; padding:1.4rem; box-shadow:var(--cv-shadow-xs);">
+        <div style="background:transparent; border:1px solid #eadbcc; border-radius:8px; padding:1.4rem; box-shadow:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.75rem; margin-bottom:1.25rem;">
             <div>
               <span class="cv-badge-unpaid" style="background:#fef3c7; color:#92400e; padding:0.2rem 0.5rem; font-size:0.75rem; font-weight:700; margin-right:0.5rem;">LABORATORY ORDER</span>
@@ -17300,7 +17300,7 @@ const Admin = (function () {
 
   function renderCbPatientDetailsCard(p) {
     return `
-      <div style="background:#ffffff; border:1px solid #bfdbfe; border-radius:8px; padding:1.15rem 1.4rem;">
+      <div style="background:transparent; border:1px solid #eadbcc; border-radius:8px; padding:1.15rem 1.4rem; box-shadow:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:0.6rem; margin-bottom:0.85rem;">
           <div style="font-size:0.85rem; font-weight:800; color:var(--cv-primary); text-transform:uppercase; letter-spacing:0.04em;">
             PATIENT DETAILS
@@ -17400,7 +17400,7 @@ const Admin = (function () {
     const invoiceNumDisplay = cbConsolidatedData.existingInvoiceNumber || 'Not yet issued (Click \'Generate Consolidated Bill &amp; Invoice\' below)';
 
     mount.innerHTML = `
-      <div class="cv-pharmacy-card" style="background:#ffffff; border:2px solid var(--cv-primary-border); box-shadow:var(--cv-shadow-md);">
+      <div class="cv-pharmacy-card" style="background:transparent; border:1px solid #eadbcc; box-shadow:none;">
         
         <!-- CARD HEADER -->
         <div class="cv-pharmacy-card-header" style="border-bottom:1px solid var(--cv-border); padding-bottom:0.75rem;">
@@ -18607,7 +18607,7 @@ const Admin = (function () {
         </div>
 
         <!-- FINANCIAL SECTIONS AREA (Separate Tabs / Navigation Buttons) -->
-        <div class="cv-card" style="padding:0.75rem 1rem; margin-bottom:1.25rem; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0; border-radius:10px;">
+        <div class="cv-card" style="padding:0.75rem 1rem; margin-bottom:1.25rem; background:transparent; box-shadow:none; border:1px solid #eadbcc;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
             <div style="display:flex; align-items:center; gap:0.5rem;">
               <span style="font-size:0.78rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:0.4rem;">
@@ -18678,7 +18678,7 @@ const Admin = (function () {
             </div>
 
             <!-- 2. Total Collection / Received -->
-            <div class="cv-money-kpi-card" style="border-left:4px solid #059669; background:#ffffff;">
+            <div class="cv-money-kpi-card" style="border-left:4px solid #059669; background:transparent; border-top:1px solid #eadbcc; border-right:1px solid #eadbcc; border-bottom:1px solid #eadbcc; box-shadow:none;">
               <div>
                 <div class="cv-money-kpi-title">
                   <span>TOTAL COLLECTION</span>

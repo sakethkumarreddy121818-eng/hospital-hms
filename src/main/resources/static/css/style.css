@@ -15,18 +15,19 @@
   --cv-teal: #0d9488;               /* Soft Healthcare Teal */
   --cv-teal-light: #f0fdfa;
 
-  /* Neutrals & Surfaces */
-  --cv-bg: #f8fafc;                 /* Crisp light clinical canvas */
-  --cv-surface: #ffffff;
+  /* Neutrals & Surfaces - Main Application Background #F7F3EA */
+  --cv-bg: #F7F3EA;                 /* Application-Wide Warm Cream Canvas */
+  --cv-bg-warm: #FAF6ED;            /* Secondary Warm Cream Tint */
+  --cv-surface: #ffffff;            /* Solid Crisp Pure White */
   --cv-surface-card: #ffffff;
-  --cv-border: #e2e8f0;
-  --cv-border-light: #f1f5f9;
+  --cv-border: #eadbcc;             /* Warm Champagne / Ivory Border */
+  --cv-border-light: #f5ebe0;       /* Soft Warm Divider */
 
-  /* Typography Colors */
-  --cv-text-primary: #0f172a;
-  --cv-text-secondary: #475569;
-  --cv-text-muted: #64748b;
-  --cv-text-light: #94a3b8;
+  /* Typography Colors - Warm Slate */
+  --cv-text-primary: #1c1917;
+  --cv-text-secondary: #57534e;
+  --cv-text-muted: #78716c;
+  --cv-text-light: #a8a29e;
 
   /* Status Colors */
   --cv-success: #059669;
@@ -71,33 +72,24 @@
 }
 
 /* ====================================================================
-   DEDICATED HEAVILY BLURRED HOSPITAL BACKGROUND LAYER (High Priority)
-   Blur applied STRICTLY to background layer only, eliminating edge clipping
+   APPLICATION-WIDE WARM CREAM BACKGROUND (#F7F3EA)
+   Clean, soothing single cream tone (#F7F3EA) across all dashboards & roles
    ==================================================================== */
 .app-background {
   position: fixed;
-  inset: -25px;
+  inset: 0;
   z-index: -2;
-  background-image: url("/images/carevista-hospital-bg.jpg");
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  filter: blur(14px);
-  transform: scale(1.05);
+  background-color: #F7F3EA;
   pointer-events: none;
 }
 
 .app-background-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: rgba(245, 249, 252, 0.48);
-  pointer-events: none;
+  display: none;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: transparent;
+  background-color: #F7F3EA;
   color: var(--cv-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -356,7 +348,7 @@ body.cv-dashboard-active #app {
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.5rem;
-  background: radial-gradient(circle at 50% 10%, #eff6ff 0%, #f8fafc 80%);
+  background: #F7F3EA;
 }
 
 .cv-login-card {
@@ -4973,151 +4965,325 @@ body.cv-dashboard-active #app {
    Applied universally across Admin, Super Admin, and all modules
    ==================================================================== */
 
-/* Universal Transparent Glass Panels — No Solid White Backgrounds */
+/* ====================================================================
+   UNIFIED TRANSPARENT & BORDERLESS SECTIONS ACROSS ENTIRE APPLICATION
+   Applies to Admin Dashboard, OP, IP, Pharmacy, Lab, Central Billing,
+   Rooms & Beds, Money Management, Reports, Settings, and all sub-sections.
+   Blends naturally into the uniform cream (#F7F3EA) application background.
+   ==================================================================== */
+
+/* ====================================================================
+   UNIFIED CAREVISTA GLASS & CLEAN WARM BORDERS THEME
+   Restored section borders as requested while keeping transparent
+   backgrounds blending into the uniform cream (#F7F3EA) canvas.
+   ==================================================================== */
+
+/* Distinct Cards & Sections: Transparent Background + Clean Border */
 .glass-panel,
 .cv-card,
-.cv-lab-card,
-.cv-table-wrapper,
-.cv-bill-table-wrapper,
-.cv-panel,
-.cv-patient-banner,
-.cv-lab-ledger-card,
-.cv-lab-settlement-card,
+.cv-metric-card,
+.cv-chart-card,
 .cv-welcome-card,
+.cv-panel,
+.cv-analytics-card,
+.cv-summary-card,
+.cv-stat-card,
+.cv-skeleton-card,
+#cardOpRegistration,
+#cardIpSection,
+#cardPharmacyBills,
+#cardLabOrders,
+#cardTotalCollection,
+#adminAnalyticsCard,
+.cv-dashboard-section-card,
+/* Outpatient (OP) Module Containers */
 .cv-op-card,
 .cv-op-section-card,
+.cv-op-registration-card,
 .cv-patient-search-card,
+/* Inpatient (IP) Module & Rooms/Beds Containers */
 .cv-ip-card,
+.cv-ip-section-card,
 .cv-ip-summary-card,
+.cv-room-card,
+.cv-bed-card,
+/* Pharmacy Module Containers */
 .cv-pharmacy-card,
+.cv-pharmacy-bills-card,
 .cv-pharmacy-summary-card,
+.cv-pharmacy-history-card,
+.cv-pharmacy-inventory-card,
+.cv-batch-card,
+/* Laboratory Module Containers */
+.cv-lab-card,
+.cv-lab-orders-card,
+.cv-lab-ledger-card,
+.cv-lab-settlement-card,
+.cv-lab-topbar,
+/* Billing & Central Billing Containers */
 .cv-billing-card,
 .cv-billing-kpi-card,
+.cv-billing-summary-card,
+.cv-total-collection-card,
+/* Money Management Containers */
 .cv-money-card,
 .cv-money-kpi-card,
 .cv-money-source-card,
-.cv-summary-card,
-.cv-stat-card,
-.cv-bed-card,
-.cv-room-card,
+/* Settings & Administration Containers */
 .cv-settings-section-card,
+.cv-settings-card,
+.cv-settings-header-banner,
+.cv-color-preset-card,
 .cv-sa-card {
-  background: rgba(255, 255, 255, 0.25) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04) !important;
-}
-
-/* Dedicated Admin Dashboard Sections & Statistics Panels */
-.cv-metric-card,
-.cv-chart-card,
-.cv-welcome-card {
-  background: rgba(255, 255, 255, 0.20) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.52) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04) !important;
-}
-
-.cv-metric-card:hover {
-  background: rgba(255, 255, 255, 0.28) !important;
-  border-color: rgba(255, 255, 255, 0.75) !important;
-}
-
-/* Continuous Unified Background Across Application Shell */
-.cv-navbar,
-.cv-sidebar,
-.cv-sidebar-footer,
-.cv-dashboard-view,
-.cv-main-content,
-.cv-footer {
   background: transparent !important;
-}
-
-.cv-navbar {
+  background-color: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 14px !important;
   box-shadow: none !important;
 }
 
+/* Outer Layout Grids & Structural Wrappers — Transparent with no outer border */
+.cv-cards-grid,
+#adminSummaryCards,
+.cv-chart-header,
+.cv-chart-title-area,
+.cv-chart-controls,
+.cv-chart-display-container,
+#chartDisplay,
+.cv-section-container,
+.cv-op-wrapper,
+.cv-patient-search-container,
+.cv-patient-banner,
+.cv-patient-autofill-wrapper,
+.cv-op-form-grid > div,
+.cv-walkin-box,
+.cv-patient-found-chip,
+.cv-receipt-fee-box,
+.cv-ip-wrapper,
+.cv-ip-summary-grid,
+.cv-rooms-grid,
+.cv-beds-grid,
+.cv-room-beds-grid,
+.cv-room-card-head,
+.cv-room-occ-bar-wrap,
+.cv-pharmacy-wrapper,
+.cv-pharmacy-flow,
+.cv-pharmacy-summary-grid,
+.cv-batch-train-wrapper,
+.cv-pharmacy-metrics-row,
+.cv-lab-header-left,
+.cv-lab-wrapper,
+.cv-lab-flow,
+.cv-lab-patient-box,
+.cv-lab-patient-banner,
+.cv-lab-autofill-grid,
+.cv-lab-financial-grid,
+.cv-lab-processing-wrapper,
+.cv-lab-processing-toolbar,
+.cv-lab-card-header,
+.cv-billing-topbar,
+.cv-billing-kpi-grid,
+.cv-billing-wrapper,
+.cv-money-kpi-grid,
+.cv-money-sources-grid,
+.cv-money-wrapper,
+.cv-money-custom-box,
+.cv-money-today-bar,
+.cv-money-formula-banner,
+.cv-settings-container,
+.cv-settings-section-body,
+.cv-settings-section-header,
+.cv-settings-grid-2,
+.cv-settings-grid-3,
+.cv-autofill-banner,
+.cv-ip-toolbar,
+.cv-table-wrapper,
+.cv-bill-table-wrapper {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+#adminAnalyticsCard .cv-filter-group {
+  background: transparent !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 8px !important;
+}
+
+/* Hover States — Retain border with smooth highlight */
+.cv-card:hover,
+.cv-metric-card:hover,
+.cv-chart-card:hover,
+.cv-lab-card:hover,
+.cv-billing-card:hover,
+.cv-pharmacy-card:hover,
+.cv-stat-card:hover,
+.cv-room-card:hover,
+.cv-bed-card:hover,
+.cv-batch-card:hover,
+.cv-op-section-card:hover,
+.cv-ip-card:hover,
+.cv-ip-summary-card:hover,
+.cv-money-kpi-card:hover,
+.cv-money-source-card:hover,
+.cv-settings-section-card:hover,
+#adminSummaryCards .cv-metric-card:hover,
+#cardOpRegistration:hover,
+#cardIpSection:hover,
+#cardPharmacyBills:hover,
+#cardLabOrders:hover,
+#cardTotalCollection:hover,
+#adminAnalyticsCard:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: #d8c2aa !important;
+  box-shadow: 0 4px 14px rgba(120, 90, 60, 0.05) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Preserved Essential UI Controls: Dialogs, Modals & Popovers */
+.cv-modal,
+.cv-modal-card,
+.cv-modal-content,
+.cv-modal-dialog,
+.cv-modal-box,
+.cv-op-modal-box,
+.cv-lab-report-modal,
+.cv-lab-report-paper,
+.cv-invoice-paper,
+.cv-login-card {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18) !important;
+  border-radius: 14px !important;
+}
+
+.cv-calendar-popover {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Continuous Unified Shell Harmonized to #F7F3EA */
+.cv-dashboard-view,
+.cv-main-content {
+  background: #F7F3EA !important;
+}
+
+.cv-navbar {
+  background: rgba(247, 243, 234, 0.95) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-bottom: 1px solid #eadbcc !important;
+  box-shadow: 0 1px 4px rgba(120, 90, 60, 0.04) !important;
+}
+
 .cv-sidebar {
+  background: #F7F3EA !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-right: 1px solid #eadbcc !important;
   box-shadow: none !important;
 }
 
 .cv-sidebar-header {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+  background: #F7F3EA !important;
+  border-bottom: 1px solid #eadbcc !important;
 }
 
 .cv-sidebar-footer {
-  background: transparent !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.35) !important;
+  background: #F7F3EA !important;
+  border-top: 1px solid #eadbcc !important;
 }
 
+.cv-footer {
+  background: #F7F3EA !important;
+  border-top: 1px solid #eadbcc !important;
+  color: #78716c !important;
+}
+
+/* Header Controls Harmonized to #FFFAF1 */
 .cv-nav-search-bar {
-  background: rgba(255, 255, 255, 0.22) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03) !important;
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #eadbcc !important;
+  box-shadow: 0 1px 3px rgba(120, 90, 60, 0.04) !important;
 }
 
 .cv-nav-search-bar:focus-within {
-  background: rgba(255, 255, 255, 0.50) !important;
-  border-color: #06b6d4 !important;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.16) !important;
+  background: #ffffff !important;
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.16) !important;
 }
 
 .cv-nav-action-btn {
-  background: rgba(255, 255, 255, 0.22) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
-  color: #1e293b !important;
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  color: #44403c !important;
+  box-shadow: 0 1px 2px rgba(120, 90, 60, 0.03) !important;
 }
 
 .cv-nav-action-btn:hover {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border-color: rgba(255, 255, 255, 0.75) !important;
-  color: #0284c7 !important;
+  background: #fff5e6 !important;
+  border-color: #d4a373 !important;
+  color: #9a3412 !important;
 }
 
 .cv-nav-profile-pill {
-  background: rgba(255, 255, 255, 0.22) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  box-shadow: 0 1px 2px rgba(120, 90, 60, 0.03) !important;
 }
 
 .cv-nav-profile-pill:hover {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border-color: rgba(255, 255, 255, 0.75) !important;
+  background: #fff5e6 !important;
+  border-color: #d4a373 !important;
 }
 
+/* Sidebar Components Harmonized */
 .cv-sidebar-motto {
-  background: rgba(255, 255, 255, 0.20) !important;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  box-shadow: 0 2px 6px rgba(120, 90, 60, 0.04) !important;
 }
 
 .cv-sidebar-collapse-btn {
-  background: rgba(255, 255, 255, 0.25) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  color: #57534e !important;
 }
 
 .cv-tenant-badge {
-  background: rgba(240, 253, 250, 0.55) !important;
-  border: 1px solid rgba(204, 251, 241, 0.7) !important;
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a !important;
 }
 
 .cv-btn-logout {
-  background: rgba(255, 255, 255, 0.25) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: #ffffff !important;
+  border: 1px solid #fca5a5 !important;
+  color: #dc2626 !important;
 }
 
-/* Section Title Accent Bars (Matches Reference Design) */
+.cv-btn-logout:hover {
+  background: #fef2f2 !important;
+  border-color: #ef4444 !important;
+}
+
+.cv-nav-item {
+  color: #44403c !important;
+}
+
+.cv-nav-item:hover {
+  background: rgba(235, 219, 196, 0.45) !important;
+  color: #1c1917 !important;
+}
+
+/* Section Title Accent Bars */
 .cv-lab-card-title,
 .cv-section-title,
 .cv-card-title {
@@ -5125,7 +5291,7 @@ body.cv-dashboard-active #app {
   align-items: center !important;
   font-size: 0.96rem !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: #1c1917 !important;
   letter-spacing: -0.01em !important;
 }
 
@@ -5136,13 +5302,13 @@ body.cv-dashboard-active #app {
   display: inline-block !important;
   width: 4px !important;
   height: 18px !important;
-  background: linear-gradient(180deg, #0284c7, #06b6d4) !important;
+  background: linear-gradient(180deg, #0d9488, #0284c7) !important;
   border-radius: 2px !important;
   margin-right: 0.55rem !important;
   flex-shrink: 0 !important;
 }
 
-/* Form Controls & Inputs — Crystal Clear, High Contrast */
+/* Form Controls & Inputs — Crisp White on #FFFAF1 Canvas */
 .cv-input,
 .cv-select,
 .cv-textarea,
@@ -5151,14 +5317,16 @@ body.cv-dashboard-active #app {
 .cv-calc-input,
 .cv-field-input,
 .cv-search-icon-input input,
-.cv-patient-search-container input {
-  background: rgba(255, 255, 255, 0.82) !important;
-  border: 1px solid rgba(203, 213, 225, 0.88) !important;
+.cv-patient-search-container input,
+.cv-patient-search-input {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
   border-radius: 8px !important;
-  color: #0f172a !important;
+  color: #1c1917 !important;
   font-weight: 600 !important;
   font-size: 0.88rem !important;
   transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(120, 90, 60, 0.02) !important;
 }
 
 .cv-input:focus,
@@ -5169,11 +5337,40 @@ body.cv-dashboard-active #app {
 .cv-calc-input:focus,
 .cv-field-input:focus,
 .cv-search-icon-input input:focus,
-.cv-patient-search-container input:focus {
+.cv-patient-search-container input:focus,
+.cv-patient-search-input:focus {
   background: #ffffff !important;
-  border-color: #06b6d4 !important;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18) !important;
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.16) !important;
   outline: none !important;
+}
+
+/* OP Registration — Patient Full Name Input Bar Solid White */
+#opPatientName {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+#opPatientName:focus {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.16) !important;
+  outline: none !important;
+}
+
+#opPatientName::placeholder {
+  color: #94a3b8 !important;
+  opacity: 0.85 !important;
+}
+
+#opPatientName:-webkit-autofill,
+#opPatientName:-webkit-autofill:hover,
+#opPatientName:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #1c1917 !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Typography Sharpness & Hierarchy */
@@ -5182,7 +5379,7 @@ h1, h2, h3, h4, h5, h6,
 .cv-brand-title,
 .cv-tenant-name,
 .cv-metric-value {
-  color: #0f172a !important;
+  color: #1c1917 !important;
   font-weight: 800 !important;
   letter-spacing: -0.02em !important;
 }
@@ -5190,7 +5387,7 @@ h1, h2, h3, h4, h5, h6,
 label,
 .cv-form-label,
 .cv-metric-label {
-  color: #1e293b !important;
+  color: #292524 !important;
   font-weight: 700 !important;
 }
 
@@ -5198,22 +5395,22 @@ label,
 .cv-brand-subtitle,
 .cv-card-subtitle,
 .cv-lab-badge-subtitle {
-  color: #475569 !important;
+  color: #57534e !important;
   font-weight: 600 !important;
 }
 
-/* Tables — Crisp Light Headers & Sharp Dark Navy Text */
+/* Tables — Warm Ivory Header, Crisp White Rows */
 .cv-table th,
 .cv-bill-table th,
 .cv-lab-table th {
-  background: rgba(241, 245, 249, 0.88) !important;
-  color: #0f172a !important;
+  background: #fdf6e9 !important;
+  color: #44403c !important;
   font-weight: 700 !important;
   font-size: 0.78rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
   padding: 0.75rem 1rem !important;
-  border-bottom: 1px solid #cbd5e1 !important;
+  border-bottom: 1px solid #eadbcc !important;
 }
 
 .cv-table td,
@@ -5221,15 +5418,16 @@ label,
 .cv-lab-table td {
   padding: 0.75rem 1rem !important;
   font-size: 0.88rem !important;
-  color: #0f172a !important;
+  color: #1c1917 !important;
   font-weight: 600 !important;
-  border-bottom: 1px solid rgba(241, 245, 249, 0.85) !important;
+  border-bottom: 1px solid #f5ebe0 !important;
+  background: #ffffff !important;
 }
 
-.cv-table tbody tr:hover,
-.cv-bill-table tbody tr:hover,
-.cv-lab-table tbody tr:hover {
-  background: rgba(240, 249, 255, 0.65) !important;
+.cv-table tbody tr:hover td,
+.cv-bill-table tbody tr:hover td,
+.cv-lab-table tbody tr:hover td {
+  background: #fffdf7 !important;
 }
 
 /* Red Trash Action Icons */

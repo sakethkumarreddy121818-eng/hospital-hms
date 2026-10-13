@@ -5,12 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CareVista — Hospital Management SaaS</title>
   <meta name="description" content="Enterprise Multi-Tenant Hospital Management SaaS platform for clinical, outpatient, inpatient, pharmacy, and central billing operations.">
-  <link rel="stylesheet" href="/css/style.css?v=2.6.0">
+  <link rel="stylesheet" href="/css/style.css?v=3.0.0">
+  <style>
+    html, body {
+      background-color: #F7F3EA !important;
+    }
+    .app-background {
+      background-color: #F7F3EA !important;
+      background-image: none !important;
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+    }
+    .app-background-overlay {
+      display: none !important;
+    }
+    #app, .cv-login-wrapper, .cv-dashboard-view, .cv-main-content {
+      background-color: #F7F3EA !important;
+    }
+  </style>
 </head>
-<body>
-  <!-- Dedicated Heavily Blurred Hospital Background & Semi-Transparent Tint Overlay -->
-  <div class="app-background" aria-hidden="true"></div>
-  <div class="app-background-overlay" aria-hidden="true"></div>
+<body style="background-color: #F7F3EA !important;">
+  <!-- Unified Warm Cream Background (#F7F3EA) -->
+  <div class="app-background" style="background-color: #F7F3EA !important; background-image: none !important;" aria-hidden="true"></div>
+  <div class="app-background-overlay" style="display: none !important;" aria-hidden="true"></div>
 
   <div id="app">
     <!-- Top Healthcare Navigation Bar -->
