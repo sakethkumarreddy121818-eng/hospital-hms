@@ -34,6 +34,7 @@ public class MoneyManagementController {
             @RequestParam(required = false, defaultValue = "ONE_MONTH") String period,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
+            @RequestParam(required = false, defaultValue = "false") boolean refresh,
             HttpServletRequest request) {
 
         Long tenantId = getAuthenticatedTenantId(request);
@@ -41,7 +42,7 @@ public class MoneyManagementController {
             return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
         }
 
-        MoneyDashboardSummaryDto summary = moneyManagementService.getMoneyDashboard(tenantId, period, startDate, endDate);
+        MoneyDashboardSummaryDto summary = moneyManagementService.getMoneyDashboard(tenantId, period, startDate, endDate, refresh);
         return ResponseEntity.ok(ApiResponse.success(summary));
     }
 

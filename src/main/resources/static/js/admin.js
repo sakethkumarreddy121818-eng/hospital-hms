@@ -725,10 +725,6 @@ const Admin = (function () {
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
         <span>Inpatient</span>
       </a></li>
-      <li><a class="cv-nav-item" data-mod="rooms" title="Rooms & Beds" data-tooltip="Rooms & Beds">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-        <span>Rooms &amp; Beds</span>
-      </a></li>
       <li><a class="cv-nav-item" data-mod="pharmacy" title="Pharmacy" data-tooltip="Pharmacy">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
         <span>Pharmacy</span>
@@ -741,17 +737,9 @@ const Admin = (function () {
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
         <span>Central Billing</span>
       </a></li>
-      <li><a class="cv-nav-item" data-mod="mainbilling" title="Main Billing" data-tooltip="Main Billing">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path></svg>
-        <span>Main Billing</span>
-      </a></li>
       <li><a class="cv-nav-item" data-mod="money" title="Money Management" data-tooltip="Money Management">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <span>Money Management</span>
-      </a></li>
-      <li><a class="cv-nav-item" data-mod="reports" title="Reports" data-tooltip="Reports">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-        <span>Reports</span>
       </a></li>
       <li><a class="cv-nav-item" data-mod="settings" title="Settings" data-tooltip="Settings">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -933,6 +921,13 @@ const Admin = (function () {
     });
     loadDashboardData();
     loadChartData();
+
+    // Idle background prefetch Money Management data so navigation is instant
+    if (!currentMoneyData && !currentMoneyFetchPromise) {
+      setTimeout(() => {
+        prefetchMoneyData('ONE_MONTH');
+      }, 350);
+    }
   }
 
   // ====================================================================
@@ -18339,6 +18334,9 @@ const Admin = (function () {
   let currentMoneyCustomStart = '';
   let currentMoneyCustomEnd = '';
   let currentMoneyData = null;
+  let currentMoneyDataTimestamp = 0;
+  let currentMoneyFetchPromise = null;
+  const MONEY_CACHE_TTL_MS = 60000; // 60 seconds freshness window
   let currentMoneyTxFilter = 'ALL';
   let currentMoneyTxSearch = '';
   let currentDoctorSort = 'HIGHEST';
@@ -18357,6 +18355,23 @@ const Admin = (function () {
   let currentMoneyPharStatus = 'ALL';
   let currentMoneyDocSearch = '';
   let currentMoneyDocSort = 'HIGHEST';
+
+  function prefetchMoneyData(period = 'ONE_MONTH') {
+    if (currentMoneyData && (Date.now() - currentMoneyDataTimestamp < MONEY_CACHE_TTL_MS)) return;
+    const url = `/api/admin/money/dashboard?period=${encodeURIComponent(period)}`;
+    if (currentMoneyFetchPromise) return;
+    const fetchPromise = Api.get(url).then(res => {
+      if (res && res.success && res.data) {
+        currentMoneyData = res.data;
+        currentMoneyDataTimestamp = Date.now();
+      }
+    }).catch(() => {}).finally(() => {
+      if (currentMoneyFetchPromise && currentMoneyFetchPromise.url === url) {
+        currentMoneyFetchPromise = null;
+      }
+    });
+    currentMoneyFetchPromise = { url, promise: fetchPromise };
+  }
 
   function renderMoneyManagementSkeleton(container, period = 'ONE_MONTH') {
     container.innerHTML = `
@@ -18475,9 +18490,15 @@ const Admin = (function () {
         : (currentMoneyData.startDate === customStart && currentMoneyData.endDate === customEnd)
     );
 
+    const isCacheFresh = hasCachedMatchingData && (Date.now() - currentMoneyDataTimestamp < MONEY_CACHE_TTL_MS);
+
     if (hasCachedMatchingData) {
       // Instant seamless render without blank void or spinner delay
       renderMoneyDashboardHtml(mainContent, currentMoneyData);
+      if (isCacheFresh) {
+        // Data is fresh within TTL, avoid redundant repeated network call
+        return;
+      }
     } else {
       // Structured full-layout skeleton with smooth shimmer animation
       renderMoneyManagementSkeleton(mainContent, period);
@@ -18488,19 +18509,39 @@ const Admin = (function () {
       if (period === 'CUSTOM' && customStart && customEnd) {
         url += `&startDate=${encodeURIComponent(customStart)}&endDate=${encodeURIComponent(customEnd)}`;
       }
+      if (forceRefresh) {
+        url += `&refresh=true`;
+      }
 
-      const res = await Api.get(url);
+      // Deduplicate simultaneous in-flight requests for the exact same URL
+      if (!currentMoneyFetchPromise || currentMoneyFetchPromise.url !== url) {
+        const fetchPromise = Api.get(url).finally(() => {
+          if (currentMoneyFetchPromise && currentMoneyFetchPromise.url === url) {
+            currentMoneyFetchPromise = null;
+          }
+        });
+        currentMoneyFetchPromise = { url, promise: fetchPromise };
+      }
+
+      const res = await currentMoneyFetchPromise.promise;
       if (!res || !res.success || !res.data) {
-        currentMoneyData = null;
-        renderMoneyErrorView(mainContent, res, period, customStart, customEnd);
+        if (!hasCachedMatchingData) {
+          currentMoneyData = null;
+          currentMoneyDataTimestamp = 0;
+          renderMoneyErrorView(mainContent, res, period, customStart, customEnd);
+        }
         return;
       }
 
       currentMoneyData = res.data;
+      currentMoneyDataTimestamp = Date.now();
       renderMoneyDashboardHtml(mainContent, res.data);
     } catch (err) {
-      currentMoneyData = null;
-      renderMoneyErrorView(mainContent, { success: false, status: 0, message: 'Network or connection error while retrieving financial data.' }, period, customStart, customEnd);
+      if (!hasCachedMatchingData) {
+        currentMoneyData = null;
+        currentMoneyDataTimestamp = 0;
+        renderMoneyErrorView(mainContent, { success: false, status: 0, message: 'Network or connection error while retrieving financial data.' }, period, customStart, customEnd);
+      }
     }
   }
 
@@ -18584,7 +18625,7 @@ const Admin = (function () {
           </div>
 
           <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-            <button type="button" class="cv-btn-secondary" onclick="Admin.renderMoneyManagementModule('${currentMoneyPeriod}', '${currentMoneyCustomStart}', '${currentMoneyCustomEnd}')" title="Refresh financial analytics" style="height:38px;">
+            <button type="button" class="cv-btn-secondary" onclick="Admin.renderMoneyManagementModule('${currentMoneyPeriod}', '${currentMoneyCustomStart}', '${currentMoneyCustomEnd}', true)" title="Refresh financial analytics" style="height:38px;">
               <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
               Refresh
             </button>
@@ -19778,7 +19819,8 @@ const Admin = (function () {
       if (res && res.success) {
         showToast('Hospital expense recorded successfully: ' + (res.data?.expenseNumber || ''));
         document.getElementById('recordExpenseModal')?.remove();
-        renderMoneyManagementModule(currentMoneyPeriod, currentMoneyCustomStart, currentMoneyCustomEnd);
+        currentMoneyDataTimestamp = 0;
+        renderMoneyManagementModule(currentMoneyPeriod, currentMoneyCustomStart, currentMoneyCustomEnd, true);
       } else {
         alert('Could not record expense: ' + (res?.message || 'Error'));
       }
@@ -19801,7 +19843,8 @@ const Admin = (function () {
       const res = await Api.delete(`/api/admin/money/expenses/${id}`);
       if (res && res.success) {
         showToast(`Expense ${expNum} cancelled.`);
-        renderMoneyManagementModule(currentMoneyPeriod, currentMoneyCustomStart, currentMoneyCustomEnd);
+        currentMoneyDataTimestamp = 0;
+        renderMoneyManagementModule(currentMoneyPeriod, currentMoneyCustomStart, currentMoneyCustomEnd, true);
       } else {
         alert('Could not cancel expense: ' + (res?.message || 'Error'));
       }
@@ -19815,7 +19858,29 @@ const Admin = (function () {
   // ====================================================================
   function switchMoneySectionTab(tab) {
     currentMoneySectionTab = tab;
-    if (currentMoneyData) {
+    if (!currentMoneyData) return;
+
+    const overviewMount = document.getElementById('moneyOverviewSectionMount');
+    const dedicatedMount = document.getElementById('moneyDedicatedSectionMount');
+
+    if (overviewMount && dedicatedMount) {
+      overviewMount.style.display = (tab === 'OVERVIEW') ? 'block' : 'none';
+      dedicatedMount.style.display = (tab !== 'OVERVIEW') ? 'block' : 'none';
+      if (tab !== 'OVERVIEW') {
+        dedicatedMount.innerHTML = renderDedicatedMoneySectionHtml(currentMoneyData);
+      }
+      const pills = document.querySelectorAll('.cv-card .cv-money-period-pills button');
+      pills.forEach(b => {
+        const text = b.textContent.toUpperCase();
+        const matches = (tab === 'OVERVIEW' && text.includes('OVERVIEW')) ||
+                        (tab === 'OP' && text.includes('OP FINANCIALS')) ||
+                        (tab === 'IP' && text.includes('IP FINANCIALS')) ||
+                        (tab === 'LAB' && text.includes('LABORATORY')) ||
+                        (tab === 'PHARMACY' && text.includes('PHARMACY')) ||
+                        (tab === 'DOCTOR' && text.includes('DOCTOR'));
+        b.classList.toggle('active', matches);
+      });
+    } else {
       renderMoneyDashboardHtml(document.getElementById('dashboardMain'), currentMoneyData);
     }
   }

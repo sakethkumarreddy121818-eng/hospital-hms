@@ -34,6 +34,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -85,7 +87,37 @@ public class MoneyManagementService {
         this.auditService = auditService;
     }
 
+    private final Map<String, CacheEntry> dashboardCache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 60_000L; // 60 seconds
+
+    private static class CacheEntry {
+        final MoneyDashboardSummaryDto data;
+        final long timestamp;
+        CacheEntry(MoneyDashboardSummaryDto data, long timestamp) {
+            this.data = data;
+            this.timestamp = timestamp;
+        }
+    }
+
+    public void evictCacheForTenant(Long tenantId) {
+        if (tenantId == null) return;
+        String prefix = tenantId + ":";
+        dashboardCache.keySet().removeIf(k -> k.startsWith(prefix));
+    }
+
     public MoneyDashboardSummaryDto getMoneyDashboard(Long tenantId, String period, String customStart, String customEnd) {
+        return getMoneyDashboard(tenantId, period, customStart, customEnd, false);
+    }
+
+    public MoneyDashboardSummaryDto getMoneyDashboard(Long tenantId, String period, String customStart, String customEnd, boolean forceRefresh) {
+        String cacheKey = tenantId + ":" + (period != null ? period.trim().toUpperCase() : "ONE_MONTH") + ":" + (customStart != null ? customStart.trim() : "") + ":" + (customEnd != null ? customEnd.trim() : "");
+        if (!forceRefresh) {
+            CacheEntry cached = dashboardCache.get(cacheKey);
+            if (cached != null && (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS)) {
+                return cached.data;
+            }
+        }
+
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Tenant not found with ID: " + tenantId));
 
@@ -99,7 +131,8 @@ public class MoneyManagementService {
         summary.setStartDate(start != null ? start.format(DD_MM_YYYY) : "Lifetime");
         summary.setEndDate(end != null ? end.format(DD_MM_YYYY) : "Present");
 
-        // 1. Fetch all tenant records
+        // 1. Fetch all tenant records efficiently within active transactional context
+        LocalDate today = LocalDate.now();
         List<OpRegistration> allOps = opRegistrationRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
         List<IpAdmission> allIps = ipAdmissionRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
         List<PharmacyBill> allPhars = pharmacyBillRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
@@ -107,6 +140,11 @@ public class MoneyManagementService {
         List<Medicine> allMeds = medicineRepository.findByTenantIdOrderByNameAsc(tenantId);
         List<HospitalExpense> allExpenses = hospitalExpenseRepository.findByTenantIdOrderByExpenseDateDescCreatedAtDesc(tenantId);
         List<Doctor> allDoctors = doctorRepository.findByTenantId(tenantId);
+        List<Room> allRooms = roomRepository.findByTenantIdOrderByRoomNumberAsc(tenantId);
+        List<Bed> allBeds = bedRepository.findByTenantIdOrderByBedNumberAsc(tenantId);
+        List<CentralBill> allCentralBills = centralBillRepository != null ? centralBillRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
+        List<PaymentRecord> allPaymentRecords = paymentRecordRepository != null ? paymentRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
+        BigDecimal paymentsToday = (paymentRecordRepository != null) ? paymentRecordRepository.sumAmountByTenantIdAndPaymentDate(tenantId, today) : null;
 
         // Filter by selected period
         List<OpRegistration> periodOps = allOps.stream()
@@ -319,9 +357,6 @@ public class MoneyManagementService {
         ipBreakdown.setTotalOutstanding(ipOutstanding);
         ipBreakdown.setTotalAdmissions(periodIps.size());
 
-        List<Room> allRooms = roomRepository.findByTenantIdOrderByRoomNumberAsc(tenantId);
-        List<Bed> allBeds = bedRepository.findByTenantIdOrderByBedNumberAsc(tenantId);
-
         // Identify custom room types configured in hospital that don't match the 7 standard categories
         Set<String> customConfiguredTypes = new LinkedHashSet<>();
         for (Room r : allRooms) {
@@ -512,16 +547,13 @@ public class MoneyManagementService {
         summary.setTotalOutstanding(totalRevOutstanding);
 
         // 7. Today's Metrics
-        LocalDate today = LocalDate.now();
-        calculateTodayMetrics(summary, tenantId, allOps, allIps, allPhars, allLabs, allMeds, allExpenses, today);
+        calculateTodayMetrics(summary, tenantId, allOps, allIps, allPhars, allLabs, allMeds, allExpenses, today, paymentsToday);
 
         // 8. Unified Transaction History
         List<FinancialTransactionDto> transactions = buildTransactionHistory(periodOps, periodIps, periodPhars, periodLabs, periodMeds, periodExpenses);
         summary.setRecentTransactions(transactions);
 
-        // 9. Fetch Central Bills & Payment Records for accurate invoice/tax linking
-        List<CentralBill> allCentralBills = centralBillRepository != null ? centralBillRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
-        List<PaymentRecord> allPaymentRecords = paymentRecordRepository != null ? paymentRecordRepository.findByTenantIdOrderByCreatedAtDesc(tenantId) : Collections.emptyList();
+        // 9. Process Central Bills & Payment Records for accurate invoice/tax linking
 
         Map<String, CentralBill> centralBillsByOpId = new HashMap<>();
         Map<String, CentralBill> centralBillsByIpId = new HashMap<>();
@@ -552,6 +584,7 @@ public class MoneyManagementService {
         summary.setPharmacyFinancials(buildPharmacyFinancialSection(periodPhars));
         summary.setDoctorFinancials(buildDoctorFinancialSection(docList, totalRevBilled, totalRevCollected));
 
+        dashboardCache.put(cacheKey, new CacheEntry(summary, System.currentTimeMillis()));
         return summary;
     }
 
@@ -563,7 +596,8 @@ public class MoneyManagementService {
                                        List<LabOrder> allLabs,
                                        List<Medicine> allMeds,
                                        List<HospitalExpense> allExpenses,
-                                       LocalDate today) {
+                                       LocalDate today,
+                                       BigDecimal paymentsToday) {
         BigDecimal todayBilled = BigDecimal.ZERO;
         BigDecimal todayCollected = BigDecimal.ZERO;
 
@@ -592,11 +626,8 @@ public class MoneyManagementService {
             }
         }
 
-        if (paymentRecordRepository != null && tenantId != null) {
-            BigDecimal paymentsToday = paymentRecordRepository.sumAmountByTenantIdAndPaymentDate(tenantId, today);
-            if (paymentsToday != null) {
-                todayCollected = paymentsToday;
-            }
+        if (paymentsToday != null) {
+            todayCollected = paymentsToday;
         }
 
         BigDecimal todayExpenses = BigDecimal.ZERO;
@@ -641,7 +672,7 @@ public class MoneyManagementService {
                     "OP Consultation",
                     "OP",
                     op.getOpId(),
-                    op.getPatient() != null ? op.getPatient().getFullName() : "-",
+                    resolveSafePatientName(op.getPatient(), null),
                     "-",
                     op.getDoctorName() != null ? op.getDoctorName() : "-",
                     date,
@@ -664,7 +695,7 @@ public class MoneyManagementService {
                     "Inpatient Care (" + ward + ")",
                     "IP",
                     ip.getIpId(),
-                    ip.getPatient() != null ? ip.getPatient().getFullName() : "-",
+                    resolveSafePatientName(ip.getPatient(), null),
                     "-",
                     ip.getDoctorName() != null ? ip.getDoctorName() : "-",
                     date,
@@ -686,7 +717,7 @@ public class MoneyManagementService {
                     "Pharmacy Sale",
                     "PHARMACY",
                     p.getBillNumber(),
-                    p.getPatientName() != null ? p.getPatientName() : (p.getPatient() != null ? p.getPatient().getFullName() : "-"),
+                    resolveSafePatientName(p.getPatient(), p.getPatientName()),
                     "-",
                     p.getDoctorName() != null ? p.getDoctorName() : "-",
                     date,
@@ -708,7 +739,7 @@ public class MoneyManagementService {
                     "Lab Diagnostics (" + (l.getCategory() != null ? l.getCategory() : "GENERAL") + ")",
                     "LABORATORY",
                     l.getOrderNumber(),
-                    l.getPatientName() != null ? l.getPatientName() : (l.getPatient() != null ? l.getPatient().getFullName() : "-"),
+                    resolveSafePatientName(l.getPatient(), l.getPatientName()),
                     "-",
                     l.getDoctorName() != null ? l.getDoctorName() : "-",
                     date,
@@ -801,6 +832,7 @@ public class MoneyManagementService {
         );
 
         HospitalExpense saved = hospitalExpenseRepository.save(expense);
+        evictCacheForTenant(tenantId);
 
         if (auditService != null) {
             auditService.log(userId, userEmail, "ADMIN", tenantId, "EXPENSE_CREATED",
@@ -823,6 +855,7 @@ public class MoneyManagementService {
         exp.setStatus("CANCELLED");
         exp.setUpdatedAt(java.time.LocalDateTime.now());
         hospitalExpenseRepository.save(exp);
+        evictCacheForTenant(tenantId);
 
         if (auditService != null) {
             auditService.log(userId, userEmail, "ADMIN", tenantId, "EXPENSE_CANCELLED",
@@ -1079,8 +1112,8 @@ public class MoneyManagementService {
             rec.setId(op.getId());
             rec.setOpId(op.getOpId());
             rec.setInvoiceNumber(invNo);
-            rec.setPatientName(op.getPatient() != null ? op.getPatient().getFullName() : "-");
-            rec.setUhid(op.getPatient() != null ? op.getPatient().getUhid() : "-");
+            rec.setPatientName(resolveSafePatientName(op.getPatient(), null));
+            rec.setUhid(resolveSafePatientUhid(op.getPatient(), null));
             rec.setDoctorName(op.getDoctorName() != null ? op.getDoctorName() : "-");
             rec.setDepartment(op.getDepartment() != null ? op.getDepartment() : "General");
             rec.setDate(date);
@@ -1167,8 +1200,8 @@ public class MoneyManagementService {
             rec.setId(ip.getId());
             rec.setIpId(ip.getIpId());
             rec.setInvoiceNumber(invNo);
-            rec.setPatientName(ip.getPatient() != null ? ip.getPatient().getFullName() : "-");
-            rec.setUhid(ip.getPatient() != null ? ip.getPatient().getUhid() : "-");
+            rec.setPatientName(resolveSafePatientName(ip.getPatient(), null));
+            rec.setUhid(resolveSafePatientUhid(ip.getPatient(), null));
             rec.setDoctorName(ip.getDoctorName() != null ? ip.getDoctorName() : "-");
             rec.setDepartment(ip.getDepartment() != null ? ip.getDepartment() : "General Medicine");
             rec.setAdmissionDate(date);
@@ -1234,8 +1267,8 @@ public class MoneyManagementService {
             rec.setId(l.getId());
             rec.setOrderNumber(l.getOrderNumber());
             rec.setInvoiceNumber(l.getOrderNumber() != null ? l.getOrderNumber() : "INV-LAB-" + String.format("%04d", l.getId()));
-            rec.setPatientName(l.getPatientName() != null ? l.getPatientName() : (l.getPatient() != null ? l.getPatient().getFullName() : "-"));
-            rec.setUhid(l.getUhid() != null ? l.getUhid() : (l.getPatient() != null ? l.getPatient().getUhid() : "-"));
+            rec.setPatientName(resolveSafePatientName(l.getPatient(), l.getPatientName()));
+            rec.setUhid(resolveSafePatientUhid(l.getPatient(), l.getUhid()));
             rec.setDoctorName(l.getDoctorName() != null ? l.getDoctorName() : "-");
             rec.setTestNames(l.getTestName());
             rec.setCategory(l.getCategory() != null ? l.getCategory() : "GENERAL");
@@ -1306,8 +1339,8 @@ public class MoneyManagementService {
             rec.setInvoiceNumber(p.getBillNumber() != null ? p.getBillNumber() : "INV-PHAR-" + String.format("%04d", p.getId()));
             rec.setBillDate(date);
             rec.setBillTime(time);
-            rec.setCustomerName(p.getPatientName() != null ? p.getPatientName() : (p.getPatient() != null ? p.getPatient().getFullName() : "Walk-in Customer"));
-            rec.setUhid(p.getUhid() != null ? p.getUhid() : (p.getPatient() != null ? p.getPatient().getUhid() : "-"));
+            rec.setCustomerName(resolveSafePatientName(p.getPatient(), p.getPatientName()));
+            rec.setUhid(resolveSafePatientUhid(p.getPatient(), p.getUhid()));
             rec.setDoctorName(p.getDoctorName() != null ? p.getDoctorName() : "-");
             rec.setMedicinesSold(medsSummary);
             rec.setTotalQuantity(totalQty);
@@ -1374,5 +1407,29 @@ public class MoneyManagementService {
 
     public DoctorFinancialSectionDto getDoctorFinancials(Long tenantId, String period, String customStart, String customEnd) {
         return getMoneyDashboard(tenantId, period, customStart, customEnd).getDoctorFinancials();
+    }
+
+    private String resolveSafePatientName(com.carevista.hms.patient.entity.Patient patient, String explicitName) {
+        if (explicitName != null && !explicitName.trim().isEmpty()) {
+            return explicitName;
+        }
+        if (patient != null) {
+            try {
+                return patient.getFullName() != null ? patient.getFullName() : "-";
+            } catch (Exception ignored) {}
+        }
+        return "-";
+    }
+
+    private String resolveSafePatientUhid(com.carevista.hms.patient.entity.Patient patient, String explicitUhid) {
+        if (explicitUhid != null && !explicitUhid.trim().isEmpty()) {
+            return explicitUhid;
+        }
+        if (patient != null) {
+            try {
+                return patient.getUhid() != null ? patient.getUhid() : "-";
+            } catch (Exception ignored) {}
+        }
+        return "-";
     }
 }
