@@ -280,6 +280,57 @@ public class BillingService {
         BigDecimal totalSubtotal = opSubtotal.add(ipSubtotal).add(pharmacySubtotal).add(labSubtotal);
         dto.setOverallSubtotal(totalSubtotal);
 
+        // Accumulate valid payments already made across modules to avoid duplicate collections
+        BigDecimal opPaidTotal = BigDecimal.ZERO;
+        for (OpRegistration op : ops) {
+            if (op.getPaidAmount() != null) {
+                opPaidTotal = opPaidTotal.add(op.getPaidAmount());
+            } else if ("PAID".equalsIgnoreCase(op.getPaymentStatus())) {
+                opPaidTotal = opPaidTotal.add(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
+            }
+        }
+
+        BigDecimal ipPaidTotal = BigDecimal.ZERO;
+        for (IpAdmission ip : ips) {
+            if (ip.getDepositAmount() != null) {
+                ipPaidTotal = ipPaidTotal.add(ip.getDepositAmount());
+            }
+        }
+
+        BigDecimal pharPaidTotal = BigDecimal.ZERO;
+        for (PharmacyBillDto p : phars) {
+            if ("PAID".equalsIgnoreCase(p.getPaymentStatus())) {
+                BigDecimal pharAmt = p.getTotalAmount() != null && p.getTotalAmount().compareTo(BigDecimal.ZERO) > 0
+                        ? p.getTotalAmount() : (p.getSubtotal() != null ? p.getSubtotal() : BigDecimal.ZERO);
+                pharPaidTotal = pharPaidTotal.add(pharAmt);
+            }
+        }
+
+        BigDecimal labPaidTotal = BigDecimal.ZERO;
+        for (LabOrderDto lab : labs) {
+            if ("PAID".equalsIgnoreCase(lab.getPaymentStatus())) {
+                BigDecimal labAmt = lab.getTotalAmount() != null && lab.getTotalAmount().compareTo(BigDecimal.ZERO) > 0
+                        ? lab.getTotalAmount() : (lab.getTestPrice() != null ? lab.getTestPrice() : BigDecimal.ZERO);
+                labPaidTotal = labPaidTotal.add(labAmt);
+            }
+        }
+
+        BigDecimal totalPriorPaid = opPaidTotal.add(ipPaidTotal).add(pharPaidTotal).add(labPaidTotal);
+        dto.setPriorPaidAmount(totalPriorPaid);
+
+        if (existingBills.isEmpty()) {
+            dto.setExistingAmountPaid(totalPriorPaid);
+            BigDecimal bal = totalSubtotal.subtract(totalPriorPaid).max(BigDecimal.ZERO);
+            dto.setExistingBalance(bal);
+            if (bal.compareTo(BigDecimal.ZERO) <= 0 && totalSubtotal.compareTo(BigDecimal.ZERO) > 0) {
+                dto.setExistingPaymentStatus("PAID");
+            } else if (totalPriorPaid.compareTo(BigDecimal.ZERO) > 0) {
+                dto.setExistingPaymentStatus("PARTIALLY PAID");
+            } else {
+                dto.setExistingPaymentStatus("UNPAID");
+            }
+        }
+
         return dto;
     }
 
@@ -572,29 +623,63 @@ public class BillingService {
         CentralBill savedBill = centralBillRepository.save(bill);
 
         if (paymentAmt.compareTo(BigDecimal.ZERO) > 0) {
-            String payTime = LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"));
-            PaymentRecord pr = new PaymentRecord(
-                    tenant,
-                    "TXN-" + System.currentTimeMillis(),
-                    patient,
-                    patient.getFullName(),
-                    "CENTRAL",
-                    paymentAmt,
-                    bill.getPaymentMethod(),
-                    today
-            );
-            pr.setBillId(savedBill.getId());
-            pr.setBillNumber(savedBill.getBillNumber());
-            pr.setInvoiceNumber(savedBill.getInvoiceNumber());
-            pr.setUhid(patient != null ? patient.getUhid() : savedBill.getUhid());
-            pr.setOpId(savedBill.getOpId());
-            pr.setIpId(savedBill.getIpId());
-            pr.setTotalPaid(savedBill.getAmountPaid());
-            pr.setRemainingBalance(savedBill.getBalance());
-            pr.setPaymentStatus(savedBill.getPaymentStatus());
-            pr.setPaymentTime(payTime);
-            pr.setNotes("Payment on Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
-            paymentRecordRepository.save(pr);
+            BigDecimal paymentToRecord = paymentAmt;
+            if (isNew) {
+                BigDecimal priorPaid = BigDecimal.ZERO;
+                if (patient != null) {
+                    List<OpRegistration> patOps = opRegistrationRepository.findByTenantIdAndPatientIdOrderByCreatedAtDesc(tenant.getId(), patient.getId());
+                    for (OpRegistration op : patOps) {
+                        if (op.getPaidAmount() != null) {
+                            priorPaid = priorPaid.add(op.getPaidAmount());
+                        } else if ("PAID".equalsIgnoreCase(op.getPaymentStatus())) {
+                            priorPaid = priorPaid.add(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
+                        }
+                    }
+                    List<IpAdmission> patIps = ipAdmissionRepository.findByTenantIdAndPatientIdOrderByCreatedAtDesc(tenant.getId(), patient.getId());
+                    for (IpAdmission ip : patIps) {
+                        if (ip.getDepositAmount() != null) priorPaid = priorPaid.add(ip.getDepositAmount());
+                    }
+                    List<PharmacyBill> patPhars = pharmacyBillRepository.findByTenantIdAndPatientIdOrderByCreatedAtDesc(tenant.getId(), patient.getId());
+                    for (PharmacyBill pb : patPhars) {
+                        if ("PAID".equalsIgnoreCase(pb.getPaymentStatus())) {
+                            priorPaid = priorPaid.add(pb.getTotalAmount() != null ? pb.getTotalAmount() : BigDecimal.ZERO);
+                        }
+                    }
+                    List<LabOrder> patLabs = labOrderRepository.findByTenantIdAndPatientIdOrderByCreatedAtDesc(tenant.getId(), patient.getId());
+                    for (LabOrder lo : patLabs) {
+                        if ("PAID".equalsIgnoreCase(lo.getPaymentStatus())) {
+                            priorPaid = priorPaid.add(lo.getTotalAmount() != null ? lo.getTotalAmount() : BigDecimal.ZERO);
+                        }
+                    }
+                }
+                paymentToRecord = paymentAmt.subtract(priorPaid);
+            }
+
+            if (paymentToRecord.compareTo(BigDecimal.ZERO) > 0) {
+                String payTime = LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"));
+                PaymentRecord pr = new PaymentRecord(
+                        tenant,
+                        "TXN-" + System.currentTimeMillis(),
+                        patient,
+                        patient != null ? patient.getFullName() : savedBill.getPatientName(),
+                        "CENTRAL",
+                        paymentToRecord,
+                        bill.getPaymentMethod(),
+                        today
+                );
+                pr.setBillId(savedBill.getId());
+                pr.setBillNumber(savedBill.getBillNumber());
+                pr.setInvoiceNumber(savedBill.getInvoiceNumber());
+                pr.setUhid(patient != null ? patient.getUhid() : savedBill.getUhid());
+                pr.setOpId(savedBill.getOpId());
+                pr.setIpId(savedBill.getIpId());
+                pr.setTotalPaid(savedBill.getAmountPaid());
+                pr.setRemainingBalance(savedBill.getBalance());
+                pr.setPaymentStatus(savedBill.getPaymentStatus());
+                pr.setPaymentTime(payTime);
+                pr.setNotes("Payment on Central Bill " + savedBill.getBillNumber() + " / Invoice " + savedBill.getInvoiceNumber());
+                paymentRecordRepository.save(pr);
+            }
         }
 
         if (moneyManagementService != null) {

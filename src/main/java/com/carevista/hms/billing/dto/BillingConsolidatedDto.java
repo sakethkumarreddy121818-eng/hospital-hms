@@ -37,8 +37,12 @@ public class BillingConsolidatedDto {
     private BigDecimal labSubtotal = BigDecimal.ZERO;
 
     private BigDecimal overallSubtotal = BigDecimal.ZERO;
+    private BigDecimal priorPaidAmount = BigDecimal.ZERO;
 
     // Getters and Setters
+    public BigDecimal getPriorPaidAmount() { return priorPaidAmount; }
+    public void setPriorPaidAmount(BigDecimal priorPaidAmount) { this.priorPaidAmount = priorPaidAmount; }
+
     public Long getPatientId() { return patientId; }
     public void setPatientId(Long patientId) { this.patientId = patientId; }
 

@@ -362,7 +362,19 @@ public class BillingPdfExportService {
             rightCell.setBorderWidth(1f);
             rightCell.setPadding(6f);
 
-            Paragraph invTitle = new Paragraph("TAX INVOICE / CENTRAL BILL", invoiceTitleFont);
+            boolean hasOp = (bill.getOpRecords() != null && !bill.getOpRecords().isEmpty())
+                    || (bill.getItems() != null && bill.getItems().stream().anyMatch(it -> "OP".equalsIgnoreCase(it.getModuleType())));
+            boolean hasIp = (bill.getIpRecords() != null && !bill.getIpRecords().isEmpty())
+                    || (bill.getItems() != null && bill.getItems().stream().anyMatch(it -> "IP".equalsIgnoreCase(it.getModuleType())));
+            boolean hasPharmacy = (bill.getPharmacyBills() != null && !bill.getPharmacyBills().isEmpty())
+                    || (bill.getItems() != null && bill.getItems().stream().anyMatch(it -> "PHARMACY".equalsIgnoreCase(it.getModuleType())));
+            boolean hasLab = (bill.getLabOrders() != null && !bill.getLabOrders().isEmpty())
+                    || (bill.getItems() != null && bill.getItems().stream().anyMatch(it -> "LABORATORY".equalsIgnoreCase(it.getModuleType())));
+
+            boolean isOpOnly = hasOp && !hasIp && !hasPharmacy && !hasLab;
+
+            String pdfTitle = isOpOnly ? "OP REGISTRATION / CONSULTATION BILL" : "TAX INVOICE / CENTRAL BILL";
+            Paragraph invTitle = new Paragraph(pdfTitle, invoiceTitleFont);
             invTitle.setAlignment(Element.ALIGN_RIGHT);
             rightCell.addElement(invTitle);
 
@@ -394,7 +406,11 @@ public class BillingPdfExportService {
             addPatCell(patTable, "PAYMENT METHOD", bill.getPaymentMethod() != null ? bill.getPaymentMethod() : "CASH", false);
 
             addPatCell(patTable, "OP REGISTRATION ID", bill.getOpId() != null && !bill.getOpId().isEmpty() ? bill.getOpId() : "—", false);
-            addPatCell(patTable, "IP ADMISSION ID", bill.getIpId() != null && !bill.getIpId().isEmpty() ? bill.getIpId() : "—", false);
+            if (hasIp) {
+                addPatCell(patTable, "IP ADMISSION ID", bill.getIpId() != null && !bill.getIpId().isEmpty() ? bill.getIpId() : "—", false);
+            } else {
+                addPatCell(patTable, "PATIENT TYPE", "Outpatient (OP)", false);
+            }
             addPatCell(patTable, "DOCTOR / CONSULTANT", bill.getDoctorName() != null && !bill.getDoctorName().isEmpty() ? bill.getDoctorName() : "Attending Physician", false);
             addPatCell(patTable, "DEPARTMENT", bill.getDepartment() != null && !bill.getDepartment().isEmpty() ? bill.getDepartment() : "General Medicine", false);
 
@@ -457,11 +473,17 @@ public class BillingPdfExportService {
             noteCell.setPadding(6f);
             noteCell.setBackgroundColor(HEADER_BG);
             noteCell.addElement(new Paragraph("BILLING NOTES & REMARKS:", labelFont));
+            String defaultNotes = isOpOnly
+                    ? "Settlement of Outpatient (OP) consultation and clinical assessment charges."
+                    : "Consolidated central settlement of patient charges across OP, IP, Pharmacy, and Diagnostics.";
             String notesText = (bill.getConsolidatedNotes() != null && !bill.getConsolidatedNotes().trim().isEmpty())
-                    ? bill.getConsolidatedNotes() : "Consolidated central settlement of patient charges across OP, IP, Pharmacy, and Diagnostics.";
+                    ? bill.getConsolidatedNotes() : defaultNotes;
             noteCell.addElement(new Paragraph(notesText, valueFont));
 
-            Paragraph termP = new Paragraph("\nTerms & Conditions:\n1. Payment receipt valid subject to realization.\n2. Please quote Invoice and Bill Number for future inquiries.\n3. Goods & medicines once sold cannot be taken back.", new Font(Font.HELVETICA, 7, Font.ITALIC, TEXT_MUTED));
+            String termStr = isOpOnly
+                    ? "\nTerms & Conditions:\n1. Payment receipt valid subject to realization.\n2. Please quote Invoice No and OP ID for future inquiries.\n3. OP consultation is valid for the registered visit date only."
+                    : "\nTerms & Conditions:\n1. Payment receipt valid subject to realization.\n2. Please quote Invoice and Bill Number for future inquiries.\n3. Goods & medicines once sold cannot be taken back.";
+            Paragraph termP = new Paragraph(termStr, new Font(Font.HELVETICA, 7, Font.ITALIC, TEXT_MUTED));
             noteCell.addElement(termP);
             calcTable.addCell(noteCell);
 

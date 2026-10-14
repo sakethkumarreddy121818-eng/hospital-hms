@@ -14121,7 +14121,6 @@ const Admin = (function () {
   function buildCentralInvoicePrintHtml(bill) {
     const isPaid = (bill.paymentStatus || 'PAID').toUpperCase() === 'PAID';
     const invoiceNum = bill.invoiceNumber || bill.billNumber;
-    const headerHtml = buildHospitalPrintHeader('CONSOLIDATED TAX INVOICE', 'Invoice No', invoiceNum, bill.billDate, bill.billTime, bill.paymentStatus || 'PAID', isPaid, bill.gstNumber);
 
     const opRecords = bill.opRecords || [];
     const ipRecords = bill.ipRecords || [];
@@ -14130,7 +14129,22 @@ const Admin = (function () {
 
     // Calculate section totals
     let opSubtotal = 0;
-    opRecords.forEach(o => { opSubtotal += (o.consultationFee || 0); });
+    let opTotalDiscount = 0;
+    let opTotalOriginalFee = 0;
+    opRecords.forEach(o => {
+      const fee = (o.consultationFee != null) ? o.consultationFee : 0;
+      const orig = (o.originalFee != null && o.originalFee > 0) ? o.originalFee : (fee + (o.discountAmount || 0));
+      const disc = (o.discountAmount != null) ? o.discountAmount : 0;
+      opSubtotal += fee;
+      opTotalDiscount += disc;
+      opTotalOriginalFee += orig;
+    });
+
+    if (opRecords.length === 0) {
+      (bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'OP').forEach(it => {
+        opSubtotal += (it.amount || 0);
+      });
+    }
 
     let ipSubtotal = 0;
     ipRecords.forEach(ip => {
@@ -14146,16 +14160,31 @@ const Admin = (function () {
         ipSubtotal += dep;
       }
     });
+    if (ipRecords.length === 0) {
+      (bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'IP').forEach(it => {
+        ipSubtotal += (it.amount || 0);
+      });
+    }
 
     let pharSubtotal = 0;
     pharmacyBills.forEach(pb => {
       pharSubtotal += (pb.totalAmount != null ? pb.totalAmount : (pb.subtotal || 0));
     });
+    if (pharmacyBills.length === 0) {
+      (bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'PHARMACY').forEach(it => {
+        pharSubtotal += (it.amount || 0);
+      });
+    }
 
     let labSubtotal = 0;
     labOrders.forEach(lo => {
       labSubtotal += (lo.totalAmount != null ? lo.totalAmount : (lo.testPrice || 0));
     });
+    if (labOrders.length === 0) {
+      (bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'LABORATORY').forEach(it => {
+        labSubtotal += (it.amount || 0);
+      });
+    }
 
     // Check for any other items not in OP, IP, PHARMACY, LABORATORY
     const otherItems = (bill.items || []).filter(it => {
@@ -14165,11 +14194,30 @@ const Admin = (function () {
     let otherSubtotal = 0;
     otherItems.forEach(it => { otherSubtotal += (it.amount || 0); });
 
+    // Determine which categories ACTUALLY exist for this patient & invoice
+    const hasOp = opRecords.length > 0 || (bill.items || []).some(it => (it.moduleType || '').toUpperCase() === 'OP') || opSubtotal > 0;
+    const hasIp = ipRecords.length > 0 || (bill.items || []).some(it => (it.moduleType || '').toUpperCase() === 'IP') || ipSubtotal > 0;
+    const hasPharmacy = pharmacyBills.length > 0 || (bill.items || []).some(it => (it.moduleType || '').toUpperCase() === 'PHARMACY') || pharSubtotal > 0;
+    const hasLab = labOrders.length > 0 || (bill.items || []).some(it => (it.moduleType || '').toUpperCase() === 'LABORATORY') || labSubtotal > 0;
+    const hasOther = otherItems.length > 0;
+
+    const isOpOnly = hasOp && !hasIp && !hasPharmacy && !hasLab && !hasOther;
+    const docTitle = isOpOnly ? 'OP REGISTRATION / CONSULTATION BILL' : 'CONSOLIDATED TAX INVOICE';
+    const headerHtml = buildHospitalPrintHeader(docTitle, 'Invoice No', invoiceNum, bill.billDate, bill.billTime, bill.paymentStatus || 'PAID', isPaid, bill.gstNumber);
+
     // Derive display Doctor and Department
     const displayDoctor = bill.doctorName || (opRecords[0] ? opRecords[0].doctorName : (ipRecords[0] ? ipRecords[0].doctorName : '—'));
     const displayDept = bill.department || (opRecords[0] ? opRecords[0].department : (ipRecords[0] ? ipRecords[0].department : 'General Medicine'));
     const displayOpId = bill.opId || (opRecords[0] ? opRecords[0].opId : '—');
     const displayIpId = bill.ipId || (ipRecords[0] ? ipRecords[0].ipId : '—');
+
+    // Section numbering if multi-category
+    let sectionCounter = 1;
+    const opSecNum = hasOp ? (isOpOnly ? '' : (sectionCounter++) + '. ') : '';
+    const ipSecNum = hasIp ? (sectionCounter++) + '. ' : '';
+    const pharSecNum = hasPharmacy ? (sectionCounter++) + '. ' : '';
+    const labSecNum = hasLab ? (sectionCounter++) + '. ' : '';
+    const otherSecNum = hasOther ? (sectionCounter++) + '. ' : '';
 
     return `
       <div class="cv-print-sheet">
@@ -14182,7 +14230,7 @@ const Admin = (function () {
           <div><span style="color:#64748b;">Phone Number:</span> <strong>${escapeHtml(bill.phone || '—')}</strong></div>
           <div><span style="color:#64748b;">Payment Method:</span> <strong>${escapeHtml(bill.paymentMethod || 'CASH')}</strong></div>
           <div><span style="color:#64748b;">OP ID:</span> <strong>${escapeHtml(displayOpId)}</strong></div>
-          <div><span style="color:#64748b;">IP ID:</span> <strong>${escapeHtml(displayIpId)}</strong></div>
+          ${hasIp ? `<div><span style="color:#64748b;">IP ID:</span> <strong>${escapeHtml(displayIpId)}</strong></div>` : `<div><span style="color:#64748b;">Patient Type:</span> <strong>Outpatient (OP)</strong></div>`}
           <div><span style="color:#64748b;">Doctor:</span> <strong>${escapeHtml(displayDoctor)}</strong></div>
           <div><span style="color:#64748b;">Department:</span> <strong>${escapeHtml(displayDept)}</strong></div>
           <div><span style="color:#64748b;">Invoice Number:</span> <strong style="font-family:monospace; color:#0f172a;">${escapeHtml(invoiceNum)}</strong></div>
@@ -14191,47 +14239,82 @@ const Admin = (function () {
           <div><span style="color:#64748b;">Invoice Time:</span> <strong>${escapeHtml(bill.billTime || '')}</strong></div>
         </div>
 
-        <!-- 1. OP BILLING SECTION -->
+        ${hasOp ? `
+        <!-- OP BILLING SECTION -->
         <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
           <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-            <span>1. OP SERVICES / OP BILLING</span>
-            <span>OP SUBTOTAL: ₹${formatCurrency(opSubtotal)}</span>
+            <span>${escapeHtml(opSecNum)}${isOpOnly ? 'OP REGISTRATION / CONSULTATION BILL' : 'OP SERVICES / OP BILLING'}</span>
+            <span>OP TOTAL: ₹${formatCurrency(opSubtotal)}</span>
           </div>
-          ${opRecords.length > 0 ? opRecords.map(o => `
+          ${opRecords.length > 0 ? opRecords.map(o => {
+            const origFee = (o.originalFee != null && o.originalFee > 0) ? o.originalFee : (o.consultationFee || 0);
+            const discAmt = (o.discountAmount != null) ? o.discountAmount : 0;
+            const finalFee = (o.consultationFee != null) ? o.consultationFee : (origFee - discAmt);
+            const discDisplay = discAmt > 0
+              ? (o.discountType === 'PERCENTAGE' ? `(${o.discountValue}% off)` : `(Fixed Discount)`)
+              : '';
+            return `
             <div style="padding:6px 10px; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
-              <div><strong>OP ID:</strong> <span style="font-family:monospace; color:#0369a1;">${escapeHtml(o.opId)}</span> &bull; <strong>OP DATE:</strong> ${escapeHtml(o.visitDate || '—')} &bull; <strong>OP TIME:</strong> ${escapeHtml(o.registrationTime || '—')}</div>
-              <div><strong>Doctor:</strong> ${escapeHtml(o.doctorName || 'Consultant')} &bull; <strong>Department:</strong> ${escapeHtml(o.department || 'General')}</div>
+              <div><strong>OP ID:</strong> <span style="font-family:monospace; color:#0369a1;">${escapeHtml(o.opId || displayOpId)}</span> &bull; <strong>OP DATE:</strong> ${escapeHtml(o.visitDate || bill.billDate || '—')} &bull; <strong>OP TIME:</strong> ${escapeHtml(o.registrationTime || bill.billTime || '—')}</div>
+              <div><strong>Doctor:</strong> ${escapeHtml(o.doctorName || displayDoctor)} &bull; <strong>Department:</strong> ${escapeHtml(o.department || displayDept)}</div>
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:10px;">
               <thead>
                 <tr style="background:#f1f5f9; color:#475569; border-bottom:1px solid #cbd5e1;">
-                  <th style="padding:4px 8px; text-align:left; width:50%;">ITEM / SERVICE</th>
-                  <th style="padding:4px 8px; text-align:center; width:20%;">DATE</th>
-                  <th style="padding:4px 8px; text-align:center; width:15%;">TIME</th>
-                  <th style="padding:4px 8px; text-align:right; width:15%;">AMOUNT</th>
+                  <th style="padding:4px 8px; text-align:left; width:45%;">ITEM / SERVICE</th>
+                  <th style="padding:4px 8px; text-align:center; width:15%;">DATE &amp; TIME</th>
+                  <th style="padding:4px 8px; text-align:right; width:13%;">CONSULTATION FEE</th>
+                  <th style="padding:4px 8px; text-align:right; width:13%;">DISCOUNT</th>
+                  <th style="padding:4px 8px; text-align:right; width:14%;">FINAL AMOUNT</th>
                 </tr>
               </thead>
               <tbody>
                 <tr style="border-bottom:1px solid #f1f5f9;">
-                  <td style="padding:4px 8px; font-weight:600;">Consultation &amp; Primary Clinical Assessment</td>
-                  <td style="padding:4px 8px; text-align:center; color:#64748b;">${escapeHtml(o.visitDate || '—')}</td>
-                  <td style="padding:4px 8px; text-align:center; color:#64748b;">${escapeHtml(o.registrationTime || '—')}</td>
-                  <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(o.consultationFee || 0)}</td>
+                  <td style="padding:4px 8px; font-weight:600;">
+                    OP Consultation &amp; Primary Clinical Assessment
+                    <div style="font-size:9px; color:#64748b; font-weight:normal;">Consultant: ${escapeHtml(o.doctorName || displayDoctor)} (${escapeHtml(o.department || displayDept)})</div>
+                  </td>
+                  <td style="padding:4px 8px; text-align:center; color:#64748b;">${escapeHtml(o.visitDate || bill.billDate || '—')} ${escapeHtml(o.registrationTime || '')}</td>
+                  <td style="padding:4px 8px; text-align:right; font-weight:600; color:#334155;">₹${formatCurrency(origFee)}</td>
+                  <td style="padding:4px 8px; text-align:right; font-weight:600; color:${discAmt > 0 ? '#dc2626' : '#64748b'};">
+                    ${discAmt > 0 ? `- ₹${formatCurrency(discAmt)} <span style="font-size:8.5px; display:block;">${escapeHtml(discDisplay)}</span>` : '₹0.00'}
+                  </td>
+                  <td style="padding:4px 8px; text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(finalFee)}</td>
                 </tr>
               </tbody>
             </table>
-          `).join('') : `
-            <div style="padding:6px 10px; font-size:10px; color:#64748b; font-style:italic;">No Outpatient (OP) consultation records found for this patient.</div>
+          `;
+          }).join('') : `
+            <table style="width:100%; border-collapse:collapse; font-size:10px;">
+              <thead>
+                <tr style="background:#f1f5f9; color:#475569; border-bottom:1px solid #cbd5e1;">
+                  <th style="padding:4px 8px; text-align:left; width:50%;">ITEM / SERVICE</th>
+                  <th style="padding:4px 8px; text-align:center; width:20%;">REF ID</th>
+                  <th style="padding:4px 8px; text-align:right; width:30%;">AMOUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'OP').map(it => `
+                  <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:4px 8px; font-weight:600;">${escapeHtml(it.description || 'OP Consultation')}</td>
+                    <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#0369a1;">${escapeHtml(it.referenceId || displayOpId)}</td>
+                    <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(it.amount || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           `}
           <div style="background:#f8fafc; padding:4px 10px; border-top:1px solid #e2e8f0; text-align:right; font-size:10.5px; font-weight:700; color:#0369a1;">
             OP SUBTOTAL: ₹${formatCurrency(opSubtotal)}
           </div>
         </div>
+        ` : ''}
 
-        <!-- 2. IP BILLING SECTION -->
+        ${hasIp ? `
+        <!-- IP BILLING SECTION -->
         <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
           <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-            <span>2. IP SERVICES / IP BILLING</span>
+            <span>${escapeHtml(ipSecNum)}IP SERVICES / IP BILLING</span>
             <span>IP SUBTOTAL: ₹${formatCurrency(ipSubtotal)}</span>
           </div>
           ${ipRecords.length > 0 ? ipRecords.map(ip => {
@@ -14310,17 +14393,29 @@ const Admin = (function () {
               </table>
             `;
           }).join('') : `
-            <div style="padding:6px 10px; font-size:10px; color:#64748b; font-style:italic;">No Inpatient (IP) admission records found for this patient.</div>
+            <table style="width:100%; border-collapse:collapse; font-size:10px;">
+              <tbody>
+                ${(bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'IP').map(it => `
+                  <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:4px 8px; font-weight:600;">${escapeHtml(it.description || 'IP Service')}</td>
+                    <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#0369a1;">${escapeHtml(it.referenceId || displayIpId)}</td>
+                    <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(it.amount || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           `}
           <div style="background:#f8fafc; padding:4px 10px; border-top:1px solid #e2e8f0; text-align:right; font-size:10.5px; font-weight:700; color:#0369a1;">
             IP SUBTOTAL: ₹${formatCurrency(ipSubtotal)}
           </div>
         </div>
+        ` : ''}
 
-        <!-- 3. PHARMACY SECTION -->
+        ${hasPharmacy ? `
+        <!-- PHARMACY SECTION -->
         <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
           <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-            <span>3. PHARMACY</span>
+            <span>${escapeHtml(pharSecNum)}PHARMACY</span>
             <span>PHARMACY SUBTOTAL: ₹${formatCurrency(pharSubtotal)}</span>
           </div>
           ${pharmacyBills.length > 0 ? pharmacyBills.map(pb => {
@@ -14368,17 +14463,29 @@ const Admin = (function () {
               </table>
             `;
           }).join('') : `
-            <div style="padding:6px 10px; font-size:10px; color:#64748b; font-style:italic;">No Pharmacy dispensary transactions found for this patient.</div>
+            <table style="width:100%; border-collapse:collapse; font-size:10px;">
+              <tbody>
+                ${(bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'PHARMACY').map(it => `
+                  <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:4px 8px; font-weight:600;">${escapeHtml(it.description || 'Pharmacy Items')}</td>
+                    <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#0369a1;">${escapeHtml(it.referenceId || '—')}</td>
+                    <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(it.amount || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           `}
           <div style="background:#f8fafc; padding:4px 10px; border-top:1px solid #e2e8f0; text-align:right; font-size:10.5px; font-weight:700; color:#0369a1;">
             PHARMACY SUBTOTAL: ₹${formatCurrency(pharSubtotal)}
           </div>
         </div>
+        ` : ''}
 
-        <!-- 4. LABORATORY SECTION -->
+        ${hasLab ? `
+        <!-- LABORATORY SECTION -->
         <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
           <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-            <span>4. LABORATORY</span>
+            <span>${escapeHtml(labSecNum)}LABORATORY</span>
             <span>LAB SUBTOTAL: ₹${formatCurrency(labSubtotal)}</span>
           </div>
           ${labOrders.length > 0 ? labOrders.map(lo => {
@@ -14421,53 +14528,70 @@ const Admin = (function () {
               </table>
             `;
           }).join('') : `
-            <div style="padding:6px 10px; font-size:10px; color:#64748b; font-style:italic;">No Laboratory diagnostic orders found for this patient.</div>
-          `}
-          <div style="background:#f8fafc; padding:4px 10px; border-top:1px solid #e2e8f0; text-align:right; font-size:10.5px; font-weight:700; color:#0369a1;">
-            LAB SUBTOTAL: ₹${formatCurrency(labSubtotal)}
-          </div>
-        </div>
-
-        ${otherItems.length > 0 ? `
-          <!-- 5. OTHER SERVICES SECTION -->
-          <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
-            <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-              <span>5. OTHER SERVICES</span>
-              <span>Subtotal: ₹${formatCurrency(otherSubtotal)}</span>
-            </div>
             <table style="width:100%; border-collapse:collapse; font-size:10px;">
-              <thead>
-                <tr style="background:#f1f5f9; color:#475569; border-bottom:1px solid #cbd5e1;">
-                  <th style="padding:4px 8px; text-align:left; width:60%;">DESCRIPTION / SERVICE</th>
-                  <th style="padding:4px 8px; text-align:center; width:25%;">REFERENCE</th>
-                  <th style="padding:4px 8px; text-align:right; width:15%;">AMOUNT</th>
-                </tr>
-              </thead>
               <tbody>
-                ${otherItems.map(it => `
+                ${(bill.items || []).filter(it => (it.moduleType || '').toUpperCase() === 'LABORATORY').map(it => `
                   <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:4px 8px;">${escapeHtml(it.description || 'Service')}</td>
-                    <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#64748b;">${escapeHtml(it.referenceId || '—')}</td>
+                    <td style="padding:4px 8px; font-weight:600;">${escapeHtml(it.description || 'Laboratory Diagnostic')}</td>
+                    <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#0369a1;">${escapeHtml(it.referenceId || '—')}</td>
                     <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(it.amount || 0)}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
+          `}
+          <div style="background:#f8fafc; padding:4px 10px; border-top:1px solid #e2e8f0; text-align:right; font-size:10.5px; font-weight:700; color:#0369a1;">
+            LAB SUBTOTAL: ₹${formatCurrency(labSubtotal)}
+          </div>
+        </div>
+        ` : ''}
+
+        ${hasOther ? `
+        <!-- OTHER SERVICES SECTION -->
+        <div class="cv-print-section" style="margin-bottom:12px; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
+          <div style="background:#0284c7; color:#fff; padding:5px 10px; font-weight:700; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+            <span>${escapeHtml(otherSecNum)}OTHER SERVICES</span>
+            <span>Subtotal: ₹${formatCurrency(otherSubtotal)}</span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:10px;">
+            <thead>
+              <tr style="background:#f1f5f9; color:#475569; border-bottom:1px solid #cbd5e1;">
+                <th style="padding:4px 8px; text-align:left; width:60%;">DESCRIPTION / SERVICE</th>
+                <th style="padding:4px 8px; text-align:center; width:25%;">REFERENCE</th>
+                <th style="padding:4px 8px; text-align:right; width:15%;">AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${otherItems.map(it => `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:4px 8px;">${escapeHtml(it.description || 'Service')}</td>
+                  <td style="padding:4px 8px; text-align:center; font-family:monospace; color:#64748b;">${escapeHtml(it.referenceId || '—')}</td>
+                  <td style="padding:4px 8px; text-align:right; font-weight:700;">₹${formatCurrency(it.amount || 0)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        ${(!hasOp && !hasIp && !hasPharmacy && !hasLab && !hasOther) ? `
+          <div style="padding:24px 12px; text-align:center; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px; color:#64748b; font-size:11px; margin-bottom:12px;">
+            No billable service records found for this patient.
           </div>
         ` : ''}
 
-        <!-- 6. OVERALL BILLING SUMMARY & FINANCIAL TOTALS -->
+        <!-- 6. BILLING SUMMARY & FINANCIAL TOTALS -->
         <div class="cv-print-summary-box" style="display:grid; grid-template-columns: 1.25fr 1fr; gap:12px; margin-bottom:12px;">
           <!-- Left: Terms & Signatory -->
           <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; font-size:9.5px; display:flex; flex-direction:column; justify-content:space-between;">
             <div>
-              <div style="font-weight:700; color:#334155; margin-bottom:4px; font-size:10px;">Consolidated Settlement &amp; Terms:</div>
-              <div style="color:#475569; line-height:1.4;">${escapeHtml(bill.consolidatedNotes || 'Settlement of consolidated patient charges across Outpatient (OP), Inpatient (IP), Pharmacy Dispensary, and Laboratory Diagnostics.')}</div>
+              <div style="font-weight:700; color:#334155; margin-bottom:4px; font-size:10px;">${isOpOnly ? 'Outpatient Billing Terms:' : 'Consolidated Settlement &amp; Terms:'}</div>
+              <div style="color:#475569; line-height:1.4;">${escapeHtml(bill.consolidatedNotes || (isOpOnly ? 'Settlement of Outpatient (OP) consultation and clinical assessment charges.' : 'Settlement of consolidated patient charges across Outpatient (OP), Inpatient (IP), Pharmacy Dispensary, and Laboratory Diagnostics.'))}</div>
               <div style="margin-top:8px; color:#64748b; border-top:1px dashed #cbd5e1; padding-top:6px; line-height:1.45;">
                 1. Payment receipt is valid subject to realization of funds.<br>
                 2. Quote Invoice No <strong>${escapeHtml(invoiceNum)}</strong> and Central Bill No <strong>${escapeHtml(bill.billNumber || '—')}</strong> for all inquiries.<br>
-                3. Pharmacy items once dispensed cannot be returned or exchanged.<br>
-                4. This is a computer-generated consolidated tax invoice from CareVista HMS.
+                ${isOpOnly ? '3. Consultation is valid for the registered visit date only.<br>' : '3. Pharmacy items once dispensed cannot be returned or exchanged.<br>'}
+                4. This is a computer-generated ${isOpOnly ? 'OP consultation bill' : 'consolidated tax invoice'} from CareVista HMS.
               </div>
             </div>
             <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:flex-end;">
@@ -14485,22 +14609,23 @@ const Admin = (function () {
           <!-- Right: Detailed Totals Grid (Section 10 Layout) -->
           <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden;">
             <div style="background:#0f172a; color:#fff; padding:5px 8px; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px;">
-              OVERALL BILLING SUMMARY
+              ${isOpOnly ? 'BILLING SUMMARY' : 'OVERALL BILLING SUMMARY'}
             </div>
             <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">OP TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(opSubtotal)}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">IP TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(ipSubtotal)}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">PHARMACY TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(pharSubtotal)}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">LABORATORY TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(labSubtotal)}</td></tr>
-              ${otherSubtotal > 0 ? `
-                <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">OTHER SERVICES</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(otherSubtotal)}</td></tr>
+              ${hasOp ? `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">${isOpOnly ? 'OP CONSULTATION FEE' : 'OP TOTAL'}</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(opSubtotal)}</td></tr>` : ''}
+              ${hasIp ? `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">IP TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(ipSubtotal)}</td></tr>` : ''}
+              ${hasPharmacy ? `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">PHARMACY TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(pharSubtotal)}</td></tr>` : ''}
+              ${hasLab ? `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">LABORATORY TOTAL</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(labSubtotal)}</td></tr>` : ''}
+              ${hasOther ? `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">OTHER SERVICES</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(otherSubtotal)}</td></tr>` : ''}
+              <tr style="border-top:1px solid #cbd5e1; border-bottom:1px solid #f1f5f9; background:#f8fafc;"><td style="padding:4px 8px; font-weight:700; color:#0f172a;">SUBTOTAL</td><td style="padding:4px 8px; text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(bill.subtotal != null ? bill.subtotal : (opSubtotal + ipSubtotal + pharSubtotal + labSubtotal + otherSubtotal))}</td></tr>
+              ${(bill.discountAmount && bill.discountAmount > 0) ? `
+                <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#dc2626;">OVERALL DISCOUNT</td><td style="padding:3px 8px; text-align:right; font-weight:600; color:#dc2626;">- ₹${formatCurrency(bill.discountAmount)}</td></tr>
+                <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">NET AMOUNT</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(bill.netAmount != null ? bill.netAmount : (bill.subtotal - bill.discountAmount))}</td></tr>
               ` : ''}
-              <tr style="border-top:1px solid #cbd5e1; border-bottom:1px solid #f1f5f9; background:#f8fafc;"><td style="padding:4px 8px; font-weight:700; color:#0f172a;">SUBTOTAL</td><td style="padding:4px 8px; text-align:right; font-weight:700; color:#0f172a;">₹${formatCurrency(bill.subtotal || (opSubtotal + ipSubtotal + pharSubtotal + labSubtotal + otherSubtotal))}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#dc2626;">OVERALL DISCOUNT</td><td style="padding:3px 8px; text-align:right; font-weight:600; color:#dc2626;">${(bill.discountAmount && bill.discountAmount > 0) ? `- ₹${formatCurrency(bill.discountAmount)}` : '₹0.00'}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#475569;">NET AMOUNT</td><td style="padding:3px 8px; text-align:right; font-weight:600;">₹${formatCurrency(bill.netAmount || (bill.subtotal - (bill.discountAmount || 0)))}</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#0369a1;">GST %</td><td style="padding:3px 8px; text-align:right; font-weight:600; color:#0369a1;">${bill.gstPct || 0}%</td></tr>
-              <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#0369a1;">GST AMOUNT</td><td style="padding:3px 8px; text-align:right; font-weight:600; color:#0369a1;">+ ₹${formatCurrency(bill.gstAmount || 0)}</td></tr>
-              <tr style="background:#eff6ff; border-top:1.5px solid #0284c7; border-bottom:1.5px solid #0284c7;"><td style="padding:6px 8px; font-weight:800; color:#0369a1; font-size:12px;">FINAL TOTAL</td><td style="padding:6px 8px; text-align:right; font-weight:800; font-size:13px; color:#0369a1;">₹${formatCurrency(bill.finalTotal)}</td></tr>
+              ${(bill.gstAmount && bill.gstAmount > 0) ? `
+                <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 8px; color:#0369a1;">GST (${bill.gstPct || 0}%)</td><td style="padding:3px 8px; text-align:right; font-weight:600; color:#0369a1;">+ ₹${formatCurrency(bill.gstAmount)}</td></tr>
+              ` : ''}
+              <tr style="background:#eff6ff; border-top:1.5px solid #0284c7; border-bottom:1.5px solid #0284c7;"><td style="padding:6px 8px; font-weight:800; color:#0369a1; font-size:12px;">FINAL TOTAL</td><td style="padding:6px 8px; text-align:right; font-weight:800; font-size:13px; color:#0369a1;">₹${formatCurrency(bill.finalTotal != null ? bill.finalTotal : (bill.subtotal != null ? bill.subtotal : opSubtotal))}</td></tr>
               <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; color:#475569;">AMOUNT PAID</td><td style="padding:4px 8px; text-align:right; font-weight:700; color:#059669;">₹${formatCurrency(bill.amountPaid || 0)}</td></tr>
               <tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 8px; font-weight:700; color:${(bill.balance || 0) <= 0 ? '#059669' : '#dc2626'};">BALANCE DUE</td><td style="padding:4px 8px; text-align:right; font-weight:800; color:${(bill.balance || 0) <= 0 ? '#059669' : '#dc2626'};">₹${formatCurrency(bill.balance || 0)}</td></tr>
               <tr style="border-bottom:1px solid #f1f5f9; background:#f8fafc;"><td style="padding:3px 8px; color:#64748b; font-size:9.5px;">PAYMENT STATUS</td><td style="padding:3px 8px; text-align:right; font-weight:700; font-size:9.5px; color:${isPaid ? '#059669' : '#dc2626'};">${escapeHtml(bill.paymentStatus || 'PAID')}</td></tr>
@@ -18166,7 +18291,7 @@ const Admin = (function () {
               SETTLEMENT &amp; INVOICE
             </div>
 
-            ${(hasExistingInvoice && (cbConsolidatedData.existingAmountPaid || 0) > 0) ? `
+            ${((cbConsolidatedData.existingAmountPaid || 0) > 0) ? `
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; background:#f1f5f9; padding:0.4rem 0.6rem; border-radius:4px; margin-bottom:0.25rem;">
                 <span style="font-weight:600; color:#475569;">Previously Paid:</span>
                 <span id="cbDisplayPreviouslyPaid" style="font-weight:700; color:#059669;">₹${formatCurrency(cbConsolidatedData.existingAmountPaid)}</span>
@@ -18180,7 +18305,7 @@ const Admin = (function () {
                 <button type="button" id="btnCbPayFullAmount" style="background:none; border:none; color:var(--cv-primary); font-size:0.75rem; font-weight:700; cursor:pointer; text-decoration:underline;">Pay Full</button>
               </div>
               <div style="display:flex; gap:0.4rem; align-items:center;">
-                <input type="number" id="cbOverallPaidAmount" class="cv-form-input" min="0" step="0.01" value="${hasExistingInvoice ? (cbConsolidatedData.existingBalance || 0).toFixed(2) : '0.00'}" style="height:44px; font-weight:800; font-size:1.2rem; text-align:right; flex:1;">
+                <input type="number" id="cbOverallPaidAmount" class="cv-form-input" min="0" step="0.01" value="${(cbConsolidatedData.existingBalance != null) ? (cbConsolidatedData.existingBalance || 0).toFixed(2) : Math.max(0, overallSubtotal - (cbConsolidatedData.existingAmountPaid || 0)).toFixed(2)}" style="height:44px; font-weight:800; font-size:1.2rem; text-align:right; flex:1;">
                 <button type="button" id="btnCbPaidDirect" class="cv-btn-paid" style="height:44px; padding:0 1.25rem;">
                   PAID
                 </button>
@@ -18191,13 +18316,13 @@ const Admin = (function () {
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
               <div style="background:#f8fafc; padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--cv-border);">
                 <div style="font-size:0.7rem; color:var(--cv-text-muted); font-weight:700; text-transform:uppercase;">Outstanding Balance</div>
-                <div id="cbOverallBalanceAmt" style="font-size:1.25rem; font-weight:800; color:${(hasExistingInvoice ? (cbConsolidatedData.existingBalance || 0) : overallSubtotal) > 0 ? 'var(--cv-danger)' : '#059669'}; margin-top:0.2rem;">₹${formatCurrency(hasExistingInvoice ? (cbConsolidatedData.existingBalance || 0) : overallSubtotal)}</div>
+                <div id="cbOverallBalanceAmt" style="font-size:1.25rem; font-weight:800; color:${(cbConsolidatedData.existingBalance != null ? cbConsolidatedData.existingBalance : Math.max(0, overallSubtotal - (cbConsolidatedData.existingAmountPaid || 0))) > 0 ? 'var(--cv-danger)' : '#059669'}; margin-top:0.2rem;">₹${formatCurrency(cbConsolidatedData.existingBalance != null ? cbConsolidatedData.existingBalance : Math.max(0, overallSubtotal - (cbConsolidatedData.existingAmountPaid || 0)))}</div>
               </div>
 
               <div style="background:#f8fafc; padding:0.6rem 0.8rem; border-radius:6px; border:1px solid var(--cv-border); display:flex; flex-direction:column; justify-content:center;">
                 <div style="font-size:0.7rem; color:var(--cv-text-muted); font-weight:700; text-transform:uppercase; margin-bottom:0.3rem;">Payment Status</div>
                 <div>
-                  <span id="cbOverallStatusBadge" class="cv-payment-balance-badge ${hasExistingInvoice && (cbConsolidatedData.existingBalance || 0) <= 0 ? 'cv-badge-paid' : ((cbConsolidatedData.existingAmountPaid || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}" style="font-size:0.75rem; padding:0.2rem 0.5rem;">${hasExistingInvoice ? (cbConsolidatedData.existingPaymentStatus || 'UNPAID') : 'UNPAID'}</span>
+                  <span id="cbOverallStatusBadge" class="cv-payment-balance-badge ${(cbConsolidatedData.existingBalance != null ? cbConsolidatedData.existingBalance <= 0 : (cbConsolidatedData.existingAmountPaid || 0) >= overallSubtotal) ? 'cv-badge-paid' : ((cbConsolidatedData.existingAmountPaid || 0) > 0 ? 'cv-badge-part' : 'cv-badge-unpaid')}" style="font-size:0.75rem; padding:0.2rem 0.5rem;">${cbConsolidatedData.existingPaymentStatus || 'UNPAID'}</span>
                 </div>
               </div>
             </div>
@@ -18294,11 +18419,13 @@ const Admin = (function () {
 
     document.getElementById('btnCbPayFullAmount')?.addEventListener('click', () => {
       let curOutstanding = 0;
+      const finalTotalStr = document.getElementById('cbOverallFinalTotal')?.innerText.replace(/[^0-9.-]+/g, "") || "0";
+      const finalTotal = parseFloat(finalTotalStr) || 0;
+      const prevPaid = parseFloat(cbConsolidatedData.existingAmountPaid) || 0;
       if (cbConsolidatedData.existingBillId && cbConsolidatedData.existingBalance != null) {
         curOutstanding = parseFloat(cbConsolidatedData.existingBalance) || 0;
       } else {
-        const finalTotalStr = document.getElementById('cbOverallFinalTotal')?.innerText.replace(/[^0-9.-]+/g, "") || "0";
-        curOutstanding = parseFloat(finalTotalStr) || 0;
+        curOutstanding = Math.max(0, finalTotal - prevPaid);
       }
       const paidInput = document.getElementById('cbOverallPaidAmount');
       if (paidInput) {
@@ -18313,6 +18440,9 @@ const Admin = (function () {
         showCentralInvoiceModal(cbConsolidatedData.existingBillId);
       } else if (activeBillingPatient && (cbConsolidatedData.overallSubtotal || 0) > 0) {
         await handleGenerateCentralBill(false);
+        if (cbConsolidatedData.existingBillId) {
+          showCentralInvoiceModal(cbConsolidatedData.existingBillId);
+        }
       } else {
         alert("No invoice generated yet for this patient. Click 'Submit' first.");
       }
@@ -18324,6 +18454,9 @@ const Admin = (function () {
         printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
       } else if (activeBillingPatient && (cbConsolidatedData.overallSubtotal || 0) > 0) {
         await handleGenerateCentralBill(true);
+        if (cbConsolidatedData.existingBillId) {
+          printDedicatedCentralInvoice(cbConsolidatedData.existingBillId);
+        }
       } else {
         alert("No invoice generated yet for this patient. Click 'Submit' first.");
       }
@@ -18367,14 +18500,14 @@ const Admin = (function () {
     if (payingAmount < 0) payingAmount = 0;
 
     let balance = 0;
-    let prevPaid = 0;
+    const prevPaid = parseFloat(cbConsolidatedData.existingAmountPaid) || 0;
     if (cbConsolidatedData.existingBillId) {
-      prevPaid = parseFloat(cbConsolidatedData.existingAmountPaid) || 0;
       const currentOutstanding = (cbConsolidatedData.existingBalance != null)
         ? parseFloat(cbConsolidatedData.existingBalance) : Math.max(0, finalTotal - prevPaid);
       balance = parseFloat(Math.max(0, currentOutstanding - payingAmount).toFixed(2));
     } else {
-      balance = parseFloat(Math.max(0, finalTotal - payingAmount).toFixed(2));
+      const currentOutstanding = Math.max(0, finalTotal - prevPaid);
+      balance = parseFloat(Math.max(0, currentOutstanding - payingAmount).toFixed(2));
     }
 
     const balEl = document.getElementById('cbOverallBalanceAmt');
@@ -18510,10 +18643,11 @@ const Admin = (function () {
     const netAmount = Math.max(0, subtotal - discountAmount);
     const gstPct = parseFloat(document.getElementById('cbOverallGstPct')?.value) || 0;
     const gstAmount = parseFloat(((netAmount * gstPct) / 100).toFixed(2));
-    const finalTotal = parseFloat((netAmount + gstAmount).toFixed(2));
-    const amountPaid = parseFloat(amountPaidStr) || 0;
+    const payingNow = parseFloat(amountPaidStr) || 0;
+    const prevPaid = parseFloat(cbConsolidatedData.existingAmountPaid) || 0;
+    const totalAmountPaid = parseFloat(Math.min(finalTotal, prevPaid + payingNow).toFixed(2));
 
-    if (amountPaid > finalTotal + 0.001) {
+    if (payingNow > (finalTotal - prevPaid) + 0.001) {
       showToast('Payment amount cannot exceed the outstanding balance.', 'danger');
       return;
     }
@@ -18550,7 +18684,7 @@ const Admin = (function () {
       gstPct,
       gstAmount,
       finalTotal,
-      amountPaid,
+      amountPaid: totalAmountPaid,
       gstNumber: document.getElementById('cbOverallGstNumber')?.value.trim() || '',
       paymentMethod,
       notes,
@@ -18616,6 +18750,10 @@ const Admin = (function () {
 
         await loadBillingSummaryData();
         updateBillingKpiValues();
+
+        if (isPrintAfter && res.data && res.data.id) {
+          printDedicatedCentralInvoice(res.data.id);
+        }
       } else {
         showToast('Could not generate Central Bill: ' + (res?.message || 'Error'), 'danger');
       }
@@ -18872,6 +19010,12 @@ const Admin = (function () {
         }
       }
 
+      const hasOp = (bill.opRecords && bill.opRecords.length > 0) || (bill.items && bill.items.some(i => i.moduleType === 'OP'));
+      const hasIp = (bill.ipRecords && bill.ipRecords.length > 0) || (bill.items && bill.items.some(i => i.moduleType === 'IP'));
+      const hasPharmacy = (bill.pharmacyBills && bill.pharmacyBills.length > 0) || (bill.items && bill.items.some(i => i.moduleType === 'PHARMACY'));
+      const hasLab = (bill.labOrders && bill.labOrders.length > 0) || (bill.items && bill.items.some(i => i.moduleType === 'LABORATORY'));
+      const isOpOnly = hasOp && !hasIp && !hasPharmacy && !hasLab;
+
       const modalHtml = `
         <div id="centralInvoiceModalOverlay" class="cv-invoice-modal-overlay">
           <div class="cv-invoice-paper" style="max-width:920px; width:95%; max-height:92vh; display:flex; flex-direction:column; overflow:hidden;">
@@ -18880,7 +19024,7 @@ const Admin = (function () {
               <div style="display:flex; align-items:center; gap:0.6rem;">
                 <svg style="width:22px; height:22px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 <h3 style="margin:0; font-size:1.1rem; color:var(--cv-text-primary); font-weight:700;">
-                  Central Tax Invoice: ${escapeHtml(bill.invoiceNumber || bill.billNumber)}
+                  ${isOpOnly ? 'OP Registration / Consultation Bill: ' : 'Central Tax Invoice: '}${escapeHtml(bill.invoiceNumber || bill.billNumber)}
                 </h3>
               </div>
 
