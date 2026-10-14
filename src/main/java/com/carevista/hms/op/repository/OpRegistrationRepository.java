@@ -50,4 +50,21 @@ public interface OpRegistrationRepository extends JpaRepository<OpRegistration, 
            "LOWER(r.department) LIKE LOWER(CONCAT('%', :query, '%'))" +
            ") ORDER BY r.createdAt DESC")
     List<OpRegistration> searchOpRegistrations(@Param("tenantId") Long tenantId, @Param("query") String query);
+
+    @Query("SELECT r FROM OpRegistration r WHERE r.tenant.id = :tenantId AND " +
+           "(:startDate IS NULL OR r.visitDate >= :startDate) AND " +
+           "(:endDate IS NULL OR r.visitDate <= :endDate) AND (" +
+           ":query IS NULL OR :query = '' OR " +
+           "LOWER(r.opId) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(r.patient.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(r.patient.uhid) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "r.patient.phone LIKE CONCAT('%', :query, '%') OR " +
+           "LOWER(r.doctorName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(r.department) LIKE LOWER(CONCAT('%', :query, '%'))" +
+           ") ORDER BY r.visitDate DESC, r.createdAt DESC")
+    List<OpRegistration> searchOpRegistrationsWithDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("query") String query,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

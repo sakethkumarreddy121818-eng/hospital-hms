@@ -2825,9 +2825,66 @@ const Admin = (function () {
               </div>
             </div>
 
-            <div class="cv-form-group" style="margin-bottom:0;">
-              <label class="cv-form-label" for="opFeeInput">Consultation Fee (&#8377;)</label>
-              <input type="number" id="opFeeInput" class="cv-input" value="0.00" min="0" step="any">
+            <!-- Professional Consultation Fee & Discount Section -->
+            <div class="cv-consultation-billing-box" style="margin-top:1.15rem; padding:1rem 1.15rem; background:linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.9)); border:1px solid var(--cv-border); border-radius:var(--cv-radius-md, 10px);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; padding-bottom:0.5rem; border-bottom:1px solid #e2e8f0;">
+                <span style="font-size:0.85rem; font-weight:700; color:var(--cv-deep-blue); display:flex; align-items:center; gap:0.4rem;">
+                  <svg style="width:16px; height:16px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                  Consultation Fee &amp; Discount
+                </span>
+                <span id="opFeeStatusBadge" class="cv-op-section-badge" style="background:#eff6ff; color:#1d4ed8; font-size:0.72rem;">Database Auto-Retrieved</span>
+              </div>
+
+              <!-- Row 1: Doctor's Consultation Fee & Discount Type -->
+              <div class="cv-op-fields-row" style="margin-bottom:0.75rem;">
+                <div class="cv-form-group" style="margin-bottom:0;">
+                  <label class="cv-form-label" for="opOriginalFeeInput">Doctor's Consultation Fee</label>
+                  <div style="position:relative;">
+                    <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-weight:700; color:var(--cv-text-muted);">₹</span>
+                    <input type="text" id="opOriginalFeeInput" class="cv-input cv-op-input-readonly" readonly value="0.00" style="padding-left:1.75rem; font-weight:700; background:#f1f5f9; color:#0f172a;" placeholder="Select doctor">
+                  </div>
+                  <input type="hidden" id="opFeeInput" value="0.00">
+                </div>
+
+                <div class="cv-form-group" style="margin-bottom:0;">
+                  <label class="cv-form-label" for="opDiscountType">Discount Type</label>
+                  <select id="opDiscountType" class="cv-input" style="font-weight:600;">
+                    <option value="NO_DISCOUNT">No Discount</option>
+                    <option value="FIXED">Fixed Amount (₹)</option>
+                    <option value="PERCENTAGE">Percentage (%)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 2: Discount Value & Discount Amount -->
+              <div class="cv-op-fields-row" style="margin-bottom:0.75rem;">
+                <div class="cv-form-group" style="margin-bottom:0;">
+                  <label class="cv-form-label" for="opDiscountValue" id="lblDiscountValue">Discount Value</label>
+                  <div style="position:relative;">
+                    <span id="opDiscountPrefix" style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-weight:700; color:var(--cv-text-muted); display:none;">₹</span>
+                    <input type="number" id="opDiscountValue" class="cv-input" value="0" min="0" step="any" disabled style="padding-left:0.75rem; font-weight:600;" placeholder="0">
+                    <span id="opDiscountSuffix" style="position:absolute; right:0.75rem; top:50%; transform:translateY(-50%); font-weight:700; color:var(--cv-text-muted); display:none;">%</span>
+                  </div>
+                  <span class="cv-feedback-error" id="errDiscountValue">Invalid discount value.</span>
+                </div>
+
+                <div class="cv-form-group" style="margin-bottom:0;">
+                  <label class="cv-form-label" for="opDiscountAmountDisplay">Discount Amount</label>
+                  <div style="position:relative;">
+                    <span style="position:absolute; left:0.75rem; top:50%; transform:translateY(-50%); font-weight:700; color:#ef4444;">-₹</span>
+                    <input type="text" id="opDiscountAmountDisplay" class="cv-input cv-op-input-readonly" readonly value="0.00" style="padding-left:2rem; font-weight:700; color:#ef4444; background:#fef2f2;">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 3: Final Consultation Amount Highlight Banner -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.6rem; padding:0.65rem 0.9rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                <div>
+                  <div style="font-size:0.75rem; font-weight:700; color:var(--cv-text-muted); text-transform:uppercase; letter-spacing:0.04em;">Final Consultation Amount</div>
+                  <div style="font-size:0.72rem; color:var(--cv-text-secondary); margin-top:0.1rem;" id="opDiscountBreakdownText">Original Fee: ₹0.00 &bull; No discount applied</div>
+                </div>
+                <div style="font-size:1.35rem; font-weight:800; color:#059669;" id="opFinalAmountDisplay">₹0.00</div>
+              </div>
             </div>
           </div>
 
@@ -2865,6 +2922,7 @@ const Admin = (function () {
 
     setupPatientSearchEvents();
     loadDoctorDropdown();
+    setupOpDiscountEvents();
     setupOpFormSubmission();
     setupOpFormEnterNavigation();
 
@@ -3136,7 +3194,152 @@ const Admin = (function () {
       btnUnpaid.innerHTML = 'UNPAID';
       delete btnUnpaid.dataset.processing;
     }
+    resetOpDiscountFields(0.0);
     updateOpSummaryDisplay();
+  }
+
+  function resetOpDiscountFields(doctorFee = 0.0) {
+    const origFeeInput = document.getElementById('opOriginalFeeInput');
+    const feeInput = document.getElementById('opFeeInput');
+    const discountTypeSelect = document.getElementById('opDiscountType');
+    const discountValueInput = document.getElementById('opDiscountValue');
+    const discountAmountDisplay = document.getElementById('opDiscountAmountDisplay');
+    const finalAmountDisplay = document.getElementById('opFinalAmountDisplay');
+    const breakdownText = document.getElementById('opDiscountBreakdownText');
+    const prefix = document.getElementById('opDiscountPrefix');
+    const suffix = document.getElementById('opDiscountSuffix');
+    const errDiscount = document.getElementById('errDiscountValue');
+
+    if (origFeeInput) origFeeInput.value = doctorFee.toFixed(2);
+    if (feeInput) feeInput.value = doctorFee.toFixed(2);
+    if (discountTypeSelect) discountTypeSelect.value = 'NO_DISCOUNT';
+    if (discountValueInput) {
+      discountValueInput.value = '0';
+      discountValueInput.disabled = true;
+      discountValueInput.style.paddingLeft = '0.75rem';
+      discountValueInput.classList.remove('is-invalid');
+    }
+    if (prefix) prefix.style.display = 'none';
+    if (suffix) suffix.style.display = 'none';
+    if (discountAmountDisplay) discountAmountDisplay.value = '0.00';
+    if (finalAmountDisplay) finalAmountDisplay.textContent = '₹' + formatCurrency(doctorFee);
+    if (breakdownText) breakdownText.textContent = `Original Fee: ₹${formatCurrency(doctorFee)} • No discount applied`;
+    if (errDiscount) {
+      errDiscount.classList.remove('show');
+      errDiscount.textContent = '';
+    }
+  }
+
+  function calculateOpConsultationDiscount() {
+    const origFeeInput = document.getElementById('opOriginalFeeInput');
+    const origFee = origFeeInput ? parseFloat(origFeeInput.value) || 0.0 : 0.0;
+
+    const discountTypeSelect = document.getElementById('opDiscountType');
+    const discountType = discountTypeSelect ? discountTypeSelect.value : 'NO_DISCOUNT';
+
+    const discountValueInput = document.getElementById('opDiscountValue');
+    const prefix = document.getElementById('opDiscountPrefix');
+    const suffix = document.getElementById('opDiscountSuffix');
+    const discountAmountDisplay = document.getElementById('opDiscountAmountDisplay');
+    const finalAmountDisplay = document.getElementById('opFinalAmountDisplay');
+    const breakdownText = document.getElementById('opDiscountBreakdownText');
+    const feeInput = document.getElementById('opFeeInput');
+    const errDiscount = document.getElementById('errDiscountValue');
+
+    if (errDiscount) {
+      errDiscount.classList.remove('show');
+      errDiscount.textContent = '';
+    }
+    if (discountValueInput) {
+      discountValueInput.classList.remove('is-invalid');
+    }
+
+    let discountAmount = 0.0;
+    let finalFee = origFee;
+    let rawVal = discountValueInput ? parseFloat(discountValueInput.value) : 0.0;
+    if (isNaN(rawVal) || rawVal < 0) rawVal = 0.0;
+
+    if (discountType === 'NO_DISCOUNT') {
+      if (discountValueInput) {
+        discountValueInput.disabled = true;
+        discountValueInput.value = '0';
+        discountValueInput.style.paddingLeft = '0.75rem';
+      }
+      if (prefix) prefix.style.display = 'none';
+      if (suffix) suffix.style.display = 'none';
+      discountAmount = 0.0;
+      finalFee = origFee;
+      if (breakdownText) {
+        breakdownText.textContent = `Original Fee: ₹${formatCurrency(origFee)} • No discount applied`;
+      }
+    } else if (discountType === 'FIXED') {
+      if (discountValueInput) {
+        discountValueInput.disabled = false;
+        discountValueInput.style.paddingLeft = '1.75rem';
+      }
+      if (prefix) prefix.style.display = 'block';
+      if (suffix) suffix.style.display = 'none';
+
+      if (rawVal > origFee) {
+        if (errDiscount) {
+          errDiscount.textContent = `Fixed discount (₹${rawVal.toFixed(2)}) cannot exceed doctor fee of ₹${formatCurrency(origFee)}.`;
+          errDiscount.classList.add('show');
+        }
+        if (discountValueInput) discountValueInput.classList.add('is-invalid');
+        discountAmount = origFee;
+        finalFee = 0.0;
+      } else {
+        discountAmount = Math.round(rawVal * 100) / 100;
+        finalFee = Math.max(0, Math.round((origFee - discountAmount) * 100) / 100);
+      }
+      if (breakdownText) {
+        breakdownText.textContent = `Original Fee: ₹${formatCurrency(origFee)} • Fixed Discount: -₹${formatCurrency(discountAmount)}`;
+      }
+    } else if (discountType === 'PERCENTAGE') {
+      if (discountValueInput) {
+        discountValueInput.disabled = false;
+        discountValueInput.style.paddingLeft = '0.75rem';
+      }
+      if (prefix) prefix.style.display = 'none';
+      if (suffix) suffix.style.display = 'block';
+
+      if (rawVal > 100) {
+        if (errDiscount) {
+          errDiscount.textContent = 'Discount percentage cannot exceed 100%.';
+          errDiscount.classList.add('show');
+        }
+        if (discountValueInput) discountValueInput.classList.add('is-invalid');
+        discountAmount = origFee;
+        finalFee = 0.0;
+      } else {
+        discountAmount = Math.round((origFee * rawVal / 100.0) * 100) / 100;
+        finalFee = Math.max(0, Math.round((origFee - discountAmount) * 100) / 100);
+      }
+      if (breakdownText) {
+        breakdownText.textContent = `Original Fee: ₹${formatCurrency(origFee)} • Discount (${rawVal}%): -₹${formatCurrency(discountAmount)}`;
+      }
+    }
+
+    if (discountAmountDisplay) discountAmountDisplay.value = discountAmount.toFixed(2);
+    if (finalAmountDisplay) finalAmountDisplay.textContent = '₹' + formatCurrency(finalFee);
+    if (feeInput) feeInput.value = finalFee.toFixed(2);
+  }
+
+  function setupOpDiscountEvents() {
+    const discountTypeSelect = document.getElementById('opDiscountType');
+    const discountValueInput = document.getElementById('opDiscountValue');
+
+    discountTypeSelect?.addEventListener('change', () => {
+      calculateOpConsultationDiscount();
+      if (discountTypeSelect.value !== 'NO_DISCOUNT') {
+        discountValueInput?.focus();
+        discountValueInput?.select();
+      }
+    });
+
+    discountValueInput?.addEventListener('input', () => {
+      calculateOpConsultationDiscount();
+    });
   }
 
   async function loadDoctorDropdown() {
@@ -3170,20 +3373,19 @@ const Admin = (function () {
             const dept = selectedOption.dataset.dept || '';
             const room = selectedOption.dataset.room || '';
             const fee = selectedOption.dataset.fee || '0.00';
+            const parsedFee = parseFloat(fee) || 0.0;
 
             document.getElementById('opDepartmentInput').value = dept;
             document.getElementById('opRoomNumberInput').value = room;
-            document.getElementById('opFeeInput').value = fee;
-            const paidInput = document.getElementById('opAmountPaid');
-            if (paidInput) paidInput.value = fee;
             document.getElementById('errDoctor')?.classList.remove('show');
             docSelect.classList.remove('is-invalid');
+
+            // Reset discount with new doctor's fee to prevent leakage across doctors/patients
+            resetOpDiscountFields(parsedFee);
           } else {
             document.getElementById('opDepartmentInput').value = '';
             document.getElementById('opRoomNumberInput').value = '';
-            document.getElementById('opFeeInput').value = '0.00';
-            const paidInput = document.getElementById('opAmountPaid');
-            if (paidInput) paidInput.value = '0.00';
+            resetOpDiscountFields(0.0);
           }
           updateOpSummaryDisplay();
         });
@@ -3245,6 +3447,14 @@ const Admin = (function () {
               <span style="color:#64748b;">Consulting Doctor:</span>
               <strong style="color:#0f172a;">Dr. ${escapeHtml(op.doctorName)} <span style="font-weight:normal; color:#64748b;">(${escapeHtml(op.department || 'General')})</span></strong>
             </div>
+            ${Number(op.discountAmount || 0) > 0 ? `
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.35rem;">
+              <span style="color:#64748b;">Doctor Fee &amp; Discount:</span>
+              <span style="color:#0f172a; font-weight:600;">
+                ₹${formatCurrency(op.originalFee || totalFee)}
+                <span style="color:#ef4444; font-weight:700;">(-₹${formatCurrency(op.discountAmount)} ${escapeHtml(op.discountType === 'PERCENTAGE' ? op.discountValue + '%' : 'disc')})</span>
+              </span>
+            </div>` : ''}
             <div style="display:flex; justify-content:space-between;">
               <span style="color:#64748b;">Date &amp; Time:</span>
               <span style="color:#334155; font-weight:600;">${formatDDMMYYYY(new Date())}</span>
@@ -3254,8 +3464,9 @@ const Admin = (function () {
           <!-- Billing Financial Overview -->
           <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:0.75rem; margin-bottom:1.25rem;">
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
-              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Total Payable</div>
+              <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Final Payable</div>
               <div style="font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:0.25rem;">₹${formatCurrency(totalFee)}</div>
+              ${Number(op.discountAmount || 0) > 0 ? `<div style="font-size:0.68rem; color:#ef4444; font-weight:700;">(Orig: ₹${formatCurrency(op.originalFee || totalFee)})</div>` : ''}
             </div>
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.75rem; text-align:center;">
               <div style="font-size:0.68rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Previously Paid</div>
@@ -3303,7 +3514,7 @@ const Admin = (function () {
           </div>
 
           <div id="opModalPaidBanner" style="display:${isPaid ? 'block' : 'none'}; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:0.85rem; text-align:center; color:#065f46; font-size:0.88rem; font-weight:700; margin-top:0.75rem;">
-            ✓ OP Invoice Fully Settled (₹${formatCurrency(totalFee)} collected)
+            ${totalFee === 0 && Number(op.discountAmount || 0) > 0 ? '✓ OP Consultation 100% Discounted (Free Consultation Settled)' : `✓ OP Invoice Fully Settled (₹${formatCurrency(totalFee)} collected)`}
           </div>
         </div>
 
@@ -3455,9 +3666,10 @@ const Admin = (function () {
       'opPatientEmail',      // 5. Patient Email ID (Optional)
       'opVisitType',         // 6. Consultation Type
       'opDoctorSelect',      // 7. Attending Doctor
-      'opFeeInput',          // 8. Consultation Fee
-      'opAddressInput',      // 9. Residential Address
-      'opNotesInput'         // 10. Clinical Triage / Notes (Last field)
+      'opDiscountType',      // 8. Discount Type
+      'opDiscountValue',     // 9. Discount Value
+      'opAddressInput',      // 10. Residential Address
+      'opNotesInput'         // 11. Clinical Triage / Notes (Last field)
     ];
 
     form.addEventListener('keydown', (e) => {
@@ -3553,7 +3765,15 @@ const Admin = (function () {
       const address = document.getElementById('opAddressInput')?.value?.trim();
       const notes = document.getElementById('opNotesInput')?.value?.trim();
       const feeStr = document.getElementById('opFeeInput')?.value?.trim() || '0';
+      const originalFeeStr = document.getElementById('opOriginalFeeInput')?.value?.trim() || '0';
+      const discountType = document.getElementById('opDiscountType')?.value || 'NO_DISCOUNT';
+      const discountValStr = document.getElementById('opDiscountValue')?.value?.trim() || '0';
+      const discountAmountDisplayStr = document.getElementById('opDiscountAmountDisplay')?.value?.trim() || '0';
       const existingUhid = opLoadedPatient ? opLoadedPatient.uhid : document.getElementById('opPatientUhid')?.value?.trim();
+
+      const originalFee = parseFloat(originalFeeStr) || 0.0;
+      const discountValue = parseFloat(discountValStr) || 0.0;
+      const discountAmount = parseFloat(discountAmountDisplayStr) || 0.0;
 
       const vName = validatePatientName(rawPatientName, true);
       const vAge = validatePatientAge(rawAgeStr, true);
@@ -3600,6 +3820,36 @@ const Admin = (function () {
         document.getElementById('opDoctorSelect')?.classList.add('is-invalid');
         document.getElementById('errDoctor')?.classList.add('show');
         isValid = false;
+      } else if (originalFee <= 0) {
+        const errDoctor = document.getElementById('errDoctor');
+        if (errDoctor) {
+          errDoctor.textContent = 'Selected doctor has no valid consultation fee configured.';
+          errDoctor.classList.add('show');
+        }
+        document.getElementById('opDoctorSelect')?.classList.add('is-invalid');
+        isValid = false;
+      }
+
+      if (discountType === 'FIXED') {
+        if (discountValue < 0 || discountValue > originalFee) {
+          const errDiscount = document.getElementById('errDiscountValue');
+          if (errDiscount) {
+            errDiscount.textContent = `Fixed discount (₹${discountValue}) cannot exceed original fee (₹${formatCurrency(originalFee)}).`;
+            errDiscount.classList.add('show');
+          }
+          document.getElementById('opDiscountValue')?.classList.add('is-invalid');
+          isValid = false;
+        }
+      } else if (discountType === 'PERCENTAGE') {
+        if (discountValue < 0 || discountValue > 100) {
+          const errDiscount = document.getElementById('errDiscountValue');
+          if (errDiscount) {
+            errDiscount.textContent = 'Discount percentage must be between 0 and 100.';
+            errDiscount.classList.add('show');
+          }
+          document.getElementById('opDiscountValue')?.classList.add('is-invalid');
+          isValid = false;
+        }
       }
 
       const totalFee = parseFloat(feeStr);
@@ -3634,6 +3884,10 @@ const Admin = (function () {
         doctorName: doctorName,
         department: department || 'General Medicine',
         consultationFee: totalFee,
+        originalFee: originalFee,
+        discountType: discountType,
+        discountValue: discountValue,
+        discountAmount: discountAmount,
         paidAmount: 0.0,
         paymentMethod: 'CASH',
         paymentStatus: 'UNPAID',
@@ -3696,6 +3950,41 @@ const Admin = (function () {
   // ====================================================================
   let opHistoryPagination = null;
   let opHistoryRawList = [];
+  let opHistoryPeriod = 'TODAY'; // TODAY, YESTERDAY, ONE_WEEK, CUSTOM, ALL
+  let opHistoryCustomStart = '';
+  let opHistoryCustomEnd = '';
+
+  function getOpFilterPeriodDescription() {
+    const today = new Date();
+    const formatDate = (d) => {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    if (opHistoryPeriod === 'TODAY') {
+      return `Registrations for Today (${formatDate(today)})`;
+    } else if (opHistoryPeriod === 'YESTERDAY') {
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      return `Registrations for Yesterday (${formatDate(yest)})`;
+    } else if (opHistoryPeriod === 'ONE_WEEK') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 6);
+      return `Registrations for Past 7 Days (${formatDate(weekAgo)} to ${formatDate(today)})`;
+    } else if (opHistoryPeriod === 'CUSTOM') {
+      if (opHistoryCustomStart && opHistoryCustomEnd) {
+        return `Custom Range: ${opHistoryCustomStart} to ${opHistoryCustomEnd}`;
+      } else if (opHistoryCustomStart) {
+        return `Custom Date: ${opHistoryCustomStart}`;
+      }
+      return 'Custom Date Range';
+    } else if (opHistoryPeriod === 'ALL') {
+      return 'All Historical OP Registrations';
+    }
+    return '';
+  }
 
   function renderOpHistoryTab() {
     const tabContent = document.getElementById('opTabContent');
@@ -3717,9 +4006,41 @@ const Admin = (function () {
 
     tabContent.innerHTML = `
       <div class="cv-op-section-card">
-        <div class="cv-op-section-header">
-          <span>Outpatient (OP) Registration History & Records</span>
-          <span class="cv-op-section-badge" style="background:#eff6ff; color:#1d4ed8;">Real MySQL Records</span>
+        <div class="cv-op-section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <span>Outpatient (OP) Registration History & Records</span>
+            <span id="opHistoryCountBadge" class="cv-op-section-badge" style="background:#eff6ff; color:#1d4ed8;">Loading...</span>
+          </div>
+          <span style="font-size:0.8rem; color:var(--cv-text-muted);">Real-time MySQL Database Filtering</span>
+        </div>
+
+        <!-- Filter Controls Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+          <div class="cv-filter-group" id="opHistoryPeriodFilters">
+            <button type="button" class="cv-filter-btn ${opHistoryPeriod === 'TODAY' ? 'active' : ''}" data-period="TODAY">Today</button>
+            <button type="button" class="cv-filter-btn ${opHistoryPeriod === 'YESTERDAY' ? 'active' : ''}" data-period="YESTERDAY">Yesterday</button>
+            <button type="button" class="cv-filter-btn ${opHistoryPeriod === 'ONE_WEEK' ? 'active' : ''}" data-period="ONE_WEEK">One Week</button>
+            <button type="button" class="cv-filter-btn ${opHistoryPeriod === 'CUSTOM' ? 'active' : ''}" data-period="CUSTOM">Custom Date</button>
+            <button type="button" class="cv-filter-btn ${opHistoryPeriod === 'ALL' ? 'active' : ''}" data-period="ALL">All Records</button>
+          </div>
+          <div id="opHistoryActiveRangeText" style="font-size:0.82rem; font-weight:600; color:var(--cv-primary); display:flex; align-items:center; gap:0.35rem;">
+            <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span>${escapeHtml(getOpFilterPeriodDescription())}</span>
+          </div>
+        </div>
+
+        <!-- Collapsible Custom Date Container -->
+        <div id="opCustomDateContainer" style="display:${opHistoryPeriod === 'CUSTOM' ? 'flex' : 'none'}; align-items:center; gap:0.75rem; margin-bottom:1rem; padding:0.75rem 1rem; background:var(--cv-surface); border:1px solid var(--cv-border); border-radius:var(--cv-radius-md); flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <label for="opCustomStartDate" style="font-size:0.82rem; font-weight:600; color:var(--cv-text-secondary);">From:</label>
+            <input type="date" id="opCustomStartDate" class="cv-input" style="padding:0.4rem 0.65rem; font-size:0.84rem; width:auto;" value="${escapeHtml(opHistoryCustomStart)}">
+          </div>
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <label for="opCustomEndDate" style="font-size:0.82rem; font-weight:600; color:var(--cv-text-secondary);">To:</label>
+            <input type="date" id="opCustomEndDate" class="cv-input" style="padding:0.4rem 0.65rem; font-size:0.84rem; width:auto;" value="${escapeHtml(opHistoryCustomEnd)}">
+          </div>
+          <button type="button" id="btnApplyOpCustomDate" class="cv-btn-primary" style="padding:0.45rem 1rem; font-size:0.82rem;">Apply Filter</button>
+          <span id="opCustomDateError" style="font-size:0.8rem; color:var(--cv-danger); display:none; font-weight:600;"></span>
         </div>
 
         <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap;">
@@ -3761,6 +4082,87 @@ const Admin = (function () {
       </div>
     `;
 
+    // Bind period filter buttons
+    const periodButtons = document.querySelectorAll('#opHistoryPeriodFilters .cv-filter-btn');
+    periodButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const period = btn.dataset.period;
+        if (!period) return;
+        opHistoryPeriod = period;
+
+        periodButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const customContainer = document.getElementById('opCustomDateContainer');
+        if (customContainer) {
+          customContainer.style.display = (period === 'CUSTOM') ? 'flex' : 'none';
+        }
+
+        const rangeText = document.getElementById('opHistoryActiveRangeText');
+        if (rangeText) {
+          rangeText.innerHTML = `<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>${escapeHtml(getOpFilterPeriodDescription())}</span>`;
+        }
+
+        if (period !== 'CUSTOM') {
+          const searchInput = document.getElementById('opHistorySearchInput');
+          loadOpHistoryList(searchInput ? searchInput.value.trim() : '');
+        } else {
+          // If custom date already has inputs, load, otherwise focus start input
+          const startInput = document.getElementById('opCustomStartDate');
+          const endInput = document.getElementById('opCustomEndDate');
+          if (startInput && endInput && (startInput.value || endInput.value)) {
+            opHistoryCustomStart = startInput.value;
+            opHistoryCustomEnd = endInput.value;
+            const searchInput = document.getElementById('opHistorySearchInput');
+            loadOpHistoryList(searchInput ? searchInput.value.trim() : '');
+          } else {
+            startInput?.focus();
+          }
+        }
+      });
+    });
+
+    // Bind custom date apply button
+    document.getElementById('btnApplyOpCustomDate')?.addEventListener('click', () => {
+      const startInput = document.getElementById('opCustomStartDate');
+      const endInput = document.getElementById('opCustomEndDate');
+      const errEl = document.getElementById('opCustomDateError');
+      const startVal = startInput ? startInput.value.trim() : '';
+      const endVal = endInput ? endInput.value.trim() : '';
+
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+
+      if (!startVal && !endVal) {
+        if (errEl) {
+          errEl.textContent = 'Please select at least one date.';
+          errEl.style.display = 'inline';
+        }
+        return;
+      }
+
+      if (startVal && endVal && startVal > endVal) {
+        if (errEl) {
+          errEl.textContent = 'Start date cannot be after end date.';
+          errEl.style.display = 'inline';
+        }
+        return;
+      }
+
+      opHistoryCustomStart = startVal;
+      opHistoryCustomEnd = endVal;
+
+      const rangeText = document.getElementById('opHistoryActiveRangeText');
+      if (rangeText) {
+        rangeText.innerHTML = `<svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>${escapeHtml(getOpFilterPeriodDescription())}</span>`;
+      }
+
+      const searchInput = document.getElementById('opHistorySearchInput');
+      loadOpHistoryList(searchInput ? searchInput.value.trim() : '');
+    });
+
     loadOpHistoryList();
 
     const searchInput = document.getElementById('opHistorySearchInput');
@@ -3794,10 +4196,45 @@ const Admin = (function () {
     if (!tbody) return;
 
     if (!items || items.length === 0) {
+      let emptyTitle = 'No OP registration records found.';
+      let emptySubtitle = '';
+
+      if (opHistoryPeriod === 'TODAY') {
+        emptyTitle = 'No OP registrations created today.';
+        emptySubtitle = 'No patients registered for outpatient consultation today. Select "Yesterday", "One Week", or "All Records" to view past registrations, or register a new Outpatient.';
+      } else if (opHistoryPeriod === 'YESTERDAY') {
+        emptyTitle = 'No OP registrations found for yesterday.';
+        emptySubtitle = 'There are no outpatient registration records on file for yesterday.';
+      } else if (opHistoryPeriod === 'ONE_WEEK') {
+        emptyTitle = 'No OP registrations found in the last 7 days.';
+        emptySubtitle = 'There are no outpatient registrations recorded during the past 7 days.';
+      } else if (opHistoryPeriod === 'CUSTOM') {
+        emptyTitle = 'No OP registrations found for the selected date range.';
+        emptySubtitle = (opHistoryCustomStart && opHistoryCustomEnd)
+          ? `Date range: ${escapeHtml(opHistoryCustomStart)} to ${escapeHtml(opHistoryCustomEnd)}.`
+          : 'Please refine your custom date filter.';
+      } else if (opHistoryPeriod === 'ALL') {
+        emptyTitle = 'No OP registration records found.';
+        emptySubtitle = 'No outpatient records exist in the database for this hospital.';
+      }
+
+      const searchInput = document.getElementById('opHistorySearchInput');
+      const query = searchInput ? searchInput.value.trim() : '';
+      if (query) {
+        emptyTitle = `No matching OP records found for "${escapeHtml(query)}"`;
+        emptySubtitle = `Try checking the spelling or changing the date filter (currently: ${escapeHtml(opHistoryPeriod)}).`;
+      }
+
       tbody.innerHTML = `
         <tr>
-          <td colspan="9" style="text-align:center; padding:2rem; color:var(--cv-text-muted);">
-            No OP registration records found.
+          <td colspan="9" style="text-align:center; padding:3rem 1.5rem; color:var(--cv-text-muted);">
+            <div style="font-size:2rem; margin-bottom:0.5rem; opacity:0.6;">📋</div>
+            <div style="font-weight:700; color:var(--cv-deep-blue); font-size:1rem; margin-bottom:0.25rem;">
+              ${emptyTitle}
+            </div>
+            <div style="font-size:0.84rem; max-width:480px; margin:0 auto; line-height:1.4;">
+              ${emptySubtitle}
+            </div>
           </td>
         </tr>
       `;
@@ -3829,6 +4266,7 @@ const Admin = (function () {
         </td>
         <td>
           <div style="font-weight:700; color:#059669;">&#8377;${formatCurrency(item.consultationFee)}</div>
+          ${Number(item.discountAmount || 0) > 0 ? `<div style="font-size:0.72rem; color:#dc2626; font-weight:600;">Disc: -₹${formatCurrency(item.discountAmount)}</div>` : ''}
           <div style="font-size:0.73rem; color:var(--cv-text-muted);">${escapeHtml(item.paymentMethod || 'CASH')}</div>
         </td>
         <td>
@@ -3868,10 +4306,28 @@ const Admin = (function () {
     if (!tbody) return;
 
     try {
-      const url = '/api/op/history' + (query ? '?q=' + encodeURIComponent(query) : '');
+      const params = new URLSearchParams();
+      params.append('period', opHistoryPeriod);
+      if (query) {
+        params.append('q', query);
+      }
+      if (opHistoryPeriod === 'CUSTOM') {
+        if (opHistoryCustomStart) params.append('startDate', opHistoryCustomStart);
+        if (opHistoryCustomEnd) params.append('endDate', opHistoryCustomEnd);
+      }
+
+      const url = '/api/op/history?' + params.toString();
       const res = await Api.get(url);
       if (res.ok && res.data) {
         opHistoryRawList = res.data;
+
+        // Update count badge
+        const badge = document.getElementById('opHistoryCountBadge');
+        if (badge) {
+          const count = opHistoryRawList.length;
+          badge.textContent = `${count} ${count === 1 ? 'Record' : 'Records'}`;
+        }
+
         if (!opHistoryPagination) {
           opHistoryPagination = createHistoryPaginationController({
             defaultPageSize: 10,
@@ -3893,12 +4349,16 @@ const Admin = (function () {
           opHistoryPagination.bindEvents('opHistory');
         }
       } else {
+        const badge = document.getElementById('opHistoryCountBadge');
+        if (badge) badge.textContent = '0 Records';
         renderOpHistoryTableRows([]);
         const mount = document.getElementById('opHistoryPaginationMount');
         if (mount) mount.innerHTML = '';
       }
     } catch (err) {
       console.error('Error fetching OP history:', err);
+      const badge = document.getElementById('opHistoryCountBadge');
+      if (badge) badge.textContent = 'Error';
       tbody.innerHTML = `
         <tr>
           <td colspan="9" style="text-align:center; padding:2rem; color:var(--cv-danger);">
@@ -3984,9 +4444,20 @@ const Admin = (function () {
                 <p style="margin-top:0.25rem; color:var(--cv-text-primary);">${escapeHtml(op.address || 'No residential address recorded.')}</p>
               </div>
 
-              <div class="cv-receipt-fee-box" style="margin-top:1.25rem;">
-                <span class="cv-receipt-fee-label">Consultation Fee</span>
-                <span class="cv-receipt-fee-amount">&#8377;${formatCurrency(op.consultationFee)}</span>
+              <div class="cv-receipt-fee-box" style="margin-top:1.25rem; display:block;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                  <span class="cv-receipt-label" style="margin:0;">Doctor's Consultation Fee:</span>
+                  <span style="font-weight:600; color:#475569;">&#8377;${formatCurrency(op.originalFee || op.consultationFee)}</span>
+                </div>
+                ${Number(op.discountAmount || 0) > 0 ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; color:#dc2626;">
+                  <span class="cv-receipt-label" style="margin:0; color:#dc2626;">Discount (${escapeHtml(op.discountType || '')} ${op.discountValue ? (op.discountType === 'PERCENTAGE' ? op.discountValue + '%' : '₹' + op.discountValue) : ''}):</span>
+                  <span style="font-weight:700;">-&#8377;${formatCurrency(op.discountAmount)}</span>
+                </div>` : ''}
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #cbd5e1; padding-top:0.35rem;">
+                  <span class="cv-receipt-fee-label" style="margin:0;">Final Consultation Amount:</span>
+                  <span class="cv-receipt-fee-amount">&#8377;${formatCurrency(op.consultationFee)}</span>
+                </div>
               </div>
             </div>
             <div class="cv-op-modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
@@ -4100,14 +4571,25 @@ const Admin = (function () {
                   </div>
                 </div>
 
-                <div class="cv-receipt-fee-box">
-                  <div>
-                    <div class="cv-receipt-fee-label">Consultation Fee Paid</div>
-                    <div style="font-size:0.75rem; color:var(--cv-text-muted);">
-                      Method: <strong>${escapeHtml(r.paymentMethod || 'CASH')}</strong> &bull; Status: <strong style="color:#059669;">${escapeHtml(r.paymentStatus || 'PAID')}</strong>
-                    </div>
+                <div class="cv-receipt-fee-box" style="display:block;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                    <span style="font-size:0.85rem; color:var(--cv-text-muted);">Doctor's Consultation Fee</span>
+                    <span style="font-size:0.95rem; font-weight:600; color:#475569;">&#8377;${formatCurrency(r.originalFee || r.consultationFee)}</span>
                   </div>
-                  <div class="cv-receipt-fee-amount">&#8377;${formatCurrency(r.consultationFee)}</div>
+                  ${Number(r.discountAmount || 0) > 0 ? `
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; color:#dc2626;">
+                    <span style="font-size:0.85rem; font-weight:600;">Discount (${escapeHtml(r.discountType || '')} ${r.discountValue ? (r.discountType === 'PERCENTAGE' ? r.discountValue + '%' : '₹' + r.discountValue) : ''})</span>
+                    <span style="font-size:0.95rem; font-weight:700;">-&#8377;${formatCurrency(r.discountAmount)}</span>
+                  </div>` : ''}
+                  <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #cbd5e1; padding-top:0.4rem; margin-top:0.25rem;">
+                    <div>
+                      <div class="cv-receipt-fee-label">Final Amount Payable</div>
+                      <div style="font-size:0.75rem; color:var(--cv-text-muted);">
+                        Method: <strong>${escapeHtml(r.paymentMethod || 'CASH')}</strong> &bull; Status: <strong style="color:#059669;">${escapeHtml(r.paymentStatus || 'PAID')}</strong>
+                      </div>
+                    </div>
+                    <div class="cv-receipt-fee-amount">&#8377;${formatCurrency(r.consultationFee)}</div>
+                  </div>
                 </div>
 
                 <div class="cv-receipt-footer">

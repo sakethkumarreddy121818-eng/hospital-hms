@@ -40,6 +40,18 @@ public class OpRegistration {
     @Column(name = "consultation_fee", precision = 10, scale = 2)
     private BigDecimal consultationFee = BigDecimal.ZERO;
 
+    @Column(name = "original_fee", precision = 10, scale = 2)
+    private BigDecimal originalFee;
+
+    @Column(name = "discount_type", length = 30)
+    private String discountType = "NO_DISCOUNT";
+
+    @Column(name = "discount_value", precision = 10, scale = 2)
+    private BigDecimal discountValue = BigDecimal.ZERO;
+
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(name = "status", nullable = false, length = 30)
     private String status = "REGISTERED";
 
@@ -141,6 +153,42 @@ public class OpRegistration {
 
     public void setBalanceAmount(BigDecimal balanceAmount) {
         this.balanceAmount = balanceAmount;
+    }
+
+    public BigDecimal getOriginalFee() {
+        return originalFee != null ? originalFee : (consultationFee != null ? consultationFee : BigDecimal.ZERO);
+    }
+
+    public void setOriginalFee(BigDecimal originalFee) {
+        this.originalFee = originalFee;
+    }
+
+    public String getDiscountType() {
+        return discountType != null ? discountType : "NO_DISCOUNT";
+    }
+
+    public void setDiscountType(String discountType) {
+        this.discountType = discountType;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue != null ? discountValue : BigDecimal.ZERO;
+    }
+
+    public void setDiscountValue(BigDecimal discountValue) {
+        this.discountValue = discountValue;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount != null ? discountAmount : BigDecimal.ZERO;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
+    public BigDecimal getFinalAmount() {
+        return consultationFee != null ? consultationFee : BigDecimal.ZERO;
     }
 
     public LocalDateTime getCreatedAt() { return createdAt; }

@@ -22,6 +22,10 @@ public class OpReceiptDto {
     private String department;
     private String roomNumber;
     private BigDecimal consultationFee;
+    private BigDecimal originalFee;
+    private String discountType;
+    private BigDecimal discountValue;
+    private BigDecimal discountAmount;
     private String paymentMethod;
     private String paymentStatus;
     private String visitDate;
@@ -52,6 +56,10 @@ public class OpReceiptDto {
         dto.setDepartment(op.getDepartment());
         dto.setRoomNumber(roomNumber != null ? roomNumber : "OPD Room");
         dto.setConsultationFee(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
+        dto.setOriginalFee(op.getOriginalFee());
+        dto.setDiscountType(op.getDiscountType());
+        dto.setDiscountValue(op.getDiscountValue());
+        dto.setDiscountAmount(op.getDiscountAmount());
         dto.setPaymentMethod(op.getPaymentMethod() != null ? op.getPaymentMethod() : "CASH");
         dto.setPaymentStatus(op.getPaymentStatus() != null ? op.getPaymentStatus() : "PAID");
         dto.setVisitDate(op.getVisitDate() != null ? op.getVisitDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "");
@@ -127,4 +135,16 @@ public class OpReceiptDto {
 
     public String getRegisteredAt() { return registeredAt; }
     public void setRegisteredAt(String registeredAt) { this.registeredAt = registeredAt; }
+
+    public BigDecimal getOriginalFee() { return originalFee; }
+    public void setOriginalFee(BigDecimal originalFee) { this.originalFee = originalFee; }
+
+    public String getDiscountType() { return discountType; }
+    public void setDiscountType(String discountType) { this.discountType = discountType; }
+
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
 }

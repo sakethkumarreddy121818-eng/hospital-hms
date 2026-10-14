@@ -80,14 +80,23 @@ public class OpController {
     @GetMapping("/history")
     public ResponseEntity<ApiResponse<List<OpRegistrationDto>>> getOpHistory(
             @RequestParam(required = false, defaultValue = "") String q,
+            @RequestParam(required = false, defaultValue = "TODAY") String period,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             HttpServletRequest httpRequest) {
 
         Long tenantId = getAuthenticatedTenantId(httpRequest);
         if (tenantId == null) {
-            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session."));
+            return ResponseEntity.status(403).body(ApiResponse.error("Tenant identification missing from session. Please log in."));
         }
-        List<OpRegistrationDto> history = opService.getOpHistory(tenantId, q);
-        return ResponseEntity.ok(ApiResponse.success(history));
+        try {
+            List<OpRegistrationDto> history = opService.getOpHistory(tenantId, q, period, startDate, endDate);
+            return ResponseEntity.ok(ApiResponse.success(history));
+        } catch (ResponseStatusException rse) {
+            return ResponseEntity.status(rse.getStatusCode()).body(ApiResponse.error(rse.getReason()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+        }
     }
 
     @GetMapping("/usage")

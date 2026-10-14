@@ -18,6 +18,11 @@ public class OpRegistrationDto {
     private String doctorName;
     private String department;
     private BigDecimal consultationFee;
+    private BigDecimal originalFee;
+    private String discountType;
+    private BigDecimal discountValue;
+    private BigDecimal discountAmount;
+    private BigDecimal finalAmount;
     private BigDecimal paidAmount;
     private BigDecimal balanceAmount;
     private String paymentMethod;
@@ -46,6 +51,11 @@ public class OpRegistrationDto {
         dto.setDoctorName(op.getDoctorName());
         dto.setDepartment(op.getDepartment());
         dto.setConsultationFee(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
+        dto.setOriginalFee(op.getOriginalFee());
+        dto.setDiscountType(op.getDiscountType());
+        dto.setDiscountValue(op.getDiscountValue());
+        dto.setDiscountAmount(op.getDiscountAmount());
+        dto.setFinalAmount(op.getConsultationFee() != null ? op.getConsultationFee() : BigDecimal.ZERO);
         dto.setPaidAmount(op.getPaidAmount());
         dto.setBalanceAmount(op.getBalanceAmount());
         dto.setPaymentMethod(op.getPaymentMethod() != null ? op.getPaymentMethod() : "CASH");
@@ -124,4 +134,19 @@ public class OpRegistrationDto {
 
     public String getHospitalName() { return hospitalName; }
     public void setHospitalName(String hospitalName) { this.hospitalName = hospitalName; }
+
+    public BigDecimal getOriginalFee() { return originalFee; }
+    public void setOriginalFee(BigDecimal originalFee) { this.originalFee = originalFee; }
+
+    public String getDiscountType() { return discountType; }
+    public void setDiscountType(String discountType) { this.discountType = discountType; }
+
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public BigDecimal getFinalAmount() { return finalAmount; }
+    public void setFinalAmount(BigDecimal finalAmount) { this.finalAmount = finalAmount; }
 }

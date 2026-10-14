@@ -141,17 +141,74 @@ public class OpService {
         LocalDate visitDate = LocalDate.now();
         String regTime = LocalTime.now().format(DateTimeFormatter.ofPattern("hh:mm a"));
 
-        BigDecimal fee = request.getConsultationFee() != null ? request.getConsultationFee() : doctor.getConsultationFee();
-        if (fee == null) fee = BigDecimal.ZERO;
+        // Doctor's trusted configured fee from MySQL
+        BigDecimal docOriginalFee = doctor.getConsultationFee();
+        if (docOriginalFee == null || docOriginalFee.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Selected doctor has no valid consultation fee configured in the database.");
+        }
+
+        // Validate and calculate discount
+        String rawDiscountType = request.getDiscountType();
+        String discountType = (rawDiscountType != null && !rawDiscountType.trim().isEmpty())
+                ? rawDiscountType.trim().toUpperCase() : "NO_DISCOUNT";
+
+        BigDecimal discountValue = request.getDiscountValue() != null ? request.getDiscountValue() : BigDecimal.ZERO;
+        if (discountValue.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Discount value cannot be negative.");
+        }
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal finalFee = docOriginalFee;
+
+        switch (discountType) {
+            case "NO_DISCOUNT":
+                discountValue = BigDecimal.ZERO;
+                discountAmount = BigDecimal.ZERO;
+                finalFee = docOriginalFee;
+                break;
+
+            case "FIXED":
+                if (discountValue.compareTo(docOriginalFee) > 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Fixed discount amount (₹" + discountValue + ") cannot exceed doctor consultation fee (₹" + docOriginalFee + ").");
+                }
+                discountAmount = discountValue.setScale(2, java.math.RoundingMode.HALF_UP);
+                finalFee = docOriginalFee.subtract(discountAmount).setScale(2, java.math.RoundingMode.HALF_UP);
+                break;
+
+            case "PERCENTAGE":
+                if (discountValue.compareTo(BigDecimal.valueOf(100)) > 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Discount percentage (" + discountValue + "%) cannot exceed 100%.");
+                }
+                discountAmount = docOriginalFee.multiply(discountValue)
+                        .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                finalFee = docOriginalFee.subtract(discountAmount).setScale(2, java.math.RoundingMode.HALF_UP);
+                break;
+
+            default:
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Invalid discount type: '" + discountType + "'. Supported types: NO_DISCOUNT, FIXED, PERCENTAGE.");
+        }
+
+        finalFee = finalFee.max(BigDecimal.ZERO);
+
         String payMethod = (request.getPaymentMethod() != null && !request.getPaymentMethod().trim().isEmpty())
                 ? request.getPaymentMethod().trim().toUpperCase() : "CASH";
 
         String reqStatus = request.getPaymentStatus();
         BigDecimal paid = request.getPaidAmount() != null ? request.getPaidAmount() :
-                ("PAID".equalsIgnoreCase(reqStatus) ? fee : BigDecimal.ZERO);
-        BigDecimal bal = fee.subtract(paid).max(BigDecimal.ZERO);
+                ("PAID".equalsIgnoreCase(reqStatus) ? finalFee : BigDecimal.ZERO);
+        if (paid.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paid amount cannot be negative.");
+        }
+        if (paid.compareTo(finalFee) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paid amount cannot exceed final consultation fee.");
+        }
+        BigDecimal bal = finalFee.subtract(paid).max(BigDecimal.ZERO);
         String status;
-        if (bal.compareTo(BigDecimal.ZERO) == 0 && fee.compareTo(BigDecimal.ZERO) > 0) {
+        if (bal.compareTo(BigDecimal.ZERO) == 0) {
             status = "PAID";
         } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
             status = "PARTIALLY PAID";
@@ -166,12 +223,16 @@ public class OpService {
                 patient,
                 doctor.getName(),
                 doctor.getDepartment(),
-                fee,
+                finalFee,
                 visitDate,
                 regTime,
                 payMethod,
                 status
         );
+        op.setOriginalFee(docOriginalFee);
+        op.setDiscountType(discountType);
+        op.setDiscountValue(discountValue);
+        op.setDiscountAmount(discountAmount);
         op.setPaidAmount(paid);
         op.setBalanceAmount(bal);
         OpRegistration savedOp = opRegistrationRepository.save(op);
@@ -199,7 +260,8 @@ public class OpService {
             paymentRecord.setRemainingBalance(bal);
             paymentRecord.setPaymentStatus(status);
             paymentRecord.setPaymentTime(regTime);
-            paymentRecord.setNotes("OP Registration: " + opId + " | Doctor: " + doctor.getName());
+            paymentRecord.setNotes("OP Registration: " + opId + " | Doctor: " + doctor.getName() +
+                    (discountAmount.compareTo(BigDecimal.ZERO) > 0 ? " | Discount: ₹" + discountAmount + " (" + discountType + ")" : ""));
             paymentRecordRepository.save(paymentRecord);
         }
 
@@ -207,7 +269,7 @@ public class OpService {
         tenant.setOpCurrentUsage((int) (currentMonthUsage + 1));
         tenantRepository.save(tenant);
 
-        log.info("Registered OP {} for patient {} with doctor {} (Fee: {})", opId, patient.getFullName(), doctor.getName(), fee);
+        log.info("Registered OP {} for patient {} with doctor {} (Final Fee: {}, Discount: {})", opId, patient.getFullName(), doctor.getName(), finalFee, discountAmount);
 
         return OpRegistrationDto.fromEntity(savedOp);
     }
@@ -269,10 +331,85 @@ public class OpService {
 
     @Transactional(readOnly = true)
     public List<OpRegistrationDto> getOpHistory(Long tenantId, String search) {
+        return getOpHistory(tenantId, search, "TODAY", null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OpRegistrationDto> getOpHistory(Long tenantId, String search, String period, String startDateStr, String endDateStr) {
         if (tenantId == null) return Collections.emptyList();
         String q = (search != null) ? search.trim() : "";
-        List<OpRegistration> ops = opRegistrationRepository.searchOpRegistrations(tenantId, q);
+
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+
+        String filterPeriod = (period != null && !period.trim().isEmpty()) ? period.trim().toUpperCase() : "TODAY";
+
+        switch (filterPeriod) {
+            case "TODAY":
+                startDate = today;
+                endDate = today;
+                break;
+            case "YESTERDAY":
+                startDate = today.minusDays(1);
+                endDate = today.minusDays(1);
+                break;
+            case "ONE_WEEK":
+            case "WEEK":
+                // Defined consistently across CareVista HMS as 7-day period [today - 6, today]
+                startDate = today.minusDays(6);
+                endDate = today;
+                break;
+            case "CUSTOM":
+                if (startDateStr != null && !startDateStr.trim().isEmpty()) {
+                    startDate = parseDate(startDateStr.trim());
+                }
+                if (endDateStr != null && !endDateStr.trim().isEmpty()) {
+                    endDate = parseDate(endDateStr.trim());
+                }
+                if (startDate != null && endDate == null) {
+                    endDate = startDate;
+                } else if (startDate == null && endDate != null) {
+                    startDate = endDate;
+                }
+                if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date.");
+                }
+                break;
+            case "ALL":
+            case "LIFETIME":
+                startDate = null;
+                endDate = null;
+                break;
+            default:
+                startDate = today;
+                endDate = today;
+                break;
+        }
+
+        List<OpRegistration> ops;
+        if (startDate == null && endDate == null) {
+            ops = opRegistrationRepository.searchOpRegistrations(tenantId, q);
+        } else {
+            ops = opRegistrationRepository.searchOpRegistrationsWithDateRange(tenantId, q, startDate, endDate);
+        }
         return ops.stream().map(OpRegistrationDto::fromEntity).collect(Collectors.toList());
+    }
+
+    private LocalDate parseDate(String dateStr) {
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (Exception ignored) {
+        }
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception ignored) {
+        }
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+        } catch (Exception ignored) {
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid date format: '" + dateStr + "'. Expected format: YYYY-MM-DD");
     }
 
     @Transactional(readOnly = true)

@@ -38,6 +38,10 @@ public class CreateOpRegistrationRequest {
     private String department;
 
     private BigDecimal consultationFee;
+    private BigDecimal originalFee;
+    private String discountType = "NO_DISCOUNT";
+    private BigDecimal discountValue = BigDecimal.ZERO;
+    private BigDecimal discountAmount = BigDecimal.ZERO;
 
     private String paymentMethod = "CASH";
 
@@ -84,6 +88,18 @@ public class CreateOpRegistrationRequest {
 
     public BigDecimal getConsultationFee() { return consultationFee; }
     public void setConsultationFee(BigDecimal consultationFee) { this.consultationFee = consultationFee; }
+
+    public BigDecimal getOriginalFee() { return originalFee; }
+    public void setOriginalFee(BigDecimal originalFee) { this.originalFee = originalFee; }
+
+    public String getDiscountType() { return discountType; }
+    public void setDiscountType(String discountType) { this.discountType = discountType; }
+
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
