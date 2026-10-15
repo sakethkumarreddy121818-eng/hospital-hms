@@ -3328,6 +3328,236 @@ body.cv-dashboard-active #app {
 }
 
 /* ====================================================================
+   PHARMACY MODULE — ENHANCED POPUP, FORM GRID & SENSE POS CONTROLS
+   ==================================================================== */
+.cv-med-modal-compact {
+  background: #ffffff !important;
+  border: 1px solid #eadbcc !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  animation: cvModalIn 0.22s ease-out !important;
+  margin: auto !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-sizing: border-box !important;
+}
+
+.cv-med-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.15rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 680px) {
+  .cv-med-compact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cv-med-compact-grid .cv-full-col {
+  grid-column: 1 / -1;
+}
+
+.cv-med-compact-grid label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cv-med-compact-grid .cv-form-input,
+.cv-med-compact-grid .cv-form-select {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  font-size: 0.86rem;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+/* Sense POS Unified Medicine Search & Master Catalog Dropdown */
+.cv-unified-medicine-dropdown {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 35px -5px rgba(15, 23, 42, 0.22) !important;
+  z-index: 100 !important;
+  max-height: 340px !important;
+  overflow-y: auto !important;
+}
+
+.cv-med-result-item {
+  padding: 0.65rem 0.95rem;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cv-med-result-item:hover,
+.cv-med-result-item.highlighted {
+  background: #f0f7ff !important;
+}
+
+.cv-med-result-item:last-child {
+  border-bottom: none;
+}
+
+/* Sense POS Dispense Bar: Structured, Aligned Layout without Overlap */
+.cv-pos-dispense-bar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) minmax(160px, 1.4fr) minmax(130px, 1fr) minmax(110px, 0.9fr) minmax(110px, 0.9fr) minmax(140px, 1.1fr);
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #cbd5e1;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media (max-width: 1280px) {
+  .cv-pos-dispense-bar {
+    grid-template-columns: minmax(150px, 1fr) minmax(140px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(130px, 1.1fr);
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 1080px) {
+  .cv-pos-dispense-bar {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .cv-pos-dispense-bar .cv-pos-action-cell {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .cv-pos-dispense-bar {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+}
+
+.cv-pos-dispense-cell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cv-pos-dispense-info-box {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  height: 38px;
+  padding: 0 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cv-pos-qty-stepper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cv-qty-step-btn {
+  height: 38px;
+  width: 34px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.cv-qty-step-btn:hover {
+  background: #f1f5f9;
+}
+
+#btnPharQtyMinus {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+#btnPharQtyPlus {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.cv-qty-input {
+  height: 38px;
+  width: 100%;
+  min-width: 44px;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  border-right: none;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.92rem;
+  background: #ffffff;
+  box-sizing: border-box;
+  padding: 0 0.25rem;
+}
+
+.cv-pos-dispense-input {
+  height: 38px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  font-size: 0.88rem !important;
+  border-radius: 6px !important;
+}
+
+#pharMedicineUnitPrice {
+  text-align: right;
+  font-weight: 700;
+  background: #ffffff;
+}
+
+#pharMedicineAmount {
+  text-align: right;
+  font-weight: 800;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+#btnPharAddMedicine {
+  height: 38px !important;
+  padding: 0 1.25rem !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+  white-space: nowrap !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 6px !important;
+}
+
+/* ====================================================================
    ADMIN — LABORATORY MANAGEMENT MODULE (CareVista Design System)
    ==================================================================== */
 .cv-lab-wrapper {
@@ -5151,6 +5381,7 @@ body.cv-dashboard-active #app {
 .cv-modal-dialog,
 .cv-modal-box,
 .cv-op-modal-box,
+.cv-med-modal-compact,
 .cv-lab-report-modal,
 .cv-lab-report-paper,
 .cv-invoice-paper,

@@ -7652,30 +7652,45 @@ const Admin = (function () {
             </div>
           </div>
 
-          <!-- Dual-input Medicine Search -->
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem; margin-bottom:0.75rem;">
-            <div style="position:relative;">
-              <label for="pharMedicineSearchInput" style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem;">
-                <svg style="width:13px; height:13px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                SEARCH BY NAME / CODE / GENERIC / BATCH
+          <!-- Unified Medicine Search & Master Catalog Selector -->
+          <div style="margin-bottom:0.85rem; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+              <label for="pharMedicineSearchInput" style="font-size:0.75rem; font-weight:700; color:var(--cv-text-main); display:flex; align-items:center; gap:0.45rem;">
+                <svg style="width:15px; height:15px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Search or Select Medicine from Master Catalog
               </label>
-              <input type="text" id="pharMedicineSearchInput" class="cv-form-input" placeholder="Type medicine name, code, generic, or batch..." autocomplete="off" style="height:38px; font-size:0.86rem; width:100%;">
-              <div id="pharMedicineDropdown" class="cv-patient-dropdown" style="display:none; max-height:280px; overflow-y:auto; width:100%; z-index:100; position:absolute; top:calc(100% + 4px); left:0; right:0; box-shadow:var(--cv-shadow-lg); background:var(--cv-surface); border:1px solid var(--cv-border); border-radius:var(--cv-radius-md);"></div>
+              <div style="font-size:0.72rem; color:var(--cv-text-muted);">
+                <span id="pharCatalogCountText">${pharMedicinesCatalog.length} medicines in catalog</span>
+              </div>
             </div>
 
-            <div>
-              <label style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem;">
-                OR CHOOSE FROM MASTER CATALOG
-              </label>
-              <select id="pharMedicineSelect" class="cv-form-select" style="height:38px; font-size:0.86rem; width:100%;">
-                <option value="">-- Choose Medicine --</option>
-                ${pharMedicinesCatalog.map(m => `
-                  <option value="${m.id}">
-                    ${escapeHtml(m.name)} (${escapeHtml(m.medicineCode)}) | Stock: ${m.stockQuantity} | ₹${formatCurrency(m.unitPrice)}
-                  </option>
-                `).join('')}
-              </select>
+            <div style="position:relative; display:flex; align-items:center;">
+              <div style="position:absolute; left:0.85rem; color:var(--cv-text-muted); pointer-events:none; display:flex; align-items:center;">
+                <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <input type="text" id="pharMedicineSearchInput" class="cv-form-input" 
+                placeholder="Search by medicine name, code, generic composition, or brand — or select from the master catalog" 
+                autocomplete="off" 
+                style="height:42px; font-size:0.88rem; width:100%; padding-left:2.5rem; padding-right:5.8rem; border-radius:8px; background:#ffffff;">
+              
+              <div style="position:absolute; right:0.45rem; display:flex; align-items:center; gap:0.3rem;">
+                <button type="button" id="btnPharClearMedSearch" title="Clear medicine selection" style="display:none; background:none; border:none; color:#94a3b8; font-size:1.25rem; cursor:pointer; padding:2px 6px; line-height:1;">&times;</button>
+                <button type="button" id="btnPharToggleCatalog" class="cv-btn-secondary" style="padding:0.25rem 0.65rem; font-size:0.75rem; height:30px; font-weight:600; display:inline-flex; align-items:center; gap:0.3rem; border-radius:6px;">
+                  <span>Catalog</span>
+                  <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+              </div>
+
+              <div id="pharMedicineDropdown" class="cv-patient-dropdown cv-unified-medicine-dropdown" style="display:none; max-height:340px; overflow-y:auto; width:100%; z-index:100; position:absolute; top:calc(100% + 4px); left:0; right:0; box-shadow:0 14px 35px -5px rgba(15,23,42,0.2); background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;"></div>
             </div>
+
+            <!-- Hidden select kept in DOM for seamless backward compatibility -->
+            <select id="pharMedicineSelect" style="display:none;">
+              <option value="">-- Choose Medicine --</option>
+              ${pharMedicinesCatalog.map(m => `
+                <option value="${m.id}">${escapeHtml(m.name)} (${escapeHtml(m.medicineCode)})</option>
+              `).join('')}
+            </select>
           </div>
 
           <!-- Dynamic Medicine Workspace (Shown when medicine is selected) -->
@@ -7720,31 +7735,66 @@ const Admin = (function () {
               </div>
             </div>
 
-            <!-- Dispense Add Row -->
-            <div style="display:grid; grid-template-columns: 140px 140px 140px 1fr; gap:0.75rem; align-items:flex-end; margin-top:0.75rem; padding-top:0.6rem; border-top:1px dashed #cbd5e1;">
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">QUANTITY</label>
-                <div style="display:flex; align-items:center;">
-                  <button type="button" id="btnPharQtyMinus" style="height:36px; width:32px; border:1px solid #cbd5e1; background:#ffffff; border-radius:6px 0 0 6px; font-weight:800; cursor:pointer;">-</button>
-                  <input type="number" id="pharMedicineQty" min="1" value="1" style="height:36px; width:65px; border-top:1px solid #cbd5e1; border-bottom:1px solid #cbd5e1; border-left:none; border-right:none; text-align:center; font-weight:800;">
-                  <button type="button" id="btnPharQtyPlus" style="height:36px; width:32px; border:1px solid #cbd5e1; background:#ffffff; border-radius:0 6px 6px 0; font-weight:800; cursor:pointer;">+</button>
+            <!-- Dispense Add Bar: Aligned, Non-overlapping Grid -->
+            <div class="cv-pos-dispense-bar">
+              <!-- 1. Medicine & Location -->
+              <div class="cv-pos-dispense-cell cv-pos-med-cell">
+                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                  Medicine / Location
+                </label>
+                <div class="cv-pos-dispense-info-box" id="pharDispenseMedInfoBox">
+                  <span id="pharDispenseMedName" style="font-weight:700; font-size:0.84rem; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">—</span>
+                  <span id="pharDispenseLocation" class="cv-placement-tag" style="display:none; font-size:0.7rem; padding:0.1rem 0.35rem; flex-shrink:0;">—</span>
                 </div>
               </div>
 
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">UNIT RATE (₹)</label>
-                <input type="number" id="pharMedicineUnitPrice" class="cv-form-input" min="0" step="0.01" value="0.00" style="height:36px; font-weight:700; text-align:right;">
+              <!-- 2. Batch & Availability -->
+              <div class="cv-pos-dispense-cell cv-pos-batch-cell">
+                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                  Batch / Availability
+                </label>
+                <div class="cv-pos-dispense-info-box" id="pharDispenseBatchInfoBox">
+                  <span id="pharDispenseBatchNum" style="font-family:monospace; font-weight:700; font-size:0.82rem; color:#0369a1;">—</span>
+                  <span id="pharDispenseBatchStock" style="font-size:0.75rem; font-weight:800; color:#16a34a; flex-shrink:0;">—</span>
+                </div>
               </div>
 
-              <div>
-                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.2rem;">AMOUNT (₹)</label>
-                <input type="text" id="pharMedicineAmount" class="cv-form-input" readonly value="0.00" style="height:36px; font-weight:800; text-align:right; background:#f1f5f9;">
+              <!-- 3. Quantity -->
+              <div class="cv-pos-dispense-cell cv-pos-qty-cell">
+                <label for="pharMedicineQty" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                  Quantity
+                </label>
+                <div class="cv-pos-qty-stepper">
+                  <button type="button" id="btnPharQtyMinus" class="cv-qty-step-btn" title="Decrease quantity">-</button>
+                  <input type="number" id="pharMedicineQty" min="1" value="1" class="cv-qty-input">
+                  <button type="button" id="btnPharQtyPlus" class="cv-qty-step-btn" title="Increase quantity">+</button>
+                </div>
               </div>
 
-              <div style="display:flex; justify-content:flex-end;">
-                <button type="button" class="cv-btn-primary" id="btnPharAddMedicine" style="height:36px; padding:0 1.5rem; font-size:0.86rem; font-weight:700; display:inline-flex; align-items:center; gap:0.4rem;">
+              <!-- 4. Unit Rate -->
+              <div class="cv-pos-dispense-cell cv-pos-rate-cell">
+                <label for="pharMedicineUnitPrice" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                  Unit Rate (₹)
+                </label>
+                <input type="number" id="pharMedicineUnitPrice" class="cv-form-input cv-pos-dispense-input" min="0" step="0.01" value="0.00">
+              </div>
+
+              <!-- 5. Amount -->
+              <div class="cv-pos-dispense-cell cv-pos-amount-cell">
+                <label for="pharMedicineAmount" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                  Amount (₹)
+                </label>
+                <input type="text" id="pharMedicineAmount" class="cv-form-input cv-pos-dispense-input" readonly value="0.00">
+              </div>
+
+              <!-- 6. Action: Add to Bill -->
+              <div class="cv-pos-dispense-cell cv-pos-action-cell">
+                <label style="font-size:0.7rem; font-weight:700; color:transparent; display:block; margin-bottom:0.25rem; user-select:none;">
+                  Action
+                </label>
+                <button type="button" class="cv-btn-primary" id="btnPharAddMedicine">
                   <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                  + Add to Bill
+                  <span>+ Add to Bill</span>
                 </button>
               </div>
             </div>
@@ -8018,77 +8068,180 @@ const Admin = (function () {
       }
     });
 
-    // Medicine search bar autocomplete
+    // Unified Medicine Search & Master Catalog Autocomplete
     const medSearchInput = document.getElementById('pharMedicineSearchInput');
     const medDropdown = document.getElementById('pharMedicineDropdown');
     const medSelect = document.getElementById('pharMedicineSelect');
+    const btnClearMedSearch = document.getElementById('btnPharClearMedSearch');
+    const btnToggleCatalog = document.getElementById('btnPharToggleCatalog');
     let medSearchDebounce = null;
+
+    function renderMedicineDropdownItems(items, isCatalogBrowse = false) {
+      if (!medDropdown) return;
+      if (!items || items.length === 0) {
+        medDropdown.innerHTML = `<div style="padding:0.95rem 1rem; color:var(--cv-text-muted); font-size:0.85rem; text-align:center;">No medicines found matching your search.</div>`;
+        medDropdown.style.display = 'block';
+        return;
+      }
+
+      const headerTitle = isCatalogBrowse ? `Master Catalog (${items.length} medicines)` : `Search Results (${items.length} matched)`;
+      const headerSub = isCatalogBrowse ? 'Select from catalog or type to filter' : 'Use ↑/↓ and Enter to select';
+
+      const headerHtml = `
+        <div style="padding:0.45rem 0.95rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:0.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; display:flex; justify-content:space-between; align-items:center;">
+          <span>${escapeHtml(headerTitle)}</span>
+          <span style="font-weight:normal; text-transform:none; font-size:0.7rem; color:#94a3b8;">${escapeHtml(headerSub)}</span>
+        </div>
+      `;
+
+      medDropdown.innerHTML = headerHtml + items.map((m, idx) => `
+        <div class="cv-patient-dropdown-item cv-med-result-item" data-id="${m.id}" data-index="${idx}" tabindex="0">
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:700; color:var(--cv-text-main); font-size:0.88rem; display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+              <span>${escapeHtml(m.name)}</span>
+              <span style="font-size:0.74rem; color:var(--cv-primary); font-family:monospace; background:#e0f2fe; padding:0.1rem 0.4rem; border-radius:4px; font-weight:700;">${escapeHtml(m.medicineCode || '')}</span>
+              ${m.rackLocation ? `<span class="cv-placement-tag">📍 Shelf: ${escapeHtml(m.rackLocation)}</span>` : ''}
+              ${m.prescriptionRequired ? '<span style="color:#dc2626; font-size:0.68rem; font-weight:800; background:#fee2e2; padding:0.08rem 0.4rem; border-radius:10px;">[Rx Required]</span>' : '<span style="color:#15803d; font-size:0.68rem; font-weight:700; background:#dcfce7; padding:0.08rem 0.4rem; border-radius:10px;">[OTC]</span>'}
+            </div>
+            <div style="font-size:0.74rem; color:var(--cv-text-muted); display:flex; gap:0.75rem; margin-top:0.25rem; flex-wrap:wrap; align-items:center;">
+              ${m.genericName ? `<span>Generic: <strong style="color:#334155;">${escapeHtml(m.genericName)}</strong></span>` : ''}
+              ${m.manufacturer ? `<span>Brand: <strong>${escapeHtml(m.manufacturer)}</strong></span>` : ''}
+              <span>Stock: <strong style="color:${m.stockQuantity <= 0 ? 'var(--cv-danger)' : (m.stockQuantity <= (m.reorderLevel || 15) ? '#d97706' : '#16a34a')};">${m.stockQuantity} available</strong></span>
+              <span>MRP: <strong style="color:#0f172a;">₹${formatCurrency(m.unitPrice)}</strong></span>
+            </div>
+          </div>
+          <div style="margin-left:0.6rem; flex-shrink:0;">
+            <button type="button" class="cv-btn-secondary" style="padding:0.25rem 0.75rem; font-size:0.74rem; font-weight:700; pointer-events:none;">
+              Select
+            </button>
+          </div>
+        </div>
+      `).join('');
+      medDropdown.style.display = 'block';
+
+      medDropdown.querySelectorAll('.cv-med-result-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const mId = el.getAttribute('data-id');
+          chooseMedicine(mId);
+        });
+      });
+    }
+
+    function chooseMedicine(mId) {
+      selectMedicineForPOS(mId);
+      if (medDropdown) medDropdown.style.display = 'none';
+      const m = pharMedicinesCatalog.find(item => String(item.id) === String(mId));
+      if (m && medSearchInput) {
+        medSearchInput.value = `${m.name} (${m.medicineCode})`;
+      }
+      if (btnClearMedSearch) btnClearMedSearch.style.display = 'block';
+    }
 
     if (medSearchInput && medDropdown) {
       medSearchInput.addEventListener('input', (e) => {
         const q = e.target.value.trim();
+        if (btnClearMedSearch) btnClearMedSearch.style.display = q ? 'block' : 'none';
         if (medSearchDebounce) clearTimeout(medSearchDebounce);
 
-        if (q.length < 2) {
-          medDropdown.style.display = 'none';
-          medDropdown.innerHTML = '';
+        if (!q) {
+          renderMedicineDropdownItems(pharMedicinesCatalog, true);
           return;
+        }
+
+        // Instant local filter for instant UI responsiveness
+        const qLower = q.toLowerCase();
+        const localMatches = pharMedicinesCatalog.filter(m =>
+          (m.name && m.name.toLowerCase().includes(qLower)) ||
+          (m.medicineCode && m.medicineCode.toLowerCase().includes(qLower)) ||
+          (m.genericName && m.genericName.toLowerCase().includes(qLower)) ||
+          (m.manufacturer && m.manufacturer.toLowerCase().includes(qLower)) ||
+          (m.rackLocation && m.rackLocation.toLowerCase().includes(qLower))
+        );
+        if (localMatches.length > 0) {
+          renderMedicineDropdownItems(localMatches, false);
         }
 
         medSearchDebounce = setTimeout(async () => {
           try {
             const res = await cvFetch(`/api/pharmacy/medicines?q=${encodeURIComponent(q)}`);
             let items = (res && res.success && Array.isArray(res.data)) ? res.data : [];
-            if (items.length > 0) {
-              medDropdown.innerHTML = items.map(m => `
-                <div class="cv-patient-dropdown-item cv-med-result-item" data-id="${m.id}">
-                  <div style="flex:1;">
-                    <div style="font-weight:700; color:var(--cv-text-main); font-size:0.88rem;">
-                      ${escapeHtml(m.name)}
-                      <span style="font-size:0.75rem; color:var(--cv-primary); font-family:monospace; margin-left:0.35rem;">(${escapeHtml(m.medicineCode || '')})</span>
-                      ${m.rackLocation ? `<span class="cv-placement-tag" style="margin-left:0.4rem;">📍 ${escapeHtml(m.rackLocation)}</span>` : ''}
-                    </div>
-                    <div style="font-size:0.75rem; color:var(--cv-text-muted); display:flex; gap:0.65rem; margin-top:0.2rem; flex-wrap:wrap;">
-                      <span>Stock: <strong style="color:${m.stockQuantity <= 0 ? 'var(--cv-danger)' : (m.stockQuantity <= 15 ? '#d97706' : '#16a34a')};">${m.stockQuantity}</strong></span>
-                      <span>MRP: <strong>₹${formatCurrency(m.unitPrice)}</strong></span>
-                      ${m.prescriptionRequired ? '<span style="color:var(--cv-danger); font-weight:800;">[Rx Required]</span>' : '<span style="color:#16a34a;">[OTC]</span>'}
-                    </div>
-                  </div>
-                  <div>
-                    <span style="font-size:0.72rem; background:#dbeafe; color:#1e40af; padding:0.2rem 0.5rem; border-radius:12px; font-weight:700;">Select</span>
-                  </div>
-                </div>
-              `).join('');
-              medDropdown.style.display = 'block';
-
-              medDropdown.querySelectorAll('.cv-med-result-item').forEach(el => {
-                el.addEventListener('click', () => {
-                  const mId = el.getAttribute('data-id');
-                  selectMedicineForPOS(mId);
-                  medDropdown.style.display = 'none';
-                });
-              });
-            } else {
-              medDropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:var(--cv-text-muted); font-size:0.85rem; text-align:center;">No medicines found.</div>`;
-              medDropdown.style.display = 'block';
-            }
+            renderMedicineDropdownItems(items, false);
           } catch (err) {
             console.error('Medicine search error:', err);
           }
         }, 200);
       });
 
+      medSearchInput.addEventListener('focus', () => {
+        const q = medSearchInput.value.trim();
+        if (!q || (pharSelectedMedicineForPOS && q.includes(pharSelectedMedicineForPOS.medicineCode))) {
+          renderMedicineDropdownItems(pharMedicinesCatalog, true);
+        }
+      });
+
+      medSearchInput.addEventListener('keydown', (e) => {
+        if (!medDropdown || medDropdown.style.display !== 'block') return;
+        const items = medDropdown.querySelectorAll('.cv-med-result-item');
+        if (!items.length) return;
+
+        let activeIndex = Array.from(items).findIndex(el => el.classList.contains('highlighted'));
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (activeIndex >= 0) items[activeIndex].classList.remove('highlighted');
+          activeIndex = (activeIndex + 1) % items.length;
+          items[activeIndex].classList.add('highlighted');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (activeIndex >= 0) items[activeIndex].classList.remove('highlighted');
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          items[activeIndex].classList.add('highlighted');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          if (activeIndex >= 0) {
+            e.preventDefault();
+            const mId = items[activeIndex].getAttribute('data-id');
+            chooseMedicine(mId);
+          }
+        } else if (e.key === 'Escape') {
+          medDropdown.style.display = 'none';
+        }
+      });
+
       document.addEventListener('click', (e) => {
-        if (!medSearchInput.contains(e.target) && !medDropdown.contains(e.target)) {
+        if (!medSearchInput.contains(e.target) && !medDropdown.contains(e.target) && !btnToggleCatalog?.contains(e.target)) {
           medDropdown.style.display = 'none';
         }
       });
     }
 
+    btnToggleCatalog?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!medDropdown) return;
+      if (medDropdown.style.display === 'block') {
+        medDropdown.style.display = 'none';
+      } else {
+        renderMedicineDropdownItems(pharMedicinesCatalog, true);
+        medSearchInput?.focus();
+      }
+    });
+
+    btnClearMedSearch?.addEventListener('click', () => {
+      if (medSearchInput) medSearchInput.value = '';
+      if (btnClearMedSearch) btnClearMedSearch.style.display = 'none';
+      if (medDropdown) medDropdown.style.display = 'none';
+      document.getElementById('pharMedicineWorkspace').style.display = 'none';
+      pharSelectedMedicineForPOS = null;
+      pharSelectedBatchForPOS = null;
+      const stockPill = document.getElementById('pharStockStatusPill');
+      if (stockPill) stockPill.innerHTML = '<span class="cv-stock-info-pill cv-stock-in">Select a medicine to view stock</span>';
+    });
+
     if (medSelect) {
       medSelect.addEventListener('change', () => {
         if (medSelect.value) {
-          selectMedicineForPOS(medSelect.value);
+          chooseMedicine(medSelect.value);
         } else {
           document.getElementById('pharMedicineWorkspace').style.display = 'none';
         }
@@ -8190,6 +8343,19 @@ const Admin = (function () {
         }
       }
 
+      // Update Dispense Bar Summary elements
+      const dispMedName = document.getElementById('pharDispenseMedName');
+      if (dispMedName) dispMedName.textContent = med.name || '—';
+      const dispLocation = document.getElementById('pharDispenseLocation');
+      if (dispLocation) {
+        if (med.rackLocation) {
+          dispLocation.textContent = `📍 ${med.rackLocation}`;
+          dispLocation.style.display = 'inline-flex';
+        } else {
+          dispLocation.style.display = 'none';
+        }
+      }
+
       // Rx vs OTC dot
       const rxDot = document.getElementById('pharRxDot');
       const rxBadge = document.getElementById('pharWorkRxBadge');
@@ -8224,6 +8390,14 @@ const Admin = (function () {
       await loadMedicineBatchesForPOS(med.id);
       updatePOSRateAndAmount();
 
+      // Update search input and show clear button
+      const medSearchInput = document.getElementById('pharMedicineSearchInput');
+      if (medSearchInput) {
+        medSearchInput.value = `${med.name} (${med.medicineCode})`;
+      }
+      const btnClearMedSearch = document.getElementById('btnPharClearMedSearch');
+      if (btnClearMedSearch) btnClearMedSearch.style.display = 'block';
+
       // Update master select if not already synced
       const medSelect = document.getElementById('pharMedicineSelect');
       if (medSelect && medSelect.value !== String(med.id)) {
@@ -8250,6 +8424,13 @@ const Admin = (function () {
       if (batches.length === 0) {
         mount.innerHTML = `<div style="padding:0.4rem; font-size:0.75rem; color:var(--cv-danger); font-weight:700;">No batches available for this medicine. Please procure stock first.</div>`;
         pharSelectedBatchForPOS = null;
+        const dispBatchNum = document.getElementById('pharDispenseBatchNum');
+        if (dispBatchNum) dispBatchNum.textContent = 'No Batch';
+        const dispBatchStock = document.getElementById('pharDispenseBatchStock');
+        if (dispBatchStock) {
+          dispBatchStock.textContent = '0 available';
+          dispBatchStock.style.color = '#dc2626';
+        }
         return;
       }
 
@@ -8296,6 +8477,21 @@ const Admin = (function () {
         `;
       }).join('');
 
+      // Update Dispense Bar Batch Summary with initially selected batch
+      const dispBatchNum = document.getElementById('pharDispenseBatchNum');
+      if (dispBatchNum) dispBatchNum.textContent = pharSelectedBatchForPOS ? pharSelectedBatchForPOS.batchNumber : 'No Batch';
+      const dispBatchStock = document.getElementById('pharDispenseBatchStock');
+      if (dispBatchStock) {
+        if (pharSelectedBatchForPOS) {
+          dispBatchStock.textContent = `${pharSelectedBatchForPOS.quantity} units`;
+          dispBatchStock.style.color = (pharSelectedBatchForPOS.quantity <= 0) ? '#dc2626' : '#16a34a';
+        } else {
+          dispBatchStock.textContent = '0 available';
+          dispBatchStock.style.color = '#dc2626';
+        }
+      }
+      updatePOSRateAndAmount();
+
       // Wire batch cards click
       mount.querySelectorAll('.cv-batch-card:not(.disabled)').forEach(card => {
         card.addEventListener('click', () => {
@@ -8304,6 +8500,15 @@ const Admin = (function () {
           try {
             const bData = JSON.parse(card.getAttribute('data-batch-data'));
             pharSelectedBatchForPOS = bData;
+            
+            const dbNum = document.getElementById('pharDispenseBatchNum');
+            if (dbNum) dbNum.textContent = bData.batchNumber;
+            const dbStock = document.getElementById('pharDispenseBatchStock');
+            if (dbStock) {
+              dbStock.textContent = `${bData.quantity} units`;
+              dbStock.style.color = (bData.quantity <= 0) ? '#dc2626' : '#16a34a';
+            }
+
             updatePOSRateAndAmount();
           } catch (e) {
             console.error('Error selecting batch:', e);
@@ -9988,28 +10193,28 @@ const Admin = (function () {
 
     modalHost.innerHTML = `
       <div class="cv-modal-backdrop show" id="addMedBackdrop" style="padding:1rem;">
-        <div class="cv-med-modal-compact" style="width:920px; max-height:92vh; overflow-y:auto;">
+        <div class="cv-med-modal-compact" style="width:920px; max-width:96vw; max-height:90vh; background:#ffffff; border-radius:14px; box-shadow:0 20px 50px rgba(15,23,42,0.25); border:1px solid #eadbcc; display:flex; flex-direction:column; overflow:hidden;">
           
           <!-- Header -->
-          <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:0.75rem 1.25rem; display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:0.5rem;">
-              <div style="background:#dbeafe; color:var(--cv-primary); width:32px; height:32px; border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                <svg style="width:18px; height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:1rem 1.4rem; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <div style="background:#dbeafe; color:var(--cv-primary); width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               </div>
               <div>
-                <h3 style="margin:0; font-size:1.02rem; font-weight:800; color:#0f172a;">Register New Hospital Medicine</h3>
-                <p style="margin:0; font-size:0.72rem; color:var(--cv-text-muted);">Formulary record, shelf placement, packaging &amp; initial stock lot</p>
+                <h3 style="margin:0; font-size:1.05rem; font-weight:800; color:#0f172a;">Register New Hospital Medicine</h3>
+                <p style="margin:0.15rem 0 0 0; font-size:0.74rem; color:var(--cv-text-muted);">Formulary record, shelf placement, packaging &amp; initial stock lot</p>
               </div>
             </div>
-            <button type="button" id="btnCloseAddMedModal" style="background:none; border:none; font-size:1.35rem; cursor:pointer; color:var(--cv-text-muted);">&times;</button>
+            <button type="button" id="btnCloseAddMedModal" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--cv-text-muted); line-height:1;" title="Close (Esc)">&times;</button>
           </div>
 
           <!-- Form Grid -->
-          <form id="formAddMedicine" style="display:flex; flex-direction:column; padding:0.9rem 1.25rem;">
+          <form id="formAddMedicine" style="display:flex; flex-direction:column; flex:1; overflow-y:auto; padding:1.25rem 1.5rem; margin:0;">
             
             <div class="cv-med-compact-grid">
               
-              <!-- ROW 1: Name, Code, Generic -->
+              <!-- ROW 1: Medicine Name & Medicine ID / Code -->
               <div>
                 <label for="newMedName">MEDICINE NAME <span style="color:var(--cv-danger);">*</span></label>
                 <input type="text" id="newMedName" class="cv-form-input" required placeholder="e.g. Paracetamol 500mg">
@@ -10020,12 +10225,12 @@ const Admin = (function () {
                 <input type="text" id="newMedCode" class="cv-form-input" required value="${escapeHtml(defaultCode)}" style="font-family:monospace; font-weight:700; text-transform:uppercase;">
               </div>
 
+              <!-- ROW 2: Generic Composition & Category -->
               <div>
                 <label for="newMedGeneric">GENERIC COMPOSITION</label>
                 <input type="text" id="newMedGeneric" class="cv-form-input" placeholder="e.g. Paracetamol IP">
               </div>
 
-              <!-- ROW 2: Category, Form, Strength -->
               <div>
                 <label for="newMedCategory">CATEGORY</label>
                 <select id="newMedCategory" class="cv-form-select">
@@ -10040,6 +10245,7 @@ const Admin = (function () {
                 </select>
               </div>
 
+              <!-- ROW 3: Medicine Form & Dosage Strength -->
               <div>
                 <label for="newMedForm">MEDICINE FORM</label>
                 <select id="newMedForm" class="cv-form-select">
@@ -10059,7 +10265,21 @@ const Admin = (function () {
                 <input type="text" id="newMedDosage" class="cv-form-input" placeholder="e.g. 500 mg, 10 ml">
               </div>
 
-              <!-- ROW 3: Packaging & Placement -->
+              <!-- ROW 4: Manufacturer & Supplier -->
+              <div>
+                <label for="newMedManufacturer">MANUFACTURER</label>
+                <input type="text" id="newMedManufacturer" class="cv-form-input" placeholder="e.g. Cipla Ltd, Sun Pharma">
+              </div>
+
+              <div>
+                <label for="newMedSupplier">SUPPLIER / VENDOR</label>
+                <input type="text" id="newMedSupplier" list="pharSupplierDatalist" class="cv-form-input" placeholder="Select or enter supplier">
+                <datalist id="pharSupplierDatalist">
+                  ${existingSuppliers.map(s => `<option value="${escapeHtml(s)}">`).join('')}
+                </datalist>
+              </div>
+
+              <!-- ROW 5: Packaging & Units Per Strip -->
               <div>
                 <label for="newMedSoldAs">PACKAGING (SOLD AS)</label>
                 <select id="newMedSoldAs" class="cv-form-select">
@@ -10078,25 +10298,12 @@ const Admin = (function () {
                 <input type="number" id="newMedUnitsPerStrip" class="cv-form-input" min="1" value="10" style="text-align:right; font-weight:700;">
               </div>
 
+              <!-- ROW 6: Shelf Location & HSN Code -->
               <div>
                 <label for="newMedPlacement" style="color:var(--cv-primary);">
-                  <span>📍 SHELF / RACK LOCATION <span style="color:var(--cv-danger);">*</span></span>
+                  📍 SHELF / RACK LOCATION <span style="color:var(--cv-danger);">*</span>
                 </label>
                 <input type="text" id="newMedPlacement" class="cv-form-input" placeholder="e.g. Rack A-3, Shelf 2" style="font-weight:600; border-color:#93c5fd;">
-              </div>
-
-              <!-- ROW 4: Manufacturer, Supplier, HSN -->
-              <div>
-                <label for="newMedManufacturer">MANUFACTURER</label>
-                <input type="text" id="newMedManufacturer" class="cv-form-input" placeholder="e.g. Cipla Ltd, Sun Pharma">
-              </div>
-
-              <div>
-                <label for="newMedSupplier">SUPPLIER / VENDOR</label>
-                <input type="text" id="newMedSupplier" list="pharSupplierDatalist" class="cv-form-input" placeholder="Select or enter supplier">
-                <datalist id="pharSupplierDatalist">
-                  ${existingSuppliers.map(s => `<option value="${escapeHtml(s)}">`).join('')}
-                </datalist>
               </div>
 
               <div>
@@ -10104,14 +10311,7 @@ const Admin = (function () {
                 <input type="text" id="newMedHsn" class="cv-form-input" value="3004" placeholder="3004" style="font-family:monospace;">
               </div>
 
-              <!-- ROW 5: Regulatory Rx & Pricing -->
-              <div style="display:flex; align-items:center; gap:0.5rem; padding-top:0.6rem;">
-                <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.75rem; font-weight:700; color:#dc2626; text-transform:none;">
-                  <input type="checkbox" id="newMedRxRequired" style="accent-color:#dc2626; width:16px; height:16px;">
-                  <span>Prescription Required (Rx Only)</span>
-                </label>
-              </div>
-
+              <!-- ROW 7: Default Cost & Selling Price -->
               <div>
                 <label for="newMedCostPrice">DEFAULT COST (₹)</label>
                 <input type="number" id="newMedCostPrice" class="cv-form-input" min="0" step="0.01" value="12.00" style="text-align:right;">
@@ -10122,7 +10322,7 @@ const Admin = (function () {
                 <input type="number" id="newMedUnitPrice" class="cv-form-input" min="0" step="0.01" required value="20.00" style="font-weight:700; text-align:right;">
               </div>
 
-              <!-- ROW 6: Reorder Level, GST -->
+              <!-- ROW 8: Reorder Level & GST Rate -->
               <div>
                 <label for="newMedReorder">REORDER LEVEL</label>
                 <input type="number" id="newMedReorder" class="cv-form-input" min="1" value="15" style="text-align:right;">
@@ -10138,6 +10338,14 @@ const Admin = (function () {
                 </select>
               </div>
 
+              <!-- ROW 9: Prescription Required & Notes / Storage -->
+              <div style="display:flex; align-items:center; height:38px;">
+                <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.75rem; font-weight:700; color:#dc2626; text-transform:none; margin:0;">
+                  <input type="checkbox" id="newMedRxRequired" style="accent-color:#dc2626; width:17px; height:17px;">
+                  <span>Prescription Required (Rx Only)</span>
+                </label>
+              </div>
+
               <div>
                 <label for="newMedNotes">NOTES / STORAGE</label>
                 <input type="text" id="newMedNotes" class="cv-form-input" placeholder="e.g. Store below 25°C">
@@ -10146,33 +10354,33 @@ const Admin = (function () {
             </div>
 
             <!-- OPENING BATCH SUB-PANEL -->
-            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.75rem 1rem; margin-top:0.75rem;">
-              <div style="font-size:0.78rem; font-weight:800; color:#1e40af; margin-bottom:0.45rem; display:flex; align-items:center; gap:0.4rem;">
-                <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.85rem 1rem; margin-top:0.85rem;">
+              <div style="font-size:0.78rem; font-weight:800; color:#1e40af; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.4rem;">
+                <svg style="width:15px; height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 INITIAL OPENING STOCK BATCH LOT
               </div>
-              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.6rem;">
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.75rem;">
                 <div>
-                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">BATCH NUMBER *</label>
-                  <input type="text" id="newMedBatch" class="cv-form-input" required placeholder="BATCH-01" style="height:30px; font-family:monospace; font-weight:700;">
+                  <label style="font-size:0.68rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.2rem;">BATCH NUMBER *</label>
+                  <input type="text" id="newMedBatch" class="cv-form-input" required placeholder="BATCH-01" style="height:34px; font-family:monospace; font-weight:700; background:#ffffff;">
                 </div>
                 <div>
-                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">EXPIRY DATE *</label>
-                  <input type="date" id="newMedExpiry" class="cv-form-input" required style="height:30px;">
+                  <label style="font-size:0.68rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.2rem;">EXPIRY DATE *</label>
+                  <input type="date" id="newMedExpiry" class="cv-form-input" required style="height:34px; background:#ffffff;">
                 </div>
                 <div>
-                  <label style="font-size:0.67rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.15rem;">OPENING UNITS *</label>
-                  <input type="number" id="newMedStock" class="cv-form-input" min="0" required value="100" style="height:30px; font-weight:800; text-align:right;">
+                  <label style="font-size:0.68rem; font-weight:700; color:#1e40af; display:block; margin-bottom:0.2rem;">OPENING UNITS *</label>
+                  <input type="number" id="newMedStock" class="cv-form-input" min="0" required value="100" style="height:34px; font-weight:800; text-align:right; background:#ffffff;">
                 </div>
               </div>
             </div>
 
-            <div id="addMedFormError" style="display:none; background:#fee2e2; border:1px solid #fecaca; color:#b91c1c; padding:0.35rem 0.75rem; border-radius:6px; font-size:0.78rem; font-weight:600; margin-top:0.5rem;"></div>
+            <div id="addMedFormError" style="display:none; background:#fee2e2; border:1px solid #fecaca; color:#b91c1c; padding:0.4rem 0.75rem; border-radius:6px; font-size:0.78rem; font-weight:600; margin-top:0.65rem;"></div>
 
             <!-- Footer Actions -->
-            <div style="display:flex; justify-content:flex-end; gap:0.6rem; padding-top:0.65rem; margin-top:0.6rem; border-top:1px solid #f1f5f9;">
-              <button type="button" class="cv-btn-secondary" id="btnCancelAddMed" style="padding:0.4rem 1.15rem; font-size:0.82rem;">Cancel</button>
-              <button type="submit" class="cv-btn-primary" id="btnSubmitAddMed" style="padding:0.4rem 1.35rem; font-size:0.82rem; font-weight:700;">
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem; padding-top:0.85rem; margin-top:0.85rem; border-top:1px solid #e2e8f0; flex-shrink:0;">
+              <button type="button" class="cv-btn-secondary" id="btnCancelAddMed" style="padding:0.45rem 1.25rem; font-size:0.84rem;">Cancel</button>
+              <button type="submit" class="cv-btn-primary" id="btnSubmitAddMed" style="padding:0.45rem 1.45rem; font-size:0.84rem; font-weight:700;">
                 Save &amp; Register Medicine
               </button>
             </div>
@@ -10187,7 +10395,15 @@ const Admin = (function () {
     const submitBtn = document.getElementById('btnSubmitAddMed');
     const backdrop = document.getElementById('addMedBackdrop');
 
-    const closeModal = () => { modalHost.innerHTML = ''; };
+    const closeModal = () => {
+      document.removeEventListener('keydown', handleKeydown);
+      modalHost.innerHTML = '';
+    };
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', handleKeydown);
+
     backdrop?.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
     document.getElementById('btnCloseAddMedModal')?.addEventListener('click', closeModal);
     document.getElementById('btnCancelAddMed')?.addEventListener('click', closeModal);
@@ -10387,7 +10603,15 @@ const Admin = (function () {
       </div>
     `;
 
-    const closeModal = () => { modalHost.innerHTML = ''; };
+    const closeModal = () => {
+      document.removeEventListener('keydown', handleKeydown);
+      modalHost.innerHTML = '';
+    };
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', handleKeydown);
+
     document.getElementById('btnCloseEditMedModal')?.addEventListener('click', closeModal);
     document.getElementById('btnCancelEditMed')?.addEventListener('click', closeModal);
     document.getElementById('editMedBackdrop')?.addEventListener('click', (e) => {
