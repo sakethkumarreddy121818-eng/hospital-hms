@@ -2930,6 +2930,9 @@ const Admin = (function () {
     bindStrictAgeInput(document.getElementById('opPatientAge'));
     bindStrictPhoneInput(document.getElementById('opPatientPhone'));
 
+    // Automatically focus Patient Full Name on OP Registration form open
+    focusOpPatientName();
+
     const regForm = document.getElementById('opRegistrationForm');
     regForm?.addEventListener('input', (e) => {
       if (activeRegisteredOp) {
@@ -2989,6 +2992,19 @@ const Admin = (function () {
           console.error('Patient search error:', err);
         }
       }, 250);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const firstItem = dropdown.querySelector('.cv-patient-result-item');
+        if (dropdown.style.display === 'block' && firstItem) {
+          firstItem.click();
+        } else {
+          dropdown.style.display = 'none';
+          focusOpPatientName(true);
+        }
+      }
     });
 
     clearBtn?.addEventListener('click', () => {
@@ -3196,6 +3212,7 @@ const Admin = (function () {
     }
     resetOpDiscountFields(0.0);
     updateOpSummaryDisplay();
+    focusOpPatientName(true);
   }
 
   function resetOpDiscountFields(doctorFee = 0.0) {
@@ -3649,11 +3666,53 @@ const Admin = (function () {
   }
 
   // ====================================================================
-  // ENTER-KEY NAVIGATION HANDLER FOR OP REGISTRATION (TASK 2)
-  // Moves cursor to the next input field instead of submitting form unexpectedly
+  // AUTOMATIC FOCUS & ENTER-KEY NAVIGATION HANDLER FOR OP REGISTRATION
+  // Automatically places cursor in Patient Full Name upon opening/resetting.
+  // Moves cursor to the next input field on Enter instead of submitting prematurely.
   // Field order: Patient Full Name -> Age -> Gender -> Phone Number -> Email ID ->
-  // Consultation Type -> Attending Doctor -> Consultation Fee -> Address -> Complaint Notes
+  // Consultation Type -> Attending Doctor -> Discount Type -> Discount Value -> Address -> Notes -> Register Button
   // ====================================================================
+  function focusOpPatientName(force = false) {
+    const doFocus = () => {
+      const input = document.getElementById('opPatientName');
+      if (!input) return;
+
+      // Do not steal focus if an existing modal or dialog is active
+      const activeModal = document.querySelector(
+        '.cv-modal-backdrop.show, .cv-modal-overlay.active, .cv-op-modal-backdrop, .cv-receipt-modal-backdrop, .cv-modal.active, .cv-modal-backdrop'
+      );
+      if (activeModal && activeModal.offsetParent !== null) return;
+
+      const active = document.activeElement;
+      if (!force && active) {
+        // Do not steal focus if user has already intentionally focused another control
+        const isUserTypingElsewhere = (
+          active !== document.body &&
+          active !== document.documentElement &&
+          !active.classList?.contains('cv-nav-item') &&
+          !active.classList?.contains('cv-op-tab-btn') &&
+          active.id !== 'opPatientName' &&
+          (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')
+        );
+        if (isUserTypingElsewhere) return;
+      }
+
+      if (input.offsetParent !== null && !input.disabled && !input.readOnly) {
+        input.focus();
+        if (input.value && typeof input.setSelectionRange === 'function') {
+          const len = input.value.length;
+          input.setSelectionRange(len, len);
+        }
+      }
+    };
+
+    doFocus();
+    requestAnimationFrame(() => {
+      doFocus();
+      setTimeout(doFocus, 50);
+    });
+  }
+
   function setupOpFormEnterNavigation() {
     const form = document.getElementById('opRegistrationForm');
     if (!form) return;
@@ -3669,7 +3728,8 @@ const Admin = (function () {
       'opDiscountType',      // 8. Discount Type
       'opDiscountValue',     // 9. Discount Value
       'opAddressInput',      // 10. Residential Address
-      'opNotesInput'         // 11. Clinical Triage / Notes (Last field)
+      'opNotesInput',        // 11. Clinical Triage / Notes
+      'btnRegisterOpSubmit'  // 12. Register / Save action button
     ];
 
     form.addEventListener('keydown', (e) => {
@@ -3686,15 +3746,15 @@ const Admin = (function () {
         return;
       }
 
-      // In textarea, Shift+Enter creates a new line
-      if (target.tagName === 'TEXTAREA' && e.shiftKey) {
+      // In textarea, Shift+Enter or Ctrl+Enter inserts a new line; plain Enter moves forward
+      if (target.tagName === 'TEXTAREA' && (e.shiftKey || e.ctrlKey)) {
         return;
       }
 
       const currentId = target.id;
       const currentIndex = OP_FORM_FIELD_ORDER.indexOf(currentId);
 
-      // If target is inside the form but not in the sequence (e.g. unexpected input), prevent submit
+      // If target is inside the form but not in the sequence, prevent accidental submit
       if (currentIndex === -1) {
         if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) {
           e.preventDefault();
@@ -3704,16 +3764,12 @@ const Admin = (function () {
 
       e.preventDefault();
 
-      // If this is the last field (opNotesInput), trigger Done submission
-      if (currentIndex === OP_FORM_FIELD_ORDER.length - 1) {
-        const submitBtn = document.getElementById('btnRegisterOpSubmit');
-        if (submitBtn && !submitBtn.disabled && submitBtn.dataset.processing !== 'true') {
-          submitBtn.click();
-        }
-        return;
+      // If target is a SELECT, ensure pending change event is dispatched
+      if (target.tagName === 'SELECT') {
+        try { target.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
       }
 
-      // Move focus to the next visible, non-disabled, non-readonly field
+      // Move focus to the next visible, non-disabled, non-readonly interactive field
       for (let i = currentIndex + 1; i < OP_FORM_FIELD_ORDER.length; i++) {
         const nextId = OP_FORM_FIELD_ORDER[i];
         const nextEl = document.getElementById(nextId);
@@ -3726,10 +3782,10 @@ const Admin = (function () {
         }
       }
 
-      // If no subsequent field found, trigger submit
+      // Fallback: focus submit button without submitting
       const submitBtn = document.getElementById('btnRegisterOpSubmit');
-      if (submitBtn && !submitBtn.disabled && submitBtn.dataset.processing !== 'true') {
-        submitBtn.click();
+      if (submitBtn && !submitBtn.disabled && submitBtn.offsetParent !== null) {
+        submitBtn.focus();
       }
     });
   }
