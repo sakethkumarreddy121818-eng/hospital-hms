@@ -3382,25 +3382,110 @@ body.cv-dashboard-active #app {
   background: #ffffff;
 }
 
-/* Sense POS Unified Medicine Search & Master Catalog Dropdown */
-.cv-unified-medicine-dropdown {
+/* ====================================================================
+   PHARMACY SALES POS — SECTION CARD STACKING CONTEXTS
+   ==================================================================== */
+.cv-pos-patient-card {
+  position: relative !important;
+  z-index: 30 !important;
+  transform: none !important;
+}
+
+.cv-pos-patient-card.has-dropdown-open,
+.cv-pos-patient-card:focus-within {
+  z-index: 60 !important;
+}
+
+.cv-pos-medicine-card {
+  position: relative !important;
+  z-index: 20 !important;
+  transform: none !important;
+}
+
+.cv-pos-medicine-card.has-dropdown-open,
+.cv-pos-medicine-card:focus-within {
+  z-index: 45 !important;
+}
+
+.cv-pos-cart-card {
+  position: relative !important;
+  z-index: 10 !important;
+  transform: none !important;
+}
+
+/* Patient Search Dropdown */
+#pharPatientDropdown,
+.cv-patient-dropdown {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
   background: #ffffff !important;
+  background-color: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
   border-radius: 8px !important;
-  box-shadow: 0 14px 35px -5px rgba(15, 23, 42, 0.22) !important;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.05) !important;
   z-index: 100 !important;
-  max-height: 340px !important;
+  max-height: 280px !important;
   overflow-y: auto !important;
+  box-sizing: border-box !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+.cv-patient-dropdown-item {
+  background: #ffffff !important;
+  padding: 0.65rem 0.95rem !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.cv-patient-dropdown-item:hover,
+.cv-patient-dropdown-item.highlighted {
+  background: #f0f7ff !important;
+}
+
+.cv-patient-dropdown-item:last-child {
+  border-bottom: none !important;
+}
+
+/* Sense POS Unified Medicine Search & Master Catalog Dropdown */
+#pharMedicineDropdown,
+.cv-unified-medicine-dropdown {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.05) !important;
+  z-index: 100 !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
 }
 
 .cv-med-result-item {
-  padding: 0.65rem 0.95rem;
-  border-bottom: 1px solid #f1f5f9;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  background: #ffffff !important;
+  padding: 0.65rem 0.95rem !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
 }
 
 .cv-med-result-item:hover,
@@ -3409,7 +3494,7 @@ body.cv-dashboard-active #app {
 }
 
 .cv-med-result-item:last-child {
-  border-bottom: none;
+  border-bottom: none !important;
 }
 
 /* Sense POS Dispense Bar: Structured, Aligned Layout without Overlap */

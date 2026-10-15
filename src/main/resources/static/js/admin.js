@@ -7586,7 +7586,7 @@ const Admin = (function () {
       <div class="cv-pharmacy-flow">
         
         <!-- 1. Patient Details & Doctor Card -->
-        <div class="cv-pharmacy-card">
+        <div class="cv-pharmacy-card cv-pos-patient-card" id="pharPatientCard">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7639,7 +7639,7 @@ const Admin = (function () {
         </div>
 
         <!-- 2. Medicine Selection & FEIFO Batch Workspace -->
-        <div class="cv-pharmacy-card">
+        <div class="cv-pharmacy-card cv-pos-medicine-card" id="pharMedicineCard">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7681,7 +7681,7 @@ const Admin = (function () {
                 </button>
               </div>
 
-              <div id="pharMedicineDropdown" class="cv-patient-dropdown cv-unified-medicine-dropdown" style="display:none; max-height:340px; overflow-y:auto; width:100%; z-index:100; position:absolute; top:calc(100% + 4px); left:0; right:0; box-shadow:0 14px 35px -5px rgba(15,23,42,0.2); background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;"></div>
+              <div id="pharMedicineDropdown" class="cv-unified-medicine-dropdown" style="display:none;"></div>
             </div>
 
             <!-- Hidden select kept in DOM for seamless backward compatibility -->
@@ -7805,7 +7805,7 @@ const Admin = (function () {
         </div>
 
         <!-- 3. Selected Medicines / Cart Table Card -->
-        <div class="cv-pharmacy-card">
+        <div class="cv-pharmacy-card cv-pos-cart-card" id="pharCartCard">
           <div class="cv-pharmacy-card-header">
             <div class="cv-pharmacy-card-title">
               <svg style="width:20px; height:20px; color:var(--cv-primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7970,17 +7970,49 @@ const Admin = (function () {
     bindStrictNameInput(document.getElementById('pharWalkinName'));
     bindStrictPhoneInput(document.getElementById('pharWalkinPhone'));
 
-    // 1. Patient search autocomplete
+    // Dropdown Coordinator and Element References
+    const patientCard = document.getElementById('pharPatientCard');
     const searchInput = document.getElementById('pharPatientSearchInput');
     const dropdown = document.getElementById('pharPatientDropdown');
 
+    const medCard = document.getElementById('pharMedicineCard');
+    const medSearchInput = document.getElementById('pharMedicineSearchInput');
+    const medDropdown = document.getElementById('pharMedicineDropdown');
+    const medSelect = document.getElementById('pharMedicineSelect');
+    const btnClearMedSearch = document.getElementById('btnPharClearMedSearch');
+    const btnToggleCatalog = document.getElementById('btnPharToggleCatalog');
+    let medSearchDebounce = null;
+
+    function closePatientDropdown() {
+      if (dropdown) dropdown.style.display = 'none';
+      if (patientCard) patientCard.classList.remove('has-dropdown-open');
+    }
+
+    function openPatientDropdown() {
+      closeMedicineDropdown();
+      if (dropdown) dropdown.style.display = 'block';
+      if (patientCard) patientCard.classList.add('has-dropdown-open');
+    }
+
+    function closeMedicineDropdown() {
+      if (medDropdown) medDropdown.style.display = 'none';
+      if (medCard) medCard.classList.remove('has-dropdown-open');
+    }
+
+    function openMedicineDropdown() {
+      closePatientDropdown();
+      if (medDropdown) medDropdown.style.display = 'block';
+      if (medCard) medCard.classList.add('has-dropdown-open');
+    }
+
+    // 1. Patient search autocomplete
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         const q = e.target.value.trim();
         if (pharPatientSearchDebounce) clearTimeout(pharPatientSearchDebounce);
 
         if (q.length < 2) {
-          dropdown.style.display = 'none';
+          closePatientDropdown();
           dropdown.innerHTML = '';
           return;
         }
@@ -7991,7 +8023,7 @@ const Admin = (function () {
             if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
               const sorted = sortByStartsWith(res.data, q);
               dropdown.innerHTML = sorted.map(p => `
-                <div class="cv-patient-dropdown-item" data-patient='${JSON.stringify(p).replace(/'/g, "&apos;")}'>
+                <div class="cv-patient-dropdown-item" data-patient='${JSON.stringify(p).replace(/'/g, "&apos;")}' tabindex="0">
                   <div>
                     <div style="font-weight:700; color:var(--cv-text-main); font-size:0.9rem;">
                       ${escapeHtml(p.fullName)}
@@ -8007,13 +8039,14 @@ const Admin = (function () {
                   </div>
                 </div>
               `).join('');
-              dropdown.style.display = 'block';
+              openPatientDropdown();
 
               dropdown.querySelectorAll('.cv-patient-dropdown-item').forEach(item => {
                 item.addEventListener('click', () => {
                   try {
                     const pData = JSON.parse(item.getAttribute('data-patient'));
                     selectPharmacyPatient(pData);
+                    closePatientDropdown();
                   } catch (err) {
                     console.error('Error selecting patient:', err);
                   }
@@ -8021,7 +8054,7 @@ const Admin = (function () {
               });
             } else {
               dropdown.innerHTML = `<div style="padding:0.75rem 1rem; color:var(--cv-text-muted); font-size:0.85rem;">No matching patients found.</div>`;
-              dropdown.style.display = 'block';
+              openPatientDropdown();
             }
           } catch (err) {
             console.error('Patient search error:', err);
@@ -8029,9 +8062,47 @@ const Admin = (function () {
         }, 250);
       });
 
-      document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-          dropdown.style.display = 'none';
+      searchInput.addEventListener('focus', () => {
+        closeMedicineDropdown();
+        const q = searchInput.value.trim();
+        if (q.length >= 2 && dropdown && dropdown.innerHTML.trim() !== '') {
+          openPatientDropdown();
+        }
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (!dropdown || dropdown.style.display !== 'block') return;
+        const items = dropdown.querySelectorAll('.cv-patient-dropdown-item');
+        if (!items.length) return;
+
+        let activeIndex = Array.from(items).findIndex(el => el.classList.contains('highlighted'));
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (activeIndex >= 0) items[activeIndex].classList.remove('highlighted');
+          activeIndex = (activeIndex + 1) % items.length;
+          items[activeIndex].classList.add('highlighted');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (activeIndex >= 0) items[activeIndex].classList.remove('highlighted');
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          items[activeIndex].classList.add('highlighted');
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          if (activeIndex >= 0) {
+            e.preventDefault();
+            try {
+              const pData = JSON.parse(items[activeIndex].getAttribute('data-patient'));
+              selectPharmacyPatient(pData);
+              closePatientDropdown();
+            } catch (err) {
+              console.error('Error selecting patient via Enter:', err);
+            }
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closePatientDropdown();
         }
       });
     }
@@ -8069,18 +8140,11 @@ const Admin = (function () {
     });
 
     // Unified Medicine Search & Master Catalog Autocomplete
-    const medSearchInput = document.getElementById('pharMedicineSearchInput');
-    const medDropdown = document.getElementById('pharMedicineDropdown');
-    const medSelect = document.getElementById('pharMedicineSelect');
-    const btnClearMedSearch = document.getElementById('btnPharClearMedSearch');
-    const btnToggleCatalog = document.getElementById('btnPharToggleCatalog');
-    let medSearchDebounce = null;
-
     function renderMedicineDropdownItems(items, isCatalogBrowse = false) {
       if (!medDropdown) return;
       if (!items || items.length === 0) {
         medDropdown.innerHTML = `<div style="padding:0.95rem 1rem; color:var(--cv-text-muted); font-size:0.85rem; text-align:center;">No medicines found matching your search.</div>`;
-        medDropdown.style.display = 'block';
+        openMedicineDropdown();
         return;
       }
 
@@ -8117,7 +8181,7 @@ const Admin = (function () {
           </div>
         </div>
       `).join('');
-      medDropdown.style.display = 'block';
+      openMedicineDropdown();
 
       medDropdown.querySelectorAll('.cv-med-result-item').forEach(el => {
         el.addEventListener('click', () => {
@@ -8127,14 +8191,14 @@ const Admin = (function () {
       });
     }
 
-    function chooseMedicine(mId) {
-      selectMedicineForPOS(mId);
-      if (medDropdown) medDropdown.style.display = 'none';
+    async function chooseMedicine(mId) {
+      closeMedicineDropdown();
       const m = pharMedicinesCatalog.find(item => String(item.id) === String(mId));
       if (m && medSearchInput) {
         medSearchInput.value = `${m.name} (${m.medicineCode})`;
       }
       if (btnClearMedSearch) btnClearMedSearch.style.display = 'block';
+      await selectMedicineForPOS(mId);
     }
 
     if (medSearchInput && medDropdown) {
@@ -8173,9 +8237,12 @@ const Admin = (function () {
       });
 
       medSearchInput.addEventListener('focus', () => {
+        closePatientDropdown();
         const q = medSearchInput.value.trim();
         if (!q || (pharSelectedMedicineForPOS && q.includes(pharSelectedMedicineForPOS.medicineCode))) {
           renderMedicineDropdownItems(pharMedicinesCatalog, true);
+        } else if (medDropdown && medDropdown.innerHTML.trim() !== '') {
+          openMedicineDropdown();
         }
       });
 
@@ -8205,22 +8272,18 @@ const Admin = (function () {
             chooseMedicine(mId);
           }
         } else if (e.key === 'Escape') {
-          medDropdown.style.display = 'none';
-        }
-      });
-
-      document.addEventListener('click', (e) => {
-        if (!medSearchInput.contains(e.target) && !medDropdown.contains(e.target) && !btnToggleCatalog?.contains(e.target)) {
-          medDropdown.style.display = 'none';
+          e.preventDefault();
+          closeMedicineDropdown();
         }
       });
     }
 
     btnToggleCatalog?.addEventListener('click', (e) => {
       e.stopPropagation();
+      closePatientDropdown();
       if (!medDropdown) return;
       if (medDropdown.style.display === 'block') {
-        medDropdown.style.display = 'none';
+        closeMedicineDropdown();
       } else {
         renderMedicineDropdownItems(pharMedicinesCatalog, true);
         medSearchInput?.focus();
@@ -8230,12 +8293,33 @@ const Admin = (function () {
     btnClearMedSearch?.addEventListener('click', () => {
       if (medSearchInput) medSearchInput.value = '';
       if (btnClearMedSearch) btnClearMedSearch.style.display = 'none';
-      if (medDropdown) medDropdown.style.display = 'none';
+      closeMedicineDropdown();
       document.getElementById('pharMedicineWorkspace').style.display = 'none';
       pharSelectedMedicineForPOS = null;
       pharSelectedBatchForPOS = null;
       const stockPill = document.getElementById('pharStockStatusPill');
       if (stockPill) stockPill.innerHTML = '<span class="cv-stock-info-pill cv-stock-in">Select a medicine to view stock</span>';
+    });
+
+    // Unified Outside Click & Escape Dismissal for Both Dropdowns
+    document.addEventListener('click', (e) => {
+      if (dropdown && dropdown.style.display === 'block') {
+        if (!searchInput?.contains(e.target) && !dropdown.contains(e.target)) {
+          closePatientDropdown();
+        }
+      }
+      if (medDropdown && medDropdown.style.display === 'block') {
+        if (!medSearchInput?.contains(e.target) && !medDropdown.contains(e.target) && !btnToggleCatalog?.contains(e.target)) {
+          closeMedicineDropdown();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closePatientDropdown();
+        closeMedicineDropdown();
+      }
     });
 
     if (medSelect) {
@@ -8647,9 +8731,11 @@ const Admin = (function () {
     const searchInput = document.getElementById('pharPatientSearchInput');
     const dropdown = document.getElementById('pharPatientDropdown');
     const container = document.getElementById('pharPatientAutofillContainer');
+    const patientCard = document.getElementById('pharPatientCard');
 
     if (searchInput) searchInput.value = `${p.fullName} (${p.uhid})`;
     if (dropdown) dropdown.style.display = 'none';
+    if (patientCard) patientCard.classList.remove('has-dropdown-open');
     if (container) {
       container.innerHTML = renderPatientAutofillHtml(pharSelectedPatient);
       document.getElementById('btnPharClearPatient')?.addEventListener('click', clearPharmacyPatient);
@@ -8667,7 +8753,9 @@ const Admin = (function () {
     pharActiveSavedBill = null;
     const searchInput = document.getElementById('pharPatientSearchInput');
     const container = document.getElementById('pharPatientAutofillContainer');
+    const patientCard = document.getElementById('pharPatientCard');
     if (searchInput) searchInput.value = '';
+    if (patientCard) patientCard.classList.remove('has-dropdown-open');
     if (container) {
       container.innerHTML = renderPatientAutofillHtml(null);
       bindStrictNameInput(document.getElementById('pharWalkinName'));
