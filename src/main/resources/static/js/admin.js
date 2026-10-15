@@ -7735,33 +7735,11 @@ const Admin = (function () {
               </div>
             </div>
 
-            <!-- Dispense Add Bar: Aligned, Non-overlapping Grid -->
+            <!-- Dispense Add Bar: Compact, Aligned 4-Column Controls (Quantity, Unit Rate, Amount, Add to Bill) -->
             <div class="cv-pos-dispense-bar">
-              <!-- 1. Medicine & Location -->
-              <div class="cv-pos-dispense-cell cv-pos-med-cell">
-                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
-                  Medicine / Location
-                </label>
-                <div class="cv-pos-dispense-info-box" id="pharDispenseMedInfoBox">
-                  <span id="pharDispenseMedName" style="font-weight:700; font-size:0.84rem; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">—</span>
-                  <span id="pharDispenseLocation" class="cv-placement-tag" style="display:none; font-size:0.7rem; padding:0.1rem 0.35rem; flex-shrink:0;">—</span>
-                </div>
-              </div>
-
-              <!-- 2. Batch & Availability -->
-              <div class="cv-pos-dispense-cell cv-pos-batch-cell">
-                <label style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
-                  Batch / Availability
-                </label>
-                <div class="cv-pos-dispense-info-box" id="pharDispenseBatchInfoBox">
-                  <span id="pharDispenseBatchNum" style="font-family:monospace; font-weight:700; font-size:0.82rem; color:#0369a1;">—</span>
-                  <span id="pharDispenseBatchStock" style="font-size:0.75rem; font-weight:800; color:#16a34a; flex-shrink:0;">—</span>
-                </div>
-              </div>
-
-              <!-- 3. Quantity -->
+              <!-- 1. Quantity -->
               <div class="cv-pos-dispense-cell cv-pos-qty-cell">
-                <label for="pharMedicineQty" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                <label for="pharMedicineQty" style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
                   Quantity
                 </label>
                 <div class="cv-pos-qty-stepper">
@@ -7771,25 +7749,25 @@ const Admin = (function () {
                 </div>
               </div>
 
-              <!-- 4. Unit Rate -->
+              <!-- 2. Unit Rate -->
               <div class="cv-pos-dispense-cell cv-pos-rate-cell">
-                <label for="pharMedicineUnitPrice" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                <label for="pharMedicineUnitPrice" style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
                   Unit Rate (₹)
                 </label>
                 <input type="number" id="pharMedicineUnitPrice" class="cv-form-input cv-pos-dispense-input" min="0" step="0.01" value="0.00">
               </div>
 
-              <!-- 5. Amount -->
+              <!-- 3. Amount -->
               <div class="cv-pos-dispense-cell cv-pos-amount-cell">
-                <label for="pharMedicineAmount" style="font-size:0.7rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
+                <label for="pharMedicineAmount" style="font-size:0.72rem; font-weight:700; color:var(--cv-text-muted); display:block; margin-bottom:0.25rem; text-transform:uppercase;">
                   Amount (₹)
                 </label>
                 <input type="text" id="pharMedicineAmount" class="cv-form-input cv-pos-dispense-input" readonly value="0.00">
               </div>
 
-              <!-- 6. Action: Add to Bill -->
+              <!-- 4. Action: Add to Bill -->
               <div class="cv-pos-dispense-cell cv-pos-action-cell">
-                <label style="font-size:0.7rem; font-weight:700; color:transparent; display:block; margin-bottom:0.25rem; user-select:none;">
+                <label style="font-size:0.72rem; font-weight:700; color:transparent; display:block; margin-bottom:0.25rem; user-select:none;">
                   Action
                 </label>
                 <button type="button" class="cv-btn-primary" id="btnPharAddMedicine">
@@ -11764,6 +11742,7 @@ const Admin = (function () {
   let labActiveTab = 'orders'; // 'orders' | 'processing'
   let labSelectedPatient = null;
   let labTestCatalog = [];
+  let labDoctorsCatalog = [];
   let labOrderItems = []; // [{ testId, testCode, testName, category, sampleType, price, referenceRange, unit }]
   let labPatientSearchDebounce = null;
   let labProcessingSearchDebounce = null;
@@ -11876,14 +11855,22 @@ const Admin = (function () {
     `;
 
     try {
-      const res = await Api.get('/api/laboratory/tests');
-      if (res && res.success && Array.isArray(res.data)) {
-        labTestCatalog = res.data;
+      const [testRes, docRes] = await Promise.all([
+        Api.get('/api/laboratory/tests'),
+        cvFetch('/api/pharmacy/sales/doctors').catch(() => null)
+      ]);
+      if (testRes && testRes.success && Array.isArray(testRes.data)) {
+        labTestCatalog = testRes.data;
       } else {
         labTestCatalog = [];
       }
+      if (docRes && docRes.success && Array.isArray(docRes.data)) {
+        labDoctorsCatalog = docRes.data;
+      } else {
+        labDoctorsCatalog = [];
+      }
     } catch (err) {
-      console.error('Failed to load laboratory tests catalog:', err);
+      console.error('Failed to load laboratory tests catalog/doctors:', err);
       labTestCatalog = [];
     }
 
@@ -12035,24 +12022,64 @@ const Admin = (function () {
 
   function renderLabPatientAutofillHtml(patient) {
     if (!patient) {
+      const defaultDocs = [
+        { name: 'Dr. Arthur Vance', department: 'Diagnostics' },
+        { name: 'Dr. Sarah Lin', department: 'Pathology' },
+        { name: 'Dr. Marcus Chen', department: 'Biochemistry' },
+        { name: 'Dr. Priya Sharma', department: 'Hematology' },
+        { name: 'Dr. Elena Rostova', department: 'Microbiology' },
+        { name: 'Dr. David Kim', department: 'General Medicine' },
+        { name: 'Dr. On Duty', department: 'Emergency' }
+      ];
+      const docs = (labDoctorsCatalog && labDoctorsCatalog.length > 0) ? labDoctorsCatalog : defaultDocs;
+
+      const baseDepts = [
+        'Diagnostics',
+        'Pathology',
+        'Biochemistry',
+        'Hematology',
+        'Microbiology',
+        'General Medicine',
+        'Cardiology',
+        'Radiology',
+        'Emergency'
+      ];
+      const deptSet = new Set(baseDepts);
+      docs.forEach(d => {
+        if (d.department && d.department.trim()) deptSet.add(d.department.trim());
+      });
+      const allDepts = Array.from(deptSet);
+
       return `
         <div class="cv-lab-divider"><span>OR DIRECT / WALK-IN PATIENT DETAILS</span></div>
         <div class="cv-lab-walkin-grid">
           <div class="cv-lab-field">
-            <label>Patient Full Name <span style="color:var(--cv-danger);">*</span></label>
-            <input type="text" id="labWalkinName" class="cv-form-input" placeholder="e.g. Rajesh Sharma" maxlength="100" autocomplete="off">
+            <label for="labWalkinName">Patient Full Name <span style="color:var(--cv-danger);">*</span></label>
+            <input type="text" id="labWalkinName" class="cv-form-input cv-lab-walkin-input" placeholder="e.g. Rajesh Sharma" maxlength="100" autocomplete="off">
           </div>
           <div class="cv-lab-field">
-            <label>Phone Number (10 digits)</label>
-            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input" placeholder="e.g. 9876543210" maxlength="10" autocomplete="off">
+            <label for="labWalkinPhone">Phone Number (10 digits)</label>
+            <input type="tel" inputmode="numeric" id="labWalkinPhone" class="cv-form-input cv-lab-walkin-input" placeholder="e.g. 9876543210" maxlength="10" autocomplete="off">
           </div>
           <div class="cv-lab-field">
-            <label>Consulting Doctor</label>
-            <input type="text" id="labWalkinDoctor" class="cv-form-input" placeholder="e.g. Dr. A. Sharma">
+            <label for="labWalkinDoctor">Consulting Doctor</label>
+            <select id="labWalkinDoctor" class="cv-form-select cv-lab-walkin-select">
+              <option value="">-- Select Consulting Doctor --</option>
+              ${docs.map(d => `
+                <option value="${escapeHtml(d.name)}" data-dept="${escapeHtml(d.department || '')}">
+                  ${escapeHtml(d.name)}${d.department ? ` (${escapeHtml(d.department)})` : ''}
+                </option>
+              `).join('')}
+            </select>
           </div>
           <div class="cv-lab-field">
-            <label>Department</label>
-            <input type="text" id="labWalkinDept" class="cv-form-input" placeholder="e.g. Diagnostics / General">
+            <label for="labWalkinDept">Department</label>
+            <select id="labWalkinDept" class="cv-form-select cv-lab-walkin-select">
+              <option value="">-- Select Department --</option>
+              ${allDepts.map(dept => `
+                <option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>
+              `).join('')}
+            </select>
           </div>
         </div>
       `;
@@ -12148,9 +12175,28 @@ const Admin = (function () {
     `).join('');
   }
 
-  function setupLabOrderEvents() {
+  function bindLabWalkinEvents() {
     bindStrictNameInput(document.getElementById('labWalkinName'));
     bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
+
+    const docSelect = document.getElementById('labWalkinDoctor');
+    const deptSelect = document.getElementById('labWalkinDept');
+    if (docSelect && deptSelect) {
+      docSelect.addEventListener('change', () => {
+        const selectedOpt = docSelect.selectedOptions?.[0];
+        const dept = selectedOpt?.getAttribute('data-dept');
+        if (dept) {
+          const matchOpt = Array.from(deptSelect.options).find(o => o.value.toLowerCase() === dept.toLowerCase());
+          if (matchOpt) {
+            deptSelect.value = matchOpt.value;
+          }
+        }
+      });
+    }
+  }
+
+  function setupLabOrderEvents() {
+    bindLabWalkinEvents();
 
     // 1. Patient search autocomplete
     const searchInput = document.getElementById('labPatientSearchInput');
@@ -12329,8 +12375,7 @@ const Admin = (function () {
     if (searchInput) searchInput.value = '';
     if (container) {
       container.innerHTML = renderLabPatientAutofillHtml(null);
-      bindStrictNameInput(document.getElementById('labWalkinName'));
-      bindStrictPhoneInput(document.getElementById('labWalkinPhone'));
+      bindLabWalkinEvents();
     }
   }
 
